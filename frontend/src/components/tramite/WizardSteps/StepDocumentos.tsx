@@ -367,403 +367,405 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
       id={`${formId}-form`}
       onSubmit={handleSubmit}
       noValidate
-      className="space-y-6"
     >
-      <header className="border-b border-slate-200/80 pb-5 mb-8">
-        <div className="flex items-center gap-2.5">
-          <div className="w-1.5 h-6 bg-[#1877f2] rounded-full shrink-0" />
-          <h2 className="text-xl sm:text-2xl font-black text-[#062856]">
-            Documentos del Trámite
-          </h2>
-        </div>
-        <p className="mt-1.5 text-sm text-slate-500 pl-4">
-          Seleccione el procedimiento TUPA formal, describa el petitorio y adjunte los documentos probatorios escaneados en PDF.
-        </p>
-      </header>
-
-      <div className="space-y-5">
-        {/* 1. Selección de Procedimiento TUPA */}
-        <div>
-          <label
-            htmlFor={`${formId}-tipoTramiteId`}
-            className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
-          >
-            Procedimiento Institucional o Trámite TUPA <span className="text-red-600">*</span>
-          </label>
-          <select
-            id={`${formId}-tipoTramiteId`}
-            name="tipoTramiteId"
-            required
-            aria-required="true"
-            aria-invalid={touched.tipoTramiteId && Boolean(errors.tipoTramiteId)}
-            aria-describedby={
-              touched.tipoTramiteId && errors.tipoTramiteId
-                ? `${formId}-tipoTramiteId-error`
-                : undefined
-            }
-            value={tiposFormales.some((tipo) => tipo.id === data.tipoTramiteId) ? data.tipoTramiteId : ''}
-            onChange={(e) => handleFieldChange('tipoTramiteId', e.target.value)}
-            onBlur={() => markTouched('tipoTramiteId')}
-            disabled={isSubmitting}
-            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition cursor-pointer ${
-              touched.tipoTramiteId && errors.tipoTramiteId
-                ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
-                : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
-            } disabled:bg-slate-100`}
-          >
-            <option value="">{cargandoCatalogo ? 'Cargando tipos formales…' : '-- Seleccione un tipo disponible --'}</option>
-            {tiposFormales.map((tipo) => (
-              <option key={tipo.id} value={tipo.id}>
-                {tipo.codigo} — {tipo.denominacion}{tipo.unidad_organica ? ` (${tipo.unidad_organica})` : ''}
-              </option>
-            ))}
-          </select>
-          {tipoSeleccionado && (
-            <div className="mt-2 space-y-1 text-xs text-slate-600">
-              {tipoSeleccionado.descripcion && <p>{tipoSeleccionado.descripcion}</p>}
-              <p>La API disponible no informa los requisitos documentales ni su obligatoriedad para este procedimiento. La descripción no constituye una lista de adjuntos exigibles.</p>
+      {/* Tarjeta principal de relleno de datos ("Documentos del Trámite") */}
+      <div className="w-full rounded-2xl border border-sky-200/70 bg-white p-6 sm:p-8 md:p-10 shadow-[0_16px_40px_-8px_rgba(2,30,80,0.09),0_4px_16px_-2px_rgba(2,30,80,0.04)] ring-1 ring-slate-900/5 space-y-6 transition-all duration-300">
+          <header className="border-b border-slate-200/80 pb-5 mb-6">
+            <div className="flex items-center gap-2.5">
+              <div className="w-1.5 h-6 bg-[#1877f2] rounded-full shrink-0" />
+              <h2 className="text-xl sm:text-2xl font-black text-[#062856]">
+                Documentos del Trámite
+              </h2>
             </div>
-          )}
-          {/* Ficha institucional de detalles del procedimiento TUPA seleccionado */}
-          {detalleTupa && (
-            <div className="mt-3.5 p-4 rounded-xl border border-blue-200/80 bg-gradient-to-br from-blue-50/70 via-slate-50 to-white text-slate-800 shadow-xs space-y-3 transition-all duration-300">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-blue-100">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#1877f2]/10 text-[#1877f2]">
-                      {detalleTupa.codigo}
-                    </span>
-                    <span className="text-xs font-semibold text-slate-500">
-                      {detalleTupa.rubro}
-                    </span>
-                  </div>
-                  <h4 className="mt-1 text-sm sm:text-base font-bold text-[#062856]">
-                    {detalleTupa.denominacion}
-                  </h4>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <div className="bg-white px-3 py-1.5 rounded-lg border border-blue-100 shadow-xs">
-                    <span className="block text-[10px] uppercase font-bold text-slate-500">Derecho de Pago</span>
-                    <span className="text-xs sm:text-sm font-extrabold text-[#1877f2]">{detalleTupa.costo}</span>
-                  </div>
-                  {!tipoSeleccionado?.descripcion?.includes('no especificado en la fuente') && (
-                    <div className="bg-white px-3 py-1.5 rounded-lg border border-blue-100 shadow-xs">
-                      <span className="block text-[10px] uppercase font-bold text-slate-500">Plazo de Atención</span>
-                      <span className="text-xs sm:text-sm font-bold text-slate-700">{detalleTupa.plazoDias} días hábiles</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+            <p className="mt-1.5 text-sm text-slate-500 pl-4">
+              Seleccione el procedimiento TUPA formal, describa el petitorio y adjunte los documentos probatorios escaneados en PDF.
+            </p>
+          </header>
 
-              {/* Lista de Requisitos Obligatorios */}
-              {detalleTupa.requisitos && detalleTupa.requisitos.length > 0 && (
-                <div>
-                  <h5 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5 mb-2">
-                    <svg className="w-4 h-4 text-[#1877f2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Requisitos Obligatorios del Procedimiento TUPA:
-                  </h5>
-                  <ul className="space-y-1.5 pl-1">
-                    {detalleTupa.requisitos.map((req, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-xs text-slate-700">
-                        <span className="w-4 h-4 rounded-full bg-blue-100 text-[#1877f2] font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
-                          {idx + 1}
-                        </span>
-                        <span>{req}</span>
-                      </li>
-                    ))}
-                  </ul>
+          <div className="space-y-5">
+            {/* 1. Selección de Procedimiento TUPA */}
+            <div>
+              <label
+                htmlFor={`${formId}-tipoTramiteId`}
+                className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
+              >
+                Procedimiento Institucional o Trámite TUPA <span className="text-red-600">*</span>
+              </label>
+              <select
+                id={`${formId}-tipoTramiteId`}
+                name="tipoTramiteId"
+                required
+                aria-required="true"
+                aria-invalid={touched.tipoTramiteId && Boolean(errors.tipoTramiteId)}
+                aria-describedby={
+                  touched.tipoTramiteId && errors.tipoTramiteId
+                    ? `${formId}-tipoTramiteId-error`
+                    : undefined
+                }
+                value={tiposFormales.some((tipo) => tipo.id === data.tipoTramiteId) ? data.tipoTramiteId : ''}
+                onChange={(e) => handleFieldChange('tipoTramiteId', e.target.value)}
+                onBlur={() => markTouched('tipoTramiteId')}
+                disabled={isSubmitting}
+                className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition cursor-pointer ${
+                  touched.tipoTramiteId && errors.tipoTramiteId
+                    ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
+                    : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
+                } disabled:bg-slate-100`}
+              >
+                <option value="">{cargandoCatalogo ? 'Cargando tipos formales…' : '-- Seleccione un tipo disponible --'}</option>
+                {tiposFormales.map((tipo) => (
+                  <option key={tipo.id} value={tipo.id}>
+                    {tipo.codigo} — {tipo.denominacion}{tipo.unidad_organica ? ` (${tipo.unidad_organica})` : ''}
+                  </option>
+                ))}
+              </select>
+              {tipoSeleccionado && (
+                <div className="mt-2 space-y-1 text-xs text-slate-600">
+                  {tipoSeleccionado.descripcion && <p>{tipoSeleccionado.descripcion}</p>}
+                  <p>La API disponible no informa los requisitos documentales ni su obligatoriedad para este procedimiento. La descripción no constituye una lista de adjuntos exigibles.</p>
                 </div>
               )}
-
-              {/* Metadatos institucionales: Cuenta de recaudación, unidad orgánica y base legal */}
-              <div className="pt-2 border-t border-blue-100/80 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600">
-                <div>
-                  <span className="font-semibold text-slate-700">Canal / Cuenta de Recaudación: </span>
-                  <span className="text-slate-600">{detalleTupa.cuentaBancaria}</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-slate-700">Unidad Responsable: </span>
-                  <span className="text-slate-600">{detalleTupa.unidadOrganica}</span>
-                </div>
-              </div>
-            </div>
-          )}
-          {cargandoCatalogo && <p role="status" className="mt-1 text-xs text-slate-500">Consultando tipos formales…</p>}
-          {!cargandoCatalogo && !errorCatalogo && tiposFormales.length === 0 && (
-            <p role="status" className="mt-1 text-xs text-slate-600">El backend no informa tipos formales vigentes disponibles.</p>
-          )}
-          {errorCatalogo && (
-            <div role="alert" className="mt-1.5 text-xs text-red-700">
-              <p>{errorCatalogo}</p>
-              <button type="button" className="mt-1 font-bold underline" onClick={() => setIntentoCatalogo((valor) => valor + 1)} disabled={cargandoCatalogo}>
-                Reintentar consulta
-              </button>
-            </div>
-          )}
-          {touched.tipoTramiteId && errors.tipoTramiteId && (
-            <p
-              id={`${formId}-tipoTramiteId-error`}
-              role="alert"
-              className="mt-1.5 text-xs text-red-600 font-medium"
-            >
-              {errors.tipoTramiteId}
-            </p>
-          )}
-        </div>
-
-        {/* 2. Asunto / Petitorio Sucinto */}
-        <div>
-          <div className="flex justify-between items-center mb-1.5">
-            <label
-              htmlFor={`${formId}-asunto`}
-              className="block text-xs font-bold uppercase tracking-wider text-slate-700"
-            >
-              Asunto o Petitorio Sucinto <span className="text-red-600">*</span>
-            </label>
-            <span
-              className={`text-[11px] font-mono ${
-                data.asunto.trim().length < 10 && touched.asunto
-                  ? 'text-red-600 font-bold'
-                  : 'text-slate-400'
-              }`}
-            >
-              {data.asunto.length}/300 caracteres (mínimo 10)
-            </span>
-          </div>
-          <textarea
-            id={`${formId}-asunto`}
-            name="asunto"
-            rows={3}
-            maxLength={300}
-            required
-            aria-required="true"
-            aria-invalid={touched.asunto && Boolean(errors.asunto)}
-            aria-describedby={
-              touched.asunto && errors.asunto ? `${formId}-asunto-error` : undefined
-            }
-            placeholder="Describa claramente su solicitud dirigida a la Dirección del Instituto de Educación Superior Tecnológico Público Suiza..."
-            value={data.asunto}
-            onChange={(e) => handleFieldChange('asunto', e.target.value)}
-            onBlur={() => markTouched('asunto')}
-            disabled={isSubmitting}
-            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition ${
-              touched.asunto && errors.asunto
-                ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
-                : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
-            } disabled:bg-slate-100 placeholder:text-slate-400`}
-          />
-          {touched.asunto && errors.asunto && (
-            <p
-              id={`${formId}-asunto-error`}
-              role="alert"
-              className="mt-1.5 text-xs text-red-600 font-medium"
-            >
-              {errors.asunto}
-            </p>
-          )}
-        </div>
-
-        {/* 3. Cantidad de Folios */}
-        <div className="max-w-xs">
-          <label
-            htmlFor={`${formId}-numeroFolios`}
-            className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
-          >
-            Cantidad Estimada de Folios <span className="text-red-600">*</span>
-          </label>
-          <input
-            id={`${formId}-numeroFolios`}
-            name="numeroFolios"
-            type="number"
-            min={1}
-            max={5000}
-            required
-            aria-required="true"
-            aria-invalid={touched.numeroFolios && Boolean(errors.numeroFolios)}
-            aria-describedby={
-              touched.numeroFolios && errors.numeroFolios
-                ? `${formId}-numeroFolios-error`
-                : undefined
-            }
-            value={data.numeroFolios}
-            onChange={(e) =>
-              handleFieldChange('numeroFolios', Number(e.target.value))
-            }
-            onBlur={() => markTouched('numeroFolios')}
-            disabled={isSubmitting}
-            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm font-mono shadow-xs focus:outline-none focus:ring-2 transition ${
-              touched.numeroFolios && errors.numeroFolios
-                ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
-                : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
-            } disabled:bg-slate-100`}
-          />
-          {touched.numeroFolios && errors.numeroFolios ? (
-            <p
-              id={`${formId}-numeroFolios-error`}
-              role="alert"
-              className="mt-1.5 text-xs text-red-600 font-medium"
-            >
-              {errors.numeroFolios}
-            </p>
-          ) : (
-            <p className="mt-1 text-[11px] text-slate-500">
-              Número de caras numeradas o páginas útiles que componen el expediente.
-            </p>
-          )}
-        </div>
-
-        {/* 4. Carga Documentaria con cálculo de SHA-256 */}
-        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                Archivos adjuntos en PDF <span className="text-red-600">*</span>
-              </h3>
-              <p className="text-xs text-slate-500">
-                El envío requiere al menos un archivo PDF (máximo 20 MB por archivo). Esta exigencia técnica no determina qué documentos son requisitos institucionales del procedimiento.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleSimularArchivoPrueba}
-              disabled={isSubmitting || cargandoArchivo}
-              className="text-xs font-bold text-[#006EC7] hover:underline self-start sm:self-auto cursor-pointer"
-            >
-              + Cargar PDF de prueba
-            </button>
-          </div>
-
-          {/* Zona de Drop / Carga de Archivo */}
-          <label
-            htmlFor={`${formId}-file-upload`}
-            className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-white p-5 text-center cursor-pointer hover:border-[#006EC7] hover:bg-blue-50/20 transition"
-          >
-            <svg
-              className="h-8 w-8 text-slate-400 mb-1.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-              />
-            </svg>
-            <span className="text-sm font-semibold text-[#006EC7]">
-              Haga clic aquí para seleccionar su archivo PDF
-            </span>
-            <span className="text-xs text-slate-400 mt-0.5">
-              Cálculo de integridad criptográfica SHA-256 en navegador
-            </span>
-            <input
-              id={`${formId}-file-upload`}
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,application/pdf"
-              className="sr-only"
-              onChange={handleFileChange}
-              disabled={isSubmitting || cargandoArchivo}
-            />
-          </label>
-
-          {/* Error de archivo */}
-          {cargandoArchivo && <p role="status">Subiendo archivo: {subida.progress}%</p>}
-          {(fileError || subida.error) && (
-            <p role="alert" className="text-xs font-semibold text-red-600">
-              ⚠️ {fileError ?? subida.error?.message}
-            </p>
-          )}
-
-          {/* Alerta si no hay archivos y el paso fue tocado */}
-          {(touched.archivos || data.archivos.length > 0) && errors.archivos && (
-            <p role="alert" className="text-xs font-semibold text-red-600">
-              ⚠️ {errors.archivos}
-            </p>
-          )}
-
-          {/* Listado de archivos cargados */}
-          {data.archivos.length > 0 && (
-            <div className="space-y-2 pt-2">
-              <p className="text-xs font-bold text-slate-700">
-                Archivos adjuntados al expediente ({data.archivos.length}):
-              </p>
-              {data.archivos.map((archivo, index) => (
-                <div
-                  key={`${archivo.nombre}-${index}`}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xs"
-                >
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <span className="shrink-0 rounded bg-red-100 px-2 py-0.5 font-bold text-red-700">
-                      PDF
-                    </span>
-                    <div className="truncate">
-                      <p className="font-semibold text-slate-900 truncate">
-                        {archivo.nombre}
-                      </p>
-                      <p className="text-slate-400 font-mono text-[10px] truncate">
-                        SHA-256: {archivo.hashSha256.substring(0, 24)}... •{' '}
-                        {(archivo.peso / 1024).toFixed(1)} KB
-                      </p>
+              {/* Ficha institucional de detalles del procedimiento TUPA seleccionado */}
+              {detalleTupa && (
+                <div className="mt-3.5 p-5 rounded-2xl border border-sky-200/90 bg-gradient-to-br from-sky-50/70 via-white to-blue-50/30 text-slate-800 shadow-[0_4px_20px_-4px_rgba(2,30,80,0.06)] space-y-4 transition-all duration-300">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-blue-100">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#1877f2]/10 text-[#1877f2]">
+                          {detalleTupa.codigo}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-500">
+                          {detalleTupa.rubro}
+                        </span>
+                      </div>
+                      <h4 className="mt-1 text-sm sm:text-base font-bold text-[#062856]">
+                        {detalleTupa.denominacion}
+                      </h4>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="bg-white px-3 py-1.5 rounded-lg border border-blue-100 shadow-xs">
+                        <span className="block text-[10px] uppercase font-bold text-slate-500">Derecho de Pago</span>
+                        <span className="text-xs sm:text-sm font-extrabold text-[#1877f2]">{detalleTupa.costo}</span>
+                      </div>
+                      {!tipoSeleccionado?.descripcion?.includes('no especificado en la fuente') && (
+                        <div className="bg-white px-3 py-1.5 rounded-lg border border-blue-100 shadow-xs">
+                          <span className="block text-[10px] uppercase font-bold text-slate-500">Plazo de Atención</span>
+                          <span className="text-xs sm:text-sm font-bold text-slate-700">{detalleTupa.plazoDias} días hábiles</span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveArchivo(index)}
-                    disabled={isSubmitting}
-                    className="ml-3 shrink-0 rounded px-2 py-1 font-bold text-red-600 hover:bg-red-50 cursor-pointer"
-                  >
-                    Eliminar
+
+                  {/* Lista de Requisitos Obligatorios */}
+                  {detalleTupa.requisitos && detalleTupa.requisitos.length > 0 && (
+                    <div>
+                      <h5 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5 mb-2">
+                        <svg className="w-4 h-4 text-[#1877f2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Requisitos Obligatorios del Procedimiento TUPA:
+                      </h5>
+                      <ul className="space-y-1.5 pl-1">
+                        {detalleTupa.requisitos.map((req, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-xs text-slate-700">
+                            <span className="w-4 h-4 rounded-full bg-blue-100 text-[#1877f2] font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                              {idx + 1}
+                            </span>
+                            <span>{req}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Metadatos institucionales: Cuenta de recaudación, unidad orgánica y base legal */}
+                  <div className="pt-2 border-t border-blue-100/80 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600">
+                    <div>
+                      <span className="font-semibold text-slate-700">Canal / Cuenta de Recaudación: </span>
+                      <span className="text-slate-600">{detalleTupa.cuentaBancaria}</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-700">Unidad Responsable: </span>
+                      <span className="text-slate-600">{detalleTupa.unidadOrganica}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {cargandoCatalogo && <p role="status" className="mt-1 text-xs text-slate-500">Consultando tipos formales…</p>}
+              {!cargandoCatalogo && !errorCatalogo && tiposFormales.length === 0 && (
+                <p role="status" className="mt-1 text-xs text-slate-600">El backend no informa tipos formales vigentes disponibles.</p>
+              )}
+              {errorCatalogo && (
+                <div role="alert" className="mt-1.5 text-xs text-red-700">
+                  <p>{errorCatalogo}</p>
+                  <button type="button" className="mt-1 font-bold underline" onClick={() => setIntentoCatalogo((valor) => valor + 1)} disabled={cargandoCatalogo}>
+                    Reintentar consulta
                   </button>
                 </div>
-              ))}
+              )}
+              {touched.tipoTramiteId && errors.tipoTramiteId && (
+                <p
+                  id={`${formId}-tipoTramiteId-error`}
+                  role="alert"
+                  className="mt-1.5 text-xs text-red-600 font-medium"
+                >
+                  {errors.tipoTramiteId}
+                </p>
+              )}
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* BOTONERA DE NAVEGACIÓN ACCESIBLE */}
-      <footer className="mt-10 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200/80 pt-6">
-        <button
-          type="button"
-          onClick={onBack}
-          disabled={isSubmitting || cargandoArchivo}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-700 shadow-2xs transition hover:bg-slate-50 cursor-pointer"
-        >
-          ← Anterior
-        </button>
+            {/* 2. Asunto / Petitorio Sucinto */}
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <label
+                  htmlFor={`${formId}-asunto`}
+                  className="block text-xs font-bold uppercase tracking-wider text-slate-700"
+                >
+                  Asunto o Petitorio Sucinto <span className="text-red-600">*</span>
+                </label>
+                <span
+                  className={`text-[11px] font-mono ${
+                    data.asunto.trim().length < 10 && touched.asunto
+                      ? 'text-red-600 font-bold'
+                      : 'text-slate-400'
+                  }`}
+                >
+                  {data.asunto.length}/300 caracteres (mínimo 10)
+                </span>
+              </div>
+              <textarea
+                id={`${formId}-asunto`}
+                name="asunto"
+                rows={3}
+                maxLength={300}
+                required
+                aria-required="true"
+                aria-invalid={touched.asunto && Boolean(errors.asunto)}
+                aria-describedby={
+                  touched.asunto && errors.asunto ? `${formId}-asunto-error` : undefined
+                }
+                placeholder="Describa claramente su solicitud dirigida a la Dirección del Instituto de Educación Superior Tecnológico Público Suiza..."
+                value={data.asunto}
+                onChange={(e) => handleFieldChange('asunto', e.target.value)}
+                onBlur={() => markTouched('asunto')}
+                disabled={isSubmitting}
+                className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition ${
+                  touched.asunto && errors.asunto
+                    ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
+                    : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
+                } disabled:bg-slate-100 placeholder:text-slate-400`}
+              />
+              {touched.asunto && errors.asunto && (
+                <p
+                  id={`${formId}-asunto-error`}
+                  role="alert"
+                  className="mt-1.5 text-xs text-red-600 font-medium"
+                >
+                  {errors.asunto}
+                </p>
+              )}
+            </div>
 
-        <div
-          className="w-full sm:w-auto"
-          onClick={() => {
-            if (!isValid) {
-              setTouched((prev) => ({
-                ...prev,
-                tipoTramiteId: true,
-                asunto: true,
-                numeroFolios: true,
-                archivos: true,
-              }));
-            }
-          }}
-        >
-          <button
-            type="submit"
-            disabled={!isValid || isSubmitting || cargandoArchivo}
-            className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-7 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-xs transition ${
-              isValid && !isSubmitting
-                ? 'bg-[#1877f2] hover:bg-[#166fe5] cursor-pointer'
-                : 'bg-slate-300 text-slate-500 cursor-not-allowed pointer-events-none'
-            }`}
-          >
-            Siguiente →
-          </button>
+            {/* 3. Cantidad de Folios */}
+            <div className="max-w-xs">
+              <label
+                htmlFor={`${formId}-numeroFolios`}
+                className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5"
+              >
+                Cantidad Estimada de Folios <span className="text-red-600">*</span>
+              </label>
+              <input
+                id={`${formId}-numeroFolios`}
+                name="numeroFolios"
+                type="number"
+                min={1}
+                max={5000}
+                required
+                aria-required="true"
+                aria-invalid={touched.numeroFolios && Boolean(errors.numeroFolios)}
+                aria-describedby={
+                  touched.numeroFolios && errors.numeroFolios
+                    ? `${formId}-numeroFolios-error`
+                    : undefined
+                }
+                value={data.numeroFolios}
+                onChange={(e) =>
+                  handleFieldChange('numeroFolios', Number(e.target.value))
+                }
+                onBlur={() => markTouched('numeroFolios')}
+                disabled={isSubmitting}
+                className={`w-full rounded-lg border px-3.5 py-2.5 text-sm font-mono shadow-xs focus:outline-none focus:ring-2 transition ${
+                  touched.numeroFolios && errors.numeroFolios
+                    ? 'border-red-500 bg-red-50/30 text-red-900 focus:border-red-500 focus:ring-red-200'
+                    : 'border-slate-300 bg-white text-slate-900 focus:border-[#006EC7] focus:ring-[#006EC7]/20'
+                } disabled:bg-slate-100`}
+              />
+              {touched.numeroFolios && errors.numeroFolios ? (
+                <p
+                  id={`${formId}-numeroFolios-error`}
+                  role="alert"
+                  className="mt-1.5 text-xs text-red-600 font-medium"
+                >
+                  {errors.numeroFolios}
+                </p>
+              ) : (
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Número de caras numeradas o páginas útiles que componen el expediente.
+                </p>
+              )}
+            </div>
+
+            {/* 4. Carga Documentaria con cálculo de SHA-256 */}
+            <div className="rounded-2xl border border-sky-100 bg-gradient-to-b from-slate-50/70 to-white p-5 sm:p-6 space-y-4 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                    Archivos adjuntos en PDF <span className="text-red-600">*</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    El envío requiere al menos un archivo PDF (máximo 20 MB por archivo). Esta exigencia técnica no determina qué documentos son requisitos institucionales del procedimiento.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSimularArchivoPrueba}
+                  disabled={isSubmitting || cargandoArchivo}
+                  className="text-xs font-bold text-[#006EC7] hover:underline self-start sm:self-auto cursor-pointer"
+                >
+                  + Cargar PDF de prueba
+                </button>
+              </div>
+
+              {/* Zona de Drop / Carga de Archivo */}
+              <label
+                htmlFor={`${formId}-file-upload`}
+                className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-sky-300/80 bg-gradient-to-b from-sky-50/25 to-white p-6 text-center cursor-pointer hover:border-[#006EC7] hover:bg-blue-50/30 shadow-2xs transition group"
+              >
+                <svg
+                  className="h-9 w-9 text-sky-400 group-hover:text-[#006EC7] mb-2 transition-transform duration-200 group-hover:scale-110"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                  />
+                </svg>
+                <span className="text-sm font-semibold text-[#006EC7]">
+                  Haga clic aquí para seleccionar su archivo PDF
+                </span>
+                <span className="text-xs text-slate-400 mt-0.5">
+                  o arrastre y suelte su archivo aquí (PDF hasta 20 MB)
+                </span>
+                <input
+                  id={`${formId}-file-upload`}
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  className="sr-only"
+                  onChange={handleFileChange}
+                  disabled={isSubmitting || cargandoArchivo}
+                />
+              </label>
+
+              {/* Error de archivo */}
+              {cargandoArchivo && <p role="status">Subiendo archivo: {subida.progress}%</p>}
+              {(fileError || subida.error) && (
+                <p role="alert" className="text-xs font-semibold text-red-600">
+                  ⚠️ {fileError ?? subida.error?.message}
+                </p>
+              )}
+
+              {/* Alerta si no hay archivos y el paso fue tocado */}
+              {(touched.archivos || data.archivos.length > 0) && errors.archivos && (
+                <p role="alert" className="text-xs font-semibold text-red-600">
+                  ⚠️ {errors.archivos}
+                </p>
+              )}
+
+              {/* Listado de archivos cargados */}
+              {data.archivos.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <p className="text-xs font-bold text-slate-700">
+                    Archivos adjuntados al expediente ({data.archivos.length}):
+                  </p>
+                  {data.archivos.map((archivo, index) => (
+                    <div
+                      key={`${archivo.nombre}-${index}`}
+                      className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xs"
+                    >
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <span className="shrink-0 rounded bg-red-100 px-2 py-0.5 font-bold text-red-700">
+                          PDF
+                        </span>
+                        <div className="truncate">
+                          <p className="font-semibold text-slate-900 truncate">
+                            {archivo.nombre}
+                          </p>
+                          <p className="text-slate-400 font-mono text-[10px] truncate">
+                            SHA-256: {archivo.hashSha256.substring(0, 24)}... •{' '}
+                            {(archivo.peso / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveArchivo(index)}
+                        disabled={isSubmitting}
+                        className="ml-3 shrink-0 rounded px-2 py-1 font-bold text-red-600 hover:bg-red-50 cursor-pointer"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* BOTONERA DE NAVEGACIÓN ACCESIBLE */}
+          <footer className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200/80 pt-6">
+            <button
+              type="button"
+              onClick={onBack}
+              disabled={isSubmitting || cargandoArchivo}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-700 shadow-2xs transition hover:bg-slate-50 cursor-pointer"
+            >
+              ← Anterior
+            </button>
+
+            <div
+              className="w-full sm:w-auto"
+              onClick={() => {
+                if (!isValid) {
+                  setTouched((prev) => ({
+                    ...prev,
+                    tipoTramiteId: true,
+                    asunto: true,
+                    numeroFolios: true,
+                    archivos: true,
+                  }));
+                }
+              }}
+            >
+              <button
+                type="submit"
+                disabled={!isValid || isSubmitting || cargandoArchivo}
+                className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-7 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-xs transition ${
+                  isValid && !isSubmitting
+                    ? 'bg-[#1877f2] hover:bg-[#166fe5] cursor-pointer'
+                    : 'bg-slate-300 text-slate-500 cursor-not-allowed pointer-events-none'
+                }`}
+              >
+                Siguiente →
+              </button>
+            </div>
+          </footer>
         </div>
-      </footer>
     </form>
   );
 };
