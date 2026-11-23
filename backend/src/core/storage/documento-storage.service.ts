@@ -219,7 +219,7 @@ export class DocumentoStorageService {
     const anchoUtil = width - margenX * 2;
 
     // 1. Franja Tricolor Superior Institucional
-    const yTop = height - 32;
+    const yTop = height - 28;
     page.drawRectangle({
       x: margenX,
       y: yTop,
@@ -242,67 +242,72 @@ export class DocumentoStorageService {
       color: colorVerdeSuiza,
     });
 
-    // 2. Logo Oficial del IESTP "Suiza" de Pucallpa (el mismo de la boleta de pago)
+    // 2. Logo Oficial del IESTP "Suiza" de Pucallpa (Emblema institucional de la boleta de pago / caja)
+    const logoW = 54;
+    const logoH = 54;
+    const logoX = (width - logoW) / 2;
+    const logoY = height - 88;
+
     try {
-      const logoImg = await pdfDoc.embedPng(obtenerLogoSuizaPngBuffer());
-      page.drawImage(logoImg, {
-        x: margenX,
-        y: height - 88,
-        width: 50,
-        height: 50,
-      });
+      const logoBuffer = obtenerLogoSuizaPngBuffer();
+      if (logoBuffer && logoBuffer.length > 0) {
+        const logoImg = await pdfDoc.embedPng(logoBuffer);
+        // Logo oficial centrado en la cabecera
+        page.drawImage(logoImg, {
+          x: logoX,
+          y: logoY,
+          width: logoW,
+          height: logoH,
+        });
+
+        // Marca de agua institucional sutil en el fondo de la página
+        page.drawImage(logoImg, {
+          x: (width - 240) / 2,
+          y: (height - 240) / 2 - 20,
+          width: 240,
+          height: 240,
+          opacity: 0.035,
+        });
+      }
     } catch {
       // Continuar si no estuviera disponible
     }
 
-    // 3. Membrete Institucional Oficial
-    const textoX = margenX + 58;
-    page.drawText('GOBIERNO REGIONAL DE UCAYALI · DIRECCIÓN REGIONAL DE EDUCACIÓN DE UCAYALI', {
-      x: textoX,
-      y: height - 48,
-      size: 7.2,
-      font: fontBold,
-      color: colorTextoSecundario,
-    });
-    page.drawText('INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO "SUIZA"', {
-      x: textoX,
-      y: height - 61,
-      size: 10.5,
-      font: fontBold,
-      color: colorAzulSuiza,
-    });
-    page.drawText('SISTEMA INTEGRAL DE GESTIÓN DOCUMENTARIA (SIGD 2026) · MESA DE PARTES', {
-      x: textoX,
-      y: height - 73,
-      size: 8,
-      font: fontBold,
-      color: colorVerdeSuiza,
-    });
-    page.drawText('R.D. N° 0778-2006-ED · Revalidado R.D. N° 0507-2006-ED · Av. Túpac Amaru Km. 4.200, Pucallpa', {
-      x: textoX,
-      y: height - 84,
-      size: 7.2,
-      font,
-      color: colorTextoSecundario,
-    });
+    // 3. Membrete Institucional Centrado Oficial
+    const centrarTexto = (texto: string, yPos: number, tamano: number, f: PDFFont, c: RGB): void => {
+      const w = f.widthOfTextAtSize(texto, tamano);
+      page.drawText(texto, {
+        x: (width - w) / 2,
+        y: yPos,
+        size: tamano,
+        font: f,
+        color: c,
+      });
+    };
+
+    centrarTexto('GOBIERNO REGIONAL DE UCAYALI · DIRECCIÓN REGIONAL DE EDUCACIÓN DE UCAYALI', height - 102, 7.5, fontBold, colorTextoSecundario);
+    centrarTexto('INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO "SUIZA"', height - 116, 12, fontBold, colorAzulSuiza);
+    centrarTexto('SISTEMA INTEGRAL DE GESTIÓN DOCUMENTARIA (SIGD 2026) · MESA DE PARTES', height - 128, 8.5, fontBold, colorVerdeSuiza);
+    centrarTexto('R.D. N° 0778-2006-ED · Revalidado R.D. N° 0507-2006-ED · Av. Túpac Amaru Km. 4.200, Pucallpa', height - 139, 7.2, font, colorTextoSecundario);
 
     // Separador institucional
+    const sepY = height - 146;
     page.drawLine({
-      start: { x: margenX, y: height - 94 },
-      end: { x: width - margenX, y: height - 94 },
+      start: { x: margenX, y: sepY },
+      end: { x: width - margenX, y: sepY },
       thickness: 1.2,
       color: colorAzulSuiza,
     });
     page.drawLine({
-      start: { x: margenX, y: height - 96.5 },
-      end: { x: width - margenX, y: height - 96.5 },
+      start: { x: margenX, y: sepY - 2.5 },
+      end: { x: width - margenX, y: sepY - 2.5 },
       thickness: 0.6,
       color: colorDoradoSuiza,
     });
 
-    // 4. Banner del Título del Documento y Recuadro CUT
-    const bannerY = height - 146;
-    const bannerH = 42;
+    // 4. Banner del Título del Documento y Recuadro CUT Centrado
+    const bannerY = sepY - 50;
+    const bannerH = 44;
     page.drawRectangle({
       x: margenX,
       y: bannerY,
@@ -312,6 +317,7 @@ export class DocumentoStorageService {
       borderColor: colorBorde,
       borderWidth: 0.8,
     });
+    // Borde izquierdo decorativo azul
     page.drawRectangle({
       x: margenX,
       y: bannerY,
@@ -319,48 +325,18 @@ export class DocumentoStorageService {
       height: bannerH,
       color: colorAzulSuiza,
     });
-
-    page.drawText('CARGO OFICIAL DE RECEPCIÓN DOCUMENTARIA', {
-      x: margenX + 14,
-      y: bannerY + 23,
-      size: 12,
-      font: fontBold,
-      color: colorAzulSuiza,
-    });
-    page.drawText('CONSTANCIA FORMAL DE PRESENTACIÓN · CONFORME AL ART. 136 DEL TUO DE LA LEY N° 27444 (LPAG)', {
-      x: margenX + 14,
-      y: bannerY + 10,
-      size: 6.8,
-      font,
-      color: colorTextoSecundario,
-    });
-
-    // Insignia CUT a la derecha
-    const cutBoxW = 165;
-    const cutBoxX = width - margenX - cutBoxW - 6;
+    // Borde derecho decorativo verde
     page.drawRectangle({
-      x: cutBoxX,
-      y: bannerY + 5,
-      width: cutBoxW,
-      height: 32,
-      color: colorBlanco,
-      borderColor: colorAzulSuiza,
-      borderWidth: 0.8,
+      x: width - margenX - 4.5,
+      y: bannerY,
+      width: 4.5,
+      height: bannerH,
+      color: colorVerdeSuiza,
     });
-    page.drawText('CÓDIGO ÚNICO DE TRÁMITE', {
-      x: cutBoxX + 10,
-      y: bannerY + 24,
-      size: 6.5,
-      font: fontBold,
-      color: colorTextoSecundario,
-    });
-    page.drawText(datos.cut, {
-      x: cutBoxX + 10,
-      y: bannerY + 11,
-      size: 10.5,
-      font: fontBold,
-      color: colorAzulSuiza,
-    });
+
+    centrarTexto('CARGO OFICIAL DE RECEPCIÓN DOCUMENTARIA', bannerY + 27, 12.5, fontBold, colorAzulSuiza);
+    centrarTexto('CONSTANCIA FORMAL DE PRESENTACIÓN · CONFORME AL ART. 136 DEL TUO DE LA LEY N° 27444 (LPAG)', bannerY + 16, 7, font, colorTextoSecundario);
+    centrarTexto(`CÓDIGO ÚNICO DE TRÁMITE: ${datos.cut}`, bannerY + 5, 9.5, fontBold, colorAzulSuiza);
 
     // 5. Tabla de Metadatos Oficiales
     const fechaFormateada = datos.fechaHora.toLocaleString('es-PE', {

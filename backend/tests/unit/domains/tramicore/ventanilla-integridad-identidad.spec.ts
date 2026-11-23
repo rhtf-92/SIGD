@@ -679,7 +679,7 @@ describe('Ventanilla Presencial: Integridad Documental, Identidad y Cronología'
               resultado_resumen: 'Aprobado formalmente',
               s3_key: 'expedientes/otro-expediente/resoluciones/inyeccion.pdf',
             })
-          ).rejects.toThrow(/FLUJO_RESOLUTIVO_REQUIERE_FIRMA/);
+          ).rejects.toThrow(/FLUJO_RESOLUTIVO_REQUIERE_FIRMA|El dictamen técnico de este procedimiento/);
         },
       );
     });

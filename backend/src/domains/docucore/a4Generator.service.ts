@@ -1206,7 +1206,7 @@ export class A4GeneratorService {
   // -------------------------------------------------------------------------
 
   private altoMembrete(membrete: MembreteInstitucional): number {
-    let alto = 74;
+    let alto = 114;
     if (membrete.tipoDocumento !== undefined) {
       alto += 42;
     }
@@ -1403,59 +1403,62 @@ export class A4GeneratorService {
       color: colorVerdeSuiza,
     });
 
-    // Logo Oficial del IESTP "Suiza" de Pucallpa (Emblema institucional de la boleta de pago)
-    const logoCy = topY - 22;
+    // Logo Oficial del IESTP "Suiza" de Pucallpa Centrado (el mismo de la boleta de pago / caja)
+    const logoW = 46;
+    const logoH = 46;
+    const logoX = (A4_PUNTOS.ancho - logoW) / 2;
+    const logoY = topY - 42;
+
     if (logoImagen) {
       hoja.drawImage(logoImagen, {
-        x: MARGEN_PUNTOS + 2,
-        y: topY - 50,
-        width: 48,
-        height: 48,
+        x: logoX,
+        y: logoY,
+        width: logoW,
+        height: logoH,
       });
     } else {
-      const logoCx = MARGEN_PUNTOS + 25;
+      const logoCx = A4_PUNTOS.ancho / 2;
+      const logoCy = topY - 19;
       this.pintarLogoSuizaVectorial(hoja, fuentes, logoCx, logoCy);
     }
 
-    // Bloque central de identidad institucional (desplazado ligeramente a la derecha del logo)
-    const areaTextoX = MARGEN_PUNTOS + 54;
-    const areaTextoAncho = ANCHO_UTIL - 54;
-    let y = topY - 4;
+    // Bloque central de identidad institucional (centrado con respecto a la página completa)
+    let y = logoY - 12;
 
     const centrarEnCabecera = (texto: string, estilo: EstiloFuente, cuerpo: number, color: RGB): void => {
       const ancho = fuentes[estilo].widthOfTextAtSize(texto, cuerpo);
       hoja.drawText(texto, {
-        x: areaTextoX + (areaTextoAncho - ancho) / 2,
+        x: (A4_PUNTOS.ancho - ancho) / 2,
         y,
         size: cuerpo,
         font: fuentes[estilo],
         color,
       });
-      y -= cuerpo * 1.32;
+      y -= cuerpo * 1.30;
     };
 
     centrarEnCabecera(
       "MINISTERIO DE EDUCACIÓN · DIRECCIÓN REGIONAL DE EDUCACIÓN DE UCAYALI",
       "negrita",
-      7.8,
+      7.5,
       COLOR_SECUNDARIO,
     );
-    centrarEnCabecera(membrete.institucion, "negrita", 10.5, colorAzulSuiza);
+    centrarEnCabecera(membrete.institucion, "negrita", 11.5, colorAzulSuiza);
     if (membrete.unidad !== undefined) {
-      centrarEnCabecera(membrete.unidad, "negrita", 9.2, colorVerdeSuiza);
+      centrarEnCabecera(membrete.unidad, "negrita", 8.8, colorVerdeSuiza);
     }
     const direccionOficial =
       membrete.direccion ??
       "Av. Túpac Amaru Km. 4.200, Callería - Pucallpa, Región Ucayali · Revalidado R.D. N° 0507-2006-ED";
-    centrarEnCabecera(direccionOficial, "normal", 7.6, COLOR_SECUNDARIO);
+    centrarEnCabecera(direccionOficial, "normal", 7.0, COLOR_SECUNDARIO);
 
-    const reglaY = Math.min(y - 3, logoCy - 27);
-    this.regla(hoja, MARGEN_PUNTOS, A4_PUNTOS.ancho - MARGEN_PUNTOS, reglaY, 1.5, colorAzulSuiza);
-    this.regla(hoja, MARGEN_PUNTOS, A4_PUNTOS.ancho - MARGEN_PUNTOS, reglaY - 2.5, 0.7, colorDoradoSuiza);
+    const reglaY = y - 3;
+    this.regla(hoja, MARGEN_PUNTOS, A4_PUNTOS.ancho - MARGEN_PUNTOS, reglaY, 1.2, colorAzulSuiza);
+    this.regla(hoja, MARGEN_PUNTOS, A4_PUNTOS.ancho - MARGEN_PUNTOS, reglaY - 2.5, 0.6, colorDoradoSuiza);
 
     if (membrete.tipoDocumento !== undefined) {
       const boxTop = reglaY - 8;
-      const boxHeight = 32;
+      const boxHeight = 34;
       hoja.drawRectangle({
         x: MARGEN_PUNTOS,
         y: boxTop - boxHeight,
@@ -1472,25 +1475,39 @@ export class A4GeneratorService {
         height: boxHeight,
         color: colorAzulSuiza,
       });
+      hoja.drawRectangle({
+        x: A4_PUNTOS.ancho - MARGEN_PUNTOS - 4,
+        y: boxTop - boxHeight,
+        width: 4,
+        height: boxHeight,
+        color: colorVerdeSuiza,
+      });
 
-      const wTipo = fuentes["negrita"].widthOfTextAtSize(membrete.tipoDocumento, 11);
-      hoja.drawText(membrete.tipoDocumento, {
-        x: (A4_PUNTOS.ancho - wTipo) / 2,
+      const linea1 = membrete.tipoDocumento;
+      const linea2Partes: string[] = [];
+      if (membrete.numeroDocumento !== undefined) {
+        linea2Partes.push(`N° ${membrete.numeroDocumento}`);
+      }
+      if (membrete.correlativo !== undefined) {
+        linea2Partes.push(membrete.correlativo);
+      }
+      const linea2 = linea2Partes.join("  |  ");
+
+      const ancho1 = fuentes["negrita"].widthOfTextAtSize(linea1, 10.5);
+      hoja.drawText(linea1, {
+        x: (A4_PUNTOS.ancho - ancho1) / 2,
         y: boxTop - 13,
-        size: 11,
+        size: 10.5,
         font: fuentes["negrita"],
         color: colorAzulSuiza,
       });
 
-      if (membrete.numeroDocumento !== undefined) {
-        const numTexto = `N° ${membrete.numeroDocumento.replace(/^N°\s*/i, "")}${
-          membrete.correlativo ? `   |   ${membrete.correlativo}` : ""
-        }`;
-        const wNum = fuentes["negrita"].widthOfTextAtSize(numTexto, 9.5);
-        hoja.drawText(numTexto, {
-          x: (A4_PUNTOS.ancho - wNum) / 2,
+      if (linea2) {
+        const ancho2 = fuentes["negrita"].widthOfTextAtSize(linea2, 8.5);
+        hoja.drawText(linea2, {
+          x: (A4_PUNTOS.ancho - ancho2) / 2,
           y: boxTop - 26,
-          size: 9.5,
+          size: 8.5,
           font: fuentes["negrita"],
           color: colorVerdeSuiza,
         });
