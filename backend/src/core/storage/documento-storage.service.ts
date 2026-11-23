@@ -72,7 +72,11 @@ export class DocumentoStorageService {
    * para evitar retardos de timeout por red en contenedores o demos sin MinIO activo.
    */
   private estaS3Disponible(): boolean {
-    if (process.env.DISABLE_S3 === 'true' || process.env.STORAGE_DRIVER === 'local') {
+    if (
+      process.env.DISABLE_S3 === 'true' ||
+      process.env.STORAGE_DRIVER === 'local' ||
+      (this.config.endpoint.includes('minio:9000') && process.env.ENABLE_MINIO !== 'true')
+    ) {
       return false;
     }
     return Date.now() >= DocumentoStorageService.s3OfflineHasta;
@@ -507,13 +511,24 @@ export class DocumentoStorageService {
       codigo === 'EACCES' ||
       codigo === 'TimeoutError' ||
       codigo === 'ENOTFOUND' ||
+      codigo === 'EAI_AGAIN' ||
+      codigo === 'EHOSTUNREACH' ||
+      codigo === 'ENETUNREACH' ||
+      codigo === 'ECONNRESET' ||
+      codigo === 'ETIMEDOUT' ||
       codigo === 'AggregateError' ||
       mensaje.includes('ECONNREFUSED') ||
       mensaje.includes('EACCES') ||
       mensaje.includes('fetch failed') ||
       mensaje.includes('connect ECONNREFUSED') ||
       mensaje.includes('connect EACCES') ||
-      mensaje.includes('socket hang up')
+      mensaje.includes('socket hang up') ||
+      mensaje.includes('EAI_AGAIN') ||
+      mensaje.includes('getaddrinfo') ||
+      mensaje.includes('ENOTFOUND') ||
+      mensaje.includes('EHOSTUNREACH') ||
+      mensaje.includes('ETIMEDOUT') ||
+      mensaje.includes('ENETUNREACH')
     ) {
       return true;
     }
