@@ -114,9 +114,14 @@ const CUENTAS_DEMO: Record<string, CuentaDemo> = {
     roles: ['MESA_PARTES'],
     permisos: [
       { codigo: 'EXPEDIENTE_LEER', ambito: 'GLOBAL', areaId: null },
+      { codigo: 'EXPEDIENTE_REGISTRAR', ambito: 'GLOBAL', areaId: null },
       { codigo: 'EXPEDIENTE_RADICAR', ambito: 'GLOBAL', areaId: null },
       { codigo: 'EXPEDIENTE_RECEPCIONAR', ambito: 'GLOBAL', areaId: null },
-      { codigo: 'EXPEDIENTE_DERIVAR', ambito: 'AREA', areaId: null },
+      { codigo: 'EXPEDIENTE_DERIVAR', ambito: 'GLOBAL', areaId: null },
+      { codigo: 'EXPEDIENTE_ADJUNTAR', ambito: 'GLOBAL', areaId: null },
+      { codigo: 'EXPEDIENTE_OBSERVAR', ambito: 'GLOBAL', areaId: null },
+      { codigo: 'EXPEDIENTE_SUBSANAR', ambito: 'GLOBAL', areaId: null },
+      { codigo: 'TRAMICORE_DEVOLUCION_EVALUAR', ambito: 'GLOBAL', areaId: null },
     ],
   },
   director: {

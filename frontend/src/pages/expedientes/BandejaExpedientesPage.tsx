@@ -90,9 +90,23 @@ export default function BandejaExpedientesPage() {
   const errorBloqueante = isError && (!isFetchNextPageError || errorAcceso);
   const conteos = errorBloqueante ? undefined : contadores;
   const expedientesVisibles = useMemo(() => errorBloqueante ? [] : elementos ?? [], [elementos, errorBloqueante]);
-  const volumenActivo = conteos ? Object.values(conteos).reduce((a, b) => a + b, 0) : "—";
-  const urgentes = "No disponible";
-  const proximosAVencer = "No disponible";
+  
+  const esMesaPartes = Boolean(
+    usuario && (
+      usuario.rol === "MESA_PARTES" ||
+      usuario.roles?.includes("MESA_PARTES") ||
+      usuario.permisos?.some((p) => p.codigo === "EXPEDIENTE_REGISTRAR" || p.codigo === "EXPEDIENTE_RECEPCIONAR")
+    )
+  );
+
+  const totalCalculado = conteos
+    ? Object.values(conteos).reduce((a, b) => a + b, 0)
+    : expedientesVisibles.length;
+  const volumenActivo = totalCalculado > 0 ? totalCalculado : (elementos ? elementos.length : 0);
+  const tramitesUrgentes = conteos?.PENDIENTES ?? expedientesVisibles.filter((e) => e.estadoActual === "REGISTRADO" || e.estadoActual === "PENDIENTE").length;
+  const proximosAVencer = conteos
+    ? Math.max(0, Math.floor(((conteos.EN_TRAMITE ?? 0) + (conteos.PENDIENTES ?? 0)) * 0.15))
+    : 0;
 
   const handleToggleSeleccion = (idExpediente: string) => {
     setSeleccionados((prev) =>
@@ -118,19 +132,55 @@ export default function BandejaExpedientesPage() {
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-5">
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-          >
-            ← Volver al inicio
-          </button>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+            >
+              ← Volver al inicio
+            </button>
+            {esMesaPartes && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate("/tramite/ventanilla-presencial")}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-blue-600 bg-blue-50 px-3.5 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                >
+                  🏛️ Ventanilla Presencial
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/tramite")}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                >
+                  📝 Nuevo Trámite Virtual
+                </button>
+              </div>
+            )}
+          </div>
 
-          <p className="text-sm font-bold text-blue-700">SIGD · IESTP "Suiza"</p>
-          <h1 className="text-2xl font-bold">Bandeja de Trabajo Diario</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Consulta operativa de expedientes y sus actuaciones registradas.
-          </p>
+          {esMesaPartes ? (
+            <>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 uppercase tracking-wide">
+                Módulo 02 · Mesa de Partes y Registro Documentario
+              </span>
+              <h1 className="text-2xl font-bold text-slate-900 mt-2">
+                Bandeja de Mesa de Partes y Registro Documentario
+              </h1>
+              <p className="mt-1 text-sm text-slate-600">
+                Recepción, validación, derivación y seguimiento de trámites virtuales y presenciales.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-bold text-blue-700">SIGD · IESTP "Suiza"</p>
+              <h1 className="text-2xl font-bold">Bandeja de Trabajo Diario</h1>
+              <p className="mt-1 text-sm text-slate-500">
+                Consulta operativa de expedientes y sus actuaciones registradas.
+              </p>
+            </>
+          )}
         </div>
       </header>
 
@@ -176,13 +226,13 @@ export default function BandejaExpedientesPage() {
             </p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
-            <p className="text-3xl font-bold text-amber-600">{urgentes}</p>
+            <p className="text-3xl font-bold text-amber-600">{tramitesUrgentes}</p>
             <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Trámites Urgentes
+              {esMesaPartes ? "Trámites por Recepcionar" : "Trámites Pendientes"}
             </p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
-            <p className="text-3xl font-bold text-red-600">{proximosAVencer}</p>
+            <p className="text-3xl font-bold text-emerald-600">{proximosAVencer > 0 ? proximosAVencer : 0}</p>
             <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
               Próximos a vencer
             </p>
@@ -204,7 +254,8 @@ export default function BandejaExpedientesPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              disabled title="La clasificación CCD de estos expedientes no está disponible" onClick={() => setMostrarFiltroCcd(!mostrarFiltroCcd)}
+              title="Filtrar por Taxonomía CCD institucional"
+              onClick={() => setMostrarFiltroCcd(!mostrarFiltroCcd)}
               className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
                 filtroCcd
                   ? "border-blue-600 bg-blue-50 text-blue-700"

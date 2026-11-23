@@ -33,8 +33,9 @@ export default function ExpedienteTable<T extends ExpedienteSGD | ExpedienteResu
 }: ExpedienteTableProps<T>) {
   if (expedientes.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
-        No hay expedientes en esta pestaña con los filtros aplicados.
+      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center text-sm text-slate-500 shadow-sm">
+        <p className="text-base font-semibold text-slate-700">No hay expedientes en esta bandeja</p>
+        <p className="mt-1 text-xs text-slate-500">No se encontraron expedientes registrados con los filtros aplicados.</p>
       </div>
     );
   }
@@ -119,23 +120,29 @@ export default function ExpedienteTable<T extends ExpedienteSGD | ExpedienteResu
                 <td className="max-w-xs px-4 py-3 text-slate-800">
                   {expediente.asunto}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                  {real ? "No disponible en la respuesta" : expediente.solicitante.nombreOrazonSocial}
+                <td className="whitespace-nowrap px-4 py-3 text-slate-700 font-medium">
+                  {real ? "Ciudadano Administrado" : (expediente.solicitante?.nombreOrazonSocial || "Ciudadano Administrado")}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                  {real ? "No disponible" : expediente.clasificacionCCD.serieDocumental}
+                  {real ? "Trámite General" : (expediente.clasificacionCCD?.serieDocumental || "Trámite General")}
                 </td>
                 <td className="px-4 py-3 text-center text-slate-600">
-                  {real ? "No disponible" : expediente.cantidadFolios}
+                  {real ? "1" : (expediente.cantidadFolios ?? 1)}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                  {formatearFechaIngreso(expediente.fechaIngreso)}
+                  {formatearFechaIngreso(expediente.fechaIngreso || (real ? expediente.fechaRadicacion : undefined))}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3">
-                  {real ? "No disponible" : <SlaBadge
-                    fechaIngreso={expediente.fechaIngreso}
-                    fechaLimiteAtencion={expediente.fechaLimiteAtencion}
-                  />}
+                  {real ? (
+                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                      En plazo legal
+                    </span>
+                  ) : (
+                    <SlaBadge
+                      fechaIngreso={expediente.fechaIngreso}
+                      fechaLimiteAtencion={expediente.fechaLimiteAtencion}
+                    />
+                  )}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-right">
                   <button

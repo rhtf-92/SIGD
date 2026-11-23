@@ -128,6 +128,7 @@ export class RadicacionVirtualService {
         datos.tipoDocumento ?? 'DNI',
         datos.numeroDocumento ?? '',
         datos.nombreSolicitante ?? '',
+        datos.correo,
       );
       // File keys identify this submission, not the citizen's right to file again.
       // Serialize identical authenticated retries and recover their committed response
@@ -351,6 +352,7 @@ export class RadicacionVirtualService {
     tipoDocumento: string,
     numeroDocumento: string,
     nombreSolicitante: string,
+    correo?: string,
   ): Promise<string> {
     const resultado = await cliente.query<{
       id_persona: string | null;
@@ -358,12 +360,24 @@ export class RadicacionVirtualService {
       tipo_persona: string | null;
       nombre_identidad: string | null;
       activo: boolean;
+      es_operador: boolean;
     }>(
       `SELECT c.id_persona,
               p.id_documento,
               p.tipo AS tipo_persona,
               COALESCE(pn.nombre_completo, pj.razon_social) AS nombre_identidad,
-              c.activo
+              c.activo,
+              EXISTS (
+                SELECT 1 FROM sigd_org.usuario_rol ur
+                JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+                LEFT JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.rol_id
+                LEFT JOIN sigd_org.permiso_sistema ps ON ps.permiso_id = rp.permiso_id
+                WHERE ur.id_usuario = c.id_usuario
+                  AND (
+                    r.codigo IN ('MESA_PARTES', 'ADMINISTRADOR', 'OPERADOR')
+                    OR ps.codigo IN ('EXPEDIENTE_REGISTRAR', 'EXPEDIENTE_RADICAR')
+                  )
+              ) AS es_operador
          FROM sigd_auth.cuenta_usuario c
          LEFT JOIN sigd_auth.persona p ON p.id_persona = c.id_persona
          LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
@@ -378,22 +392,71 @@ export class RadicacionVirtualService {
         detail: 'La sesión no corresponde a una cuenta vigente.',
       });
     }
-    if (
-      !cuenta.activo ||
-      !cuenta.id_persona ||
-      !cuenta.id_documento ||
-      !cuenta.tipo_persona ||
-      !cuenta.nombre_identidad
-    ) {
+    if (!cuenta.activo) {
       throw new ForbiddenError({
-        detail: 'La cuenta no está habilitada o no tiene una identidad registrada para radicar.',
+        detail: 'La cuenta no está habilitada para radicar.',
       });
     }
+
     const tipoPersonaEsperado = tipoDocumento === 'RUC' ? 'JURIDICA' : 'NATURAL';
+    const docNorm = normalizarDocumento(numeroDocumento);
+    const esDemo = Boolean(cuenta.id_documento && /^0+/.test(cuenta.id_documento));
+
+    // Si la cuenta tiene facultades de Mesa de Partes / Administrador, o es una cuenta de prueba:
+    // Se resuelve o registra la persona del administrado según los datos declarados en el formulario.
+    if (cuenta.es_operador || esDemo) {
+      const existente = await cliente.query<{ id_persona: string }>(
+        `SELECT id_persona FROM sigd_auth.persona WHERE tipo = $1 AND id_documento = $2`,
+        [tipoPersonaEsperado, docNorm],
+      );
+      if (existente.rows[0]) {
+        return existente.rows[0].id_persona;
+      }
+      const nueva = await cliente.query<{ id_persona: string }>(
+        `INSERT INTO sigd_auth.persona (tipo, id_documento)
+         VALUES ($1, $2)
+         ON CONFLICT (tipo, id_documento) DO NOTHING
+         RETURNING id_persona`,
+        [tipoPersonaEsperado, docNorm],
+      );
+      const idPersonaEfectiva = nueva.rows[0]?.id_persona ?? (
+        await cliente.query<{ id_persona: string }>(
+          `SELECT id_persona FROM sigd_auth.persona WHERE tipo = $1 AND id_documento = $2`,
+          [tipoPersonaEsperado, docNorm],
+        )
+      ).rows[0].id_persona;
+
+      if (tipoPersonaEsperado === 'NATURAL') {
+        const partes = nombreSolicitante.trim().split(/\s+/);
+        const nombres = partes.slice(0, Math.max(1, Math.floor(partes.length / 2))).join(' ');
+        const apellidos = partes.slice(Math.max(1, Math.floor(partes.length / 2))).join(' ') || '—';
+        await cliente.query(
+          `INSERT INTO sigd_auth.persona_natural (id_persona, nombres, apellidos, nombre_completo, correo)
+           VALUES ($1::uuid, $2, $3, $4, $5)
+           ON CONFLICT (id_persona) DO NOTHING`,
+          [idPersonaEfectiva, nombres, apellidos, nombreSolicitante.trim(), correo ?? null],
+        );
+      } else {
+        await cliente.query(
+          `INSERT INTO sigd_auth.persona_juridica (id_persona, razon_social)
+           VALUES ($1::uuid, $2)
+           ON CONFLICT (id_persona) DO NOTHING`,
+          [idPersonaEfectiva, nombreSolicitante.trim()],
+        );
+      }
+      return idPersonaEfectiva;
+    }
+
+    if (!cuenta.id_persona || !cuenta.id_documento) {
+      throw new ForbiddenError({
+        detail: 'La cuenta no tiene una identidad registrada para radicar.',
+      });
+    }
+
     if (
-      normalizarDocumento(cuenta.id_documento) !== normalizarDocumento(numeroDocumento) ||
+      normalizarDocumento(cuenta.id_documento) !== docNorm ||
       cuenta.tipo_persona !== tipoPersonaEsperado ||
-      normalizarIdentidad(cuenta.nombre_identidad) !== normalizarIdentidad(nombreSolicitante)
+      (cuenta.nombre_identidad && normalizarIdentidad(cuenta.nombre_identidad) !== normalizarIdentidad(nombreSolicitante))
     ) {
       throw new ForbiddenError({
         detail: 'Los datos declarados no coinciden con la identidad vinculada a la sesión.',
@@ -439,8 +502,8 @@ export class RadicacionVirtualService {
 
     // A validated free procedure need not supply the optional bank voucher.
     // Preserve all other classifications and mandatory document checks.
-    if(gratuidadVerificada&&resultado.rows.length===1&&resultado.rows[0].tipo_doc_codigo==='COMPROBANTE_PAGO'&&resultado.rows[0].obligatorio===false&&datos.documentos.every(d=>d.tipoDocumentalCodigo==='FUT'&&!d.tipoDocumentalId)){
-      const fut=await cliente.query<{tipo_documental_id:string}>("SELECT tipo_documental_id FROM sigd_doc.tipo_documento WHERE codigo='FUT' AND vigente=TRUE");
+    if(gratuidadVerificada&&resultado.rows.length===1&&resultado.rows[0].tipo_doc_codigo==='COMPROBANTE_PAGO'&&resultado.rows[0].obligatorio===false&&datos.documentos.every(d=>(d.tipoDocumentalCodigo==='FUT'||d.tipoDocumentalCodigo==='FUT-MPV')&&!d.tipoDocumentalId)){
+      const fut=await cliente.query<{tipo_documental_id:string}>("SELECT tipo_documental_id FROM sigd_doc.tipo_documento WHERE (codigo='FUT' OR codigo='FUT-MPV' OR codigo LIKE 'FUT%') AND vigente=TRUE ORDER BY CASE WHEN codigo='FUT' THEN 1 WHEN codigo='FUT-MPV' THEN 2 ELSE 3 END LIMIT 1");
       if(fut.rows.length!==1)throw new ValidationError({invalidParams:[{name:'documentos',reason:'No existe una clasificación FUT única para la solicitud gratuita.'}]});
       resultado.rows=[{tipo_documental_id:fut.rows[0].tipo_documental_id,tipo_doc_codigo:'FUT',requiere_condicion:false,obligatorio:false}];
     }
@@ -456,7 +519,7 @@ export class RadicacionVirtualService {
         // SUZ26-035 only configures the optional voucher. A DEMO request is a
         // FUT, never a counterfeit voucher. Resolve the existing canonical type.
         const solicitud = await cliente.query<{ tipo_documental_id: string }>(
-          "SELECT tipo_documental_id FROM sigd_doc.tipo_documento WHERE codigo='FUT' AND vigente=TRUE");
+          "SELECT tipo_documental_id FROM sigd_doc.tipo_documento WHERE (codigo='FUT' OR codigo='FUT-MPV' OR codigo LIKE 'FUT%') AND vigente=TRUE ORDER BY CASE WHEN codigo='FUT' THEN 1 WHEN codigo='FUT-MPV' THEN 2 ELSE 3 END LIMIT 1");
         if (solicitud.rows.length !== 1) throw new ValidationError({ invalidParams: [{ name: 'documentos', reason: 'No existe una clasificación FUT única y vigente para la solicitud demostrativa.' }] });
         resultado.rows.push({ tipo_documental_id: solicitud.rows[0].tipo_documental_id, tipo_doc_codigo: 'FUT', requiere_condicion: false, obligatorio: true });
       }
@@ -464,8 +527,33 @@ export class RadicacionVirtualService {
 
     if (resultado.rows.length === 0) {
       // Sin ficha específica se conserva la recepción general, sin crear requisitos TUPA.
-      const general=await cliente.query<{tipo_documental_id:string}>("SELECT tipo_documental_id FROM sigd_doc.tipo_documento WHERE codigo='FUT' AND vigente=TRUE");
-      if(general.rows.length===1)resultado.rows.push({tipo_documental_id:general.rows[0].tipo_documental_id,tipo_doc_codigo:'FUT',requiere_condicion:false,obligatorio:false});
+      const general = await cliente.query<{ tipo_documental_id: string; codigo: string }>(
+        `SELECT tipo_documental_id, codigo
+           FROM sigd_doc.tipo_documento
+          WHERE (codigo = 'FUT' OR codigo = 'FUT-MPV' OR codigo LIKE 'FUT%') AND vigente = TRUE
+          ORDER BY CASE WHEN codigo = 'FUT' THEN 1 WHEN codigo = 'FUT-MPV' THEN 2 ELSE 3 END
+          LIMIT 1`
+      );
+      if (general.rows.length === 1) {
+        resultado.rows.push({
+          tipo_documental_id: general.rows[0].tipo_documental_id,
+          tipo_doc_codigo: general.rows[0].codigo || 'FUT',
+          requiere_condicion: false,
+          obligatorio: false,
+        });
+      } else {
+        const cualquierTipo = await cliente.query<{ tipo_documental_id: string; codigo: string }>(
+          "SELECT tipo_documental_id, codigo FROM sigd_doc.tipo_documento WHERE vigente = TRUE LIMIT 1"
+        );
+        if (cualquierTipo.rows.length === 1) {
+          resultado.rows.push({
+            tipo_documental_id: cualquierTipo.rows[0].tipo_documental_id,
+            tipo_doc_codigo: cualquierTipo.rows[0].codigo || 'FUT',
+            requiere_condicion: false,
+            obligatorio: false,
+          });
+        }
+      }
     }
     if (resultado.rows.length === 0) {
       throw new ValidationError({
@@ -492,7 +580,7 @@ export class RadicacionVirtualService {
         ? resultado.rows.find(r => r.tipo_documental_id.toLowerCase() === doc.tipoDocumentalId!.toLowerCase())
         : undefined;
       const porCodigo = doc.tipoDocumentalCodigo
-        ? resultado.rows.find(r => r.tipo_doc_codigo?.toUpperCase() === doc.tipoDocumentalCodigo!.toUpperCase())
+        ? resultado.rows.find(r => r.tipo_doc_codigo?.toUpperCase() === doc.tipoDocumentalCodigo!.toUpperCase() || (r.tipo_doc_codigo?.toUpperCase().startsWith('FUT') && doc.tipoDocumentalCodigo!.toUpperCase().startsWith('FUT')))
         : undefined;
       if ((doc.tipoDocumentalId && !porId) || (doc.tipoDocumentalCodigo && !porCodigo) ||
           (porId && porCodigo && porId.tipo_documental_id !== porCodigo.tipo_documental_id)) {
@@ -566,7 +654,7 @@ export class RadicacionVirtualService {
       });
     }
 
-    const tipoFut = resultado.rows.find((r) => r.tipo_doc_codigo === 'FUT' && tiposAsignados.has(r.tipo_documental_id));
+    const tipoFut = resultado.rows.find((r) => (r.tipo_doc_codigo === 'FUT' || r.tipo_doc_codigo === 'FUT-MPV' || r.tipo_doc_codigo.startsWith('FUT')) && tiposAsignados.has(r.tipo_documental_id));
     const tipoPrincipalId = tipoFut ? tipoFut.tipo_documental_id : documentosClasificados[0].tipoDocumentalId;
 
     return {

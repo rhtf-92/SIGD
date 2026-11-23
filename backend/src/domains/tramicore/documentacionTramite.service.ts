@@ -65,8 +65,8 @@ export async function obtenerDocumentacionTramite(pool: Pool, id: string) {
   const configDoc = CATALOGO_DOCUMENTAL_TUPA_2026.find((c) => c.codigoInterno === procDb.codigo)
     ?? CATALOGO_DOCUMENTAL_POR_CODIGO.get(procDb.codigo);
 
-  const tipoFut = tiposGeneralesRes.rows.find((t) => t.codigo === 'FUT');
-  const tipoAnexo = tiposGeneralesRes.rows.find((t) => t.codigo === 'ANEXO');
+  const tipoFut = tiposGeneralesRes.rows.find((t) => t.codigo === 'FUT' || t.codigo === 'FUT-MPV' || t.codigo.startsWith('FUT'));
+  const tipoAnexo = tiposGeneralesRes.rows.find((t) => t.codigo === 'ANEXO' || t.codigo.startsWith('ANEXO')) ?? tipoFut;
 
   let requisitosFinales: RequisitoDocumental[] = requisitosDb;
   if (requisitosFinales.length === 0 && configDoc) {
@@ -122,7 +122,7 @@ export async function obtenerDocumentacionTramite(pool: Pool, id: string) {
 export async function validarDocumentacionTramite(c: Consulta, datos: RadicacionVirtualInput) {
   let requisitos = await leerRequisitosDocumentales(c, datos.idTipoTramiteTupa);
   const tiposGenerales = (await c.query<{ id: string; codigo: string; nombre: string }>(
-    "SELECT tipo_documental_id AS id, codigo, nombre FROM sigd_doc.tipo_documento WHERE codigo IN ('FUT','ANEXO') AND vigente=TRUE"
+    "SELECT tipo_documental_id AS id, codigo, nombre FROM sigd_doc.tipo_documento WHERE (codigo IN ('FUT','ANEXO','FUT-MPV') OR codigo LIKE 'FUT%') AND vigente=TRUE"
   )).rows;
 
   if (requisitos.length === 0) {
@@ -134,8 +134,8 @@ export async function validarDocumentacionTramite(c: Consulta, datos: Radicacion
       ? (CATALOGO_DOCUMENTAL_TUPA_2026.find((c) => c.codigoInterno === proc.codigo) ?? CATALOGO_DOCUMENTAL_POR_CODIGO.get(proc.codigo))
       : undefined;
     if (configDoc) {
-      const tipoFut = tiposGenerales.find(t => t.codigo === 'FUT');
-      const tipoAnx = tiposGenerales.find(t => t.codigo === 'ANEXO');
+      const tipoFut = tiposGenerales.find(t => t.codigo === 'FUT' || t.codigo === 'FUT-MPV' || t.codigo.startsWith('FUT'));
+      const tipoAnx = tiposGenerales.find(t => t.codigo === 'ANEXO' || t.codigo.startsWith('ANEXO')) ?? tipoFut;
       requisitos = [...configDoc.requisitos, ...configDoc.anexos].map(req => {
         const td = req.clasificacion === 'EXPEDIENTE' ? tipoFut : tipoAnx;
         return {
@@ -173,7 +173,7 @@ export async function validarDocumentacionTramite(c: Consulta, datos: Radicacion
     if (requisito?.tipos.some(t => t.condicion !== null)) return fallar(`La condición documental de ${requisito.nombre} requiere validación institucional.`);
     const permitidos = requisito && requisito.tipos.length > 0
       ? requisito.tipos
-      : tiposGenerales.filter(t => t.codigo === (doc.clasificacion === 'EXPEDIENTE' ? 'FUT' : 'ANEXO')).map(t => ({ id: t.id, codigo: t.codigo, nombre: t.nombre, condicion: null }));
+      : tiposGenerales.filter(t => (doc.clasificacion === 'EXPEDIENTE' ? (t.codigo === 'FUT' || t.codigo === 'FUT-MPV' || t.codigo.startsWith('FUT')) : (t.codigo === 'ANEXO' || t.codigo.startsWith('ANEXO')))).map(t => ({ id: t.id, codigo: t.codigo, nombre: t.nombre, condicion: null }));
     const tipo = doc.tipoDocumentalId || doc.tipoDocumentalCodigo
       ? permitidos.find(t => (!doc.tipoDocumentalId || t.id === doc.tipoDocumentalId) && (!doc.tipoDocumentalCodigo || t.codigo === doc.tipoDocumentalCodigo))
       : permitidos.length === 1 ? permitidos[0] : undefined;

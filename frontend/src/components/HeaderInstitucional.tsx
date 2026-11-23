@@ -256,7 +256,11 @@ export default function HeaderInstitucional() {
                     <button
                       type="button"
                       onClick={() => irA("/tramite/ventanilla-presencial")}
-                      className="rounded-lg bg-white/10 px-3 py-1.5 text-white hover:bg-white/20 transition cursor-pointer"
+                      className={`rounded-lg px-3 py-1.5 transition cursor-pointer ${
+                        location.pathname.startsWith("/tramite/ventanilla-presencial") || location.pathname === "/ventanilla"
+                          ? "bg-white text-[#004D9E] font-bold shadow-sm"
+                          : "bg-white/10 text-white hover:bg-white/20"
+                      }`}
                     >
                       Ventanilla Presencial
                     </button>
@@ -282,7 +286,11 @@ export default function HeaderInstitucional() {
                   <button
                     type="button"
                     onClick={() => irA("/expedientes")}
-                    className="rounded-lg bg-white/10 px-3 py-1.5 text-white hover:bg-white/20 transition cursor-pointer"
+                    className={`rounded-lg px-3 py-1.5 transition cursor-pointer ${
+                      location.pathname.startsWith("/expedientes") && !location.pathname.includes("/mis-evaluaciones") && !location.pathname.includes("/supervision")
+                        ? "bg-white text-[#004D9E] font-bold shadow-sm"
+                        : "bg-white/10 text-white hover:bg-white/20"
+                    }`}
                   >
                     Bandeja
                   </button>
@@ -471,7 +479,11 @@ export default function HeaderInstitucional() {
                     <button
                       type="button"
                       onClick={() => irA("/tramite/ventanilla-presencial")}
-                      className="w-full px-3 py-2 text-white hover:bg-white/10 text-left text-sm"
+                      className={`w-full px-3 py-2 text-left text-sm rounded-lg transition ${
+                        location.pathname.startsWith("/tramite/ventanilla-presencial") || location.pathname === "/ventanilla"
+                          ? "bg-white text-[#004D9E] font-bold shadow-sm"
+                          : "text-white hover:bg-white/10"
+                      }`}
                     >
                       Ventanilla Presencial
                     </button>
@@ -497,7 +509,11 @@ export default function HeaderInstitucional() {
                   <button
                     type="button"
                     onClick={() => irA("/expedientes")}
-                    className="w-full px-3 py-2 text-white hover:bg-white/10 text-left text-sm"
+                    className={`w-full px-3 py-2 text-left text-sm rounded-lg transition ${
+                      location.pathname.startsWith("/expedientes") && !location.pathname.includes("/mis-evaluaciones") && !location.pathname.includes("/supervision")
+                        ? "bg-white text-[#004D9E] font-bold shadow-sm"
+                        : "text-white hover:bg-white/10"
+                    }`}
                   >
                     Bandeja
                   </button>

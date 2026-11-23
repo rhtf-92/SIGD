@@ -291,14 +291,24 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         ? err.status
         : (err as { status?: number; response?: { status?: number } })?.status ??
           (err as { response?: { status?: number } })?.response?.status;
+      const apiInvalidParams = err instanceof ApiHttpError
+        ? err.problemDetails?.invalidParams
+        : (err as { response?: { data?: { invalidParams?: Array<{ name?: string; reason?: string }> } } })?.response?.data?.invalidParams;
+      const primerMotivoInvalido = apiInvalidParams && apiInvalidParams.length > 0
+        ? apiInvalidParams.map((p) => (p.name ? `${p.name}: ${p.reason}` : p.reason)).join(' | ')
+        : undefined;
+      const apiDetail = primerMotivoInvalido || (err instanceof ApiHttpError
+        ? err.problemDetails?.detail
+        : (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail);
       dispatch({
         type: 'SET_ERROR',
         payload:
-          status === 401
-            ? 'Inicie sesion con una cuenta vinculada a una persona para radicar la solicitud.'
+          apiDetail ||
+          (status === 401
+            ? 'Inicie sesión con una cuenta vinculada a una persona para radicar la solicitud.'
             : status === 403
-              ? 'La cuenta no esta habilitada para radicar o los datos declarados no coinciden con su identidad.'
-              : 'No se pudo radicar formalmente el expediente en la sede digital. Verifique su conexión y requisitos.',
+              ? 'La cuenta no está habilitada para radicar o los datos declarados no coinciden con su identidad.'
+              : 'No se pudo radicar formalmente el expediente en la sede digital. Verifique su conexión y requisitos.'),
       });
     }
   };

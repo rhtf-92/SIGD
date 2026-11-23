@@ -876,7 +876,27 @@ export default function ExpedienteDetallePage() {
 
   const tieneFacultad = useMemo(() => {
     return (codigo: string): boolean => {
-      if (!expediente || permisosEfectivos.length === 0) return false;
+      if (!expediente) return false;
+      const roles = Array.isArray(usuarioArchivo?.roles)
+        ? usuarioArchivo.roles
+        : (usuarioArchivo?.rol ? [usuarioArchivo.rol] : []);
+      if (roles.includes("ADMINISTRADOR")) return true;
+      if (
+        roles.includes("MESA_PARTES") &&
+        [
+          "EXPEDIENTE_LEER",
+          "EXPEDIENTE_REGISTRAR",
+          "EXPEDIENTE_RECEPCIONAR",
+          "EXPEDIENTE_DERIVAR",
+          "EXPEDIENTE_ADJUNTAR",
+          "EXPEDIENTE_OBSERVAR",
+          "EXPEDIENTE_SUBSANAR",
+          "TRAMICORE_DEVOLUCION_EVALUAR",
+        ].includes(codigo)
+      ) {
+        return true;
+      }
+      if (permisosEfectivos.length === 0) return false;
       return permisosEfectivos.some((p) => {
         if (!p || p.codigo !== codigo) return false;
         if (p.ambito === "GLOBAL" && (p.areaId === null || p.areaId === undefined)) {
@@ -888,7 +908,7 @@ export default function ExpedienteDetallePage() {
         return false;
       });
     };
-  }, [expediente, permisosEfectivos]);
+  }, [expediente, permisosEfectivos, usuarioArchivo]);
 
   const puedeRecepcionar = tieneFacultad("EXPEDIENTE_RECEPCIONAR");
   const puedeDigitalizar = tieneFacultad("EXPEDIENTE_ADJUNTAR");
