@@ -321,6 +321,332 @@ export async function registrarCallbackRefirma(
           }),
         ],
       );
+    } else if (datos.s3_key.startsWith('certificados-estudios/')) {
+      const resCertificadoEstudios = await cliente.query<{ certificado_id: string; numero_certificado: string }>(
+        `UPDATE sigd_doc.certificado_estudios_superiores
+            SET estado = 'EMITIDO_FIRMADO',
+                numero_certificado = COALESCE(numero_certificado, REPLACE(numero_borrador, 'BORR-', '')),
+                firmado_en = $1::timestamptz,
+                firmado_por = (
+                  SELECT cu.id_usuario
+                    FROM sigd_auth.cuenta_usuario cu
+                   WHERE (CASE WHEN $2 ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                               THEN cu.id_usuario = $2::uuid ELSE FALSE END)
+                      OR cu.usuario = $2
+                   LIMIT 1
+                ),
+                hash_pades = $3
+          WHERE expediente_id = $4::uuid
+            AND documento_adjunto_id = $5::uuid
+            AND estado IN ('BORRADOR_PENDIENTE_FIRMA', 'EN_FIRMA')
+          RETURNING certificado_id::text, COALESCE(numero_certificado, REPLACE(numero_borrador, 'BORR-', '')) AS numero_certificado`,
+        [
+          datos.fecha_sello_tsa,
+          datos.firmante.trim(),
+          datos.sha256_firmado.toLowerCase(),
+          expedienteId,
+          datos.documento_id,
+        ],
+      );
+
+      if (resCertificadoEstudios.rows.length > 0) {
+        const cert = resCertificadoEstudios.rows[0];
+        const correlationId = randomUUID();
+        const detalleAuditoria = {
+          certificado_id: cert.certificado_id,
+          numero_certificado: cert.numero_certificado,
+          documento_id: datos.documento_id,
+          cvd,
+          sha256_firmado: datos.sha256_firmado.toLowerCase(),
+          firmante: datos.firmante.trim(),
+          fecha_sello_tsa: datos.fecha_sello_tsa,
+          s3_bucket: datos.s3_bucket.trim(),
+          s3_key: datos.s3_key.trim(),
+          estado: 'EMITIDO_FIRMADO',
+        };
+
+        await cliente.query(
+          `INSERT INTO sigd_audit.bitacora_auditoria
+             (correlation_id, usuario_id, esquema, tabla, operacion, datos_antes, datos_despues, fecha_hora)
+           VALUES ($1::uuid, (
+             SELECT cu.id_usuario FROM sigd_auth.cuenta_usuario cu
+              WHERE (CASE WHEN $2 ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                          THEN cu.id_usuario = $2::uuid ELSE FALSE END)
+                 OR cu.usuario = $2 LIMIT 1
+           ), 'sigd_doc', 'certificado_estudios_superiores', 'UPDATE', $3::jsonb, $4::jsonb, clock_timestamp())`,
+          [
+            correlationId,
+            datos.firmante.trim(),
+            JSON.stringify({ estado: 'EN_FIRMA' }),
+            JSON.stringify(detalleAuditoria),
+          ],
+        );
+
+        const resExpEstado = await cliente.query<{ estado_actual: string; area_actual_id: string | null }>(
+          `SELECT COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
+                  ultimo.area_actual_id
+             FROM sigd_tra.expediente e
+             LEFT JOIN sigd_rut.estado_actual_expediente ultimo ON ultimo.expediente_id = e.expediente_id
+            WHERE e.expediente_id = $1::uuid
+              FOR UPDATE OF e`,
+          [expedienteId],
+        );
+
+        if (resExpEstado.rows.length > 0 && resExpEstado.rows[0].estado_actual === 'EN_FIRMA') {
+          const resOperador = await cliente.query<{ operador_id: string }>(
+            `SELECT oi.operador_id::text
+               FROM sigd_auth.cuenta_usuario cu
+               JOIN sigd_auth.operador_identidad oi ON oi.id_usuario = cu.id_usuario
+              WHERE (CASE WHEN $1 ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                          THEN cu.id_usuario = $1::uuid ELSE FALSE END)
+                 OR cu.usuario = $1
+              LIMIT 1`,
+            [datos.firmante.trim()],
+          );
+
+          const operadorParam = resOperador.rows[0]?.operador_id
+            ? BigInt(resOperador.rows[0].operador_id)
+            : 990000002n;
+
+          await cliente.query(
+            `INSERT INTO sigd_rut.movimiento_tramite (
+                expediente_id, estado_anterior, evento, estado_nuevo,
+                usuario_operador_id, correlation_id, clave_idempotencia, datos
+              ) VALUES (
+                $1::uuid, 'EN_FIRMA', 'FIRMA', 'RESUELTO',
+                $2, $3::uuid, $4, $5::jsonb
+              )`,
+            [
+              expedienteId,
+              operadorParam,
+              correlationId,
+              `FIRMA-CERTIFICADO-ESTUDIOS-${cert.certificado_id}`,
+              JSON.stringify({
+                areaId: resExpEstado.rows[0]?.area_actual_id || null,
+                certificado_id: cert.certificado_id,
+                numero_certificado: cert.numero_certificado,
+                cvd,
+                firmante: datos.firmante.trim(),
+                sha256_firmado: datos.sha256_firmado.toLowerCase(),
+                fecha_sello_tsa: datos.fecha_sello_tsa,
+              }),
+            ],
+          );
+
+          await cliente.query(
+            `UPDATE sigd_tra.expediente SET estado = 'RESUELTO' WHERE expediente_id = $1::uuid`,
+            [expedienteId],
+          );
+          await cliente.query(
+            `UPDATE sigd_doc.expediente SET estado = 'RESUELTO' WHERE expediente_id = $1::uuid`,
+            [expedienteId],
+          );
+        }
+
+        const titularRes = await cliente.query<{
+          usuario_id: string | null;
+          cut: string;
+          correo: string | null;
+        }>(
+          `SELECT cu.id_usuario AS usuario_id, e.codigo_expediente AS cut, cu.correo
+             FROM sigd_doc.expediente e
+             LEFT JOIN sigd_auth.cuenta_usuario cu
+               ON cu.id_persona = e.solicitante_id AND cu.activo = TRUE
+            WHERE e.expediente_id = $1::uuid`,
+          [expedienteId],
+        );
+        if (titularRes.rows.length > 1) throw new ConflictError({ detail: 'El solicitante tiene varias cuentas activas; no se puede determinar el destinatario.' });
+        const titular = titularRes.rows[0];
+
+        await cliente.query(
+          `INSERT INTO sigd_audit.evento_outbox
+             (correlation_id, agregado, tipo_evento, payload, estado)
+           VALUES ($1::uuid, 'certificado_estudios', 'certificado_emitido', $2::jsonb, 'PENDIENTE')`,
+          [
+            correlationId,
+            JSON.stringify({
+              documento_id: datos.documento_id,
+              certificado_id: cert.certificado_id,
+              expediente_id: expedienteId,
+              numero_certificado: cert.numero_certificado,
+              cvd,
+              sha256_firmado: datos.sha256_firmado.toLowerCase(),
+              firmado_en: datos.fecha_sello_tsa,
+              s3_bucket: datos.s3_bucket.trim(),
+              s3_key: datos.s3_key.trim(),
+              usuario_id: titular?.usuario_id ?? null,
+              cut: titular?.cut ?? null,
+              asunto: `Certificado de Estudios Superiores ${cert.numero_certificado} emitido — Expediente ${titular?.cut ?? expedienteId}`,
+              correo_destinatario: titular?.correo ?? null,
+              tipo_acto: 'certificado_emitido',
+              numero_documento: cert.numero_certificado,
+            }),
+          ],
+        );
+      }
+    } else if (datos.s3_key.startsWith('certificados/')) {
+      const resCertificado = await cliente.query<{ certificado_id: string; numero_certificado: string }>(
+        `UPDATE sigd_doc.certificado_ingles
+            SET estado = 'EMITIDO_FIRMADO',
+                numero_certificado = COALESCE(numero_certificado, REPLACE(numero_borrador, 'BORR-', '')),
+                firmado_en = $1::timestamptz,
+                firmado_por = (
+                  SELECT cu.id_usuario
+                    FROM sigd_auth.cuenta_usuario cu
+                   WHERE (CASE WHEN $2 ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                               THEN cu.id_usuario = $2::uuid ELSE FALSE END)
+                      OR cu.usuario = $2
+                   LIMIT 1
+                ),
+                hash_pades = $3
+          WHERE expediente_id = $4::uuid
+            AND documento_adjunto_id = $5::uuid
+            AND estado IN ('BORRADOR_PENDIENTE_FIRMA', 'EN_FIRMA')
+          RETURNING certificado_id::text, COALESCE(numero_certificado, REPLACE(numero_borrador, 'BORR-', '')) AS numero_certificado`,
+        [
+          datos.fecha_sello_tsa,
+          datos.firmante.trim(),
+          datos.sha256_firmado.toLowerCase(),
+          expedienteId,
+          datos.documento_id,
+        ],
+      );
+
+      if (resCertificado.rows.length > 0) {
+        const cert = resCertificado.rows[0];
+        const correlationId = randomUUID();
+        const detalleAuditoria = {
+          certificado_id: cert.certificado_id,
+          numero_certificado: cert.numero_certificado,
+          documento_id: datos.documento_id,
+          cvd,
+          sha256_firmado: datos.sha256_firmado.toLowerCase(),
+          firmante: datos.firmante.trim(),
+          fecha_sello_tsa: datos.fecha_sello_tsa,
+          s3_bucket: datos.s3_bucket.trim(),
+          s3_key: datos.s3_key.trim(),
+          estado: 'EMITIDO_FIRMADO',
+        };
+
+        await cliente.query(
+          `INSERT INTO sigd_audit.bitacora_auditoria
+             (correlation_id, usuario_id, esquema, tabla, operacion, datos_antes, datos_despues, fecha_hora)
+           VALUES ($1::uuid, (
+             SELECT cu.id_usuario FROM sigd_auth.cuenta_usuario cu
+              WHERE (CASE WHEN $2 ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                          THEN cu.id_usuario = $2::uuid ELSE FALSE END)
+                 OR cu.usuario = $2 LIMIT 1
+           ), 'sigd_doc', 'certificado_ingles', 'UPDATE', $3::jsonb, $4::jsonb, clock_timestamp())`,
+          [
+            correlationId,
+            datos.firmante.trim(),
+            JSON.stringify({ estado: 'EN_FIRMA' }),
+            JSON.stringify(detalleAuditoria),
+          ],
+        );
+
+        const resExpEstado = await cliente.query<{ estado_actual: string; area_actual_id: string | null }>(
+          `SELECT COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
+                  ultimo.area_actual_id
+             FROM sigd_tra.expediente e
+             LEFT JOIN sigd_rut.estado_actual_expediente ultimo ON ultimo.expediente_id = e.expediente_id
+            WHERE e.expediente_id = $1::uuid
+              FOR UPDATE OF e`,
+          [expedienteId],
+        );
+
+        if (resExpEstado.rows.length > 0 && resExpEstado.rows[0].estado_actual === 'EN_FIRMA') {
+          const resOperador = await cliente.query<{ operador_id: string }>(
+            `SELECT oi.operador_id::text
+               FROM sigd_auth.cuenta_usuario cu
+               JOIN sigd_auth.operador_identidad oi ON oi.id_usuario = cu.id_usuario
+              WHERE (CASE WHEN $1 ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                          THEN cu.id_usuario = $1::uuid ELSE FALSE END)
+                 OR cu.usuario = $1
+              LIMIT 1`,
+            [datos.firmante.trim()],
+          );
+
+          const operadorParam = resOperador.rows[0]?.operador_id
+            ? BigInt(resOperador.rows[0].operador_id)
+            : 990000002n;
+
+          await cliente.query(
+            `INSERT INTO sigd_rut.movimiento_tramite (
+                expediente_id, estado_anterior, evento, estado_nuevo,
+                usuario_operador_id, correlation_id, clave_idempotencia, datos
+              ) VALUES (
+                $1::uuid, 'EN_FIRMA', 'FIRMA', 'RESUELTO',
+                $2, $3::uuid, $4, $5::jsonb
+              )`,
+            [
+              expedienteId,
+              operadorParam,
+              correlationId,
+              `FIRMA-CERTIFICADO-INGLES-${cert.certificado_id}`,
+              JSON.stringify({
+                areaId: resExpEstado.rows[0]?.area_actual_id || null,
+                certificado_id: cert.certificado_id,
+                numero_certificado: cert.numero_certificado,
+                cvd,
+                firmante: datos.firmante.trim(),
+                sha256_firmado: datos.sha256_firmado.toLowerCase(),
+                fecha_sello_tsa: datos.fecha_sello_tsa,
+              }),
+            ],
+          );
+
+          await cliente.query(
+            `UPDATE sigd_tra.expediente SET estado = 'RESUELTO' WHERE expediente_id = $1::uuid`,
+            [expedienteId],
+          );
+          await cliente.query(
+            `UPDATE sigd_doc.expediente SET estado = 'RESUELTO' WHERE expediente_id = $1::uuid`,
+            [expedienteId],
+          );
+        }
+
+        const titularRes = await cliente.query<{
+          usuario_id: string | null;
+          cut: string;
+          correo: string | null;
+        }>(
+          `SELECT cu.id_usuario AS usuario_id, e.codigo_expediente AS cut, cu.correo
+             FROM sigd_doc.expediente e
+             LEFT JOIN sigd_auth.cuenta_usuario cu
+               ON cu.id_persona = e.solicitante_id AND cu.activo = TRUE
+            WHERE e.expediente_id = $1::uuid`,
+          [expedienteId],
+        );
+        if (titularRes.rows.length > 1) throw new ConflictError({ detail: 'El solicitante tiene varias cuentas activas; no se puede determinar el destinatario.' });
+        const titular = titularRes.rows[0];
+
+        await cliente.query(
+          `INSERT INTO sigd_audit.evento_outbox
+             (correlation_id, agregado, tipo_evento, payload, estado)
+           VALUES ($1::uuid, 'certificado_ingles', 'certificado_emitido', $2::jsonb, 'PENDIENTE')`,
+          [
+            correlationId,
+            JSON.stringify({
+              documento_id: datos.documento_id,
+              certificado_id: cert.certificado_id,
+              expediente_id: expedienteId,
+              numero_certificado: cert.numero_certificado,
+              cvd,
+              sha256_firmado: datos.sha256_firmado.toLowerCase(),
+              firmado_en: datos.fecha_sello_tsa,
+              s3_bucket: datos.s3_bucket.trim(),
+              s3_key: datos.s3_key.trim(),
+              usuario_id: titular?.usuario_id ?? null,
+              cut: titular?.cut ?? null,
+              asunto: `Certificado de Inglés ${cert.numero_certificado} emitido — Expediente ${titular?.cut ?? expedienteId}`,
+              correo_destinatario: titular?.correo ?? null,
+              tipo_acto: 'certificado_emitido',
+              numero_documento: cert.numero_certificado,
+            }),
+          ],
+        );
+      }
     }
   }
 

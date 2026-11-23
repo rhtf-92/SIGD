@@ -64,5 +64,22 @@ export interface ActuacionRutaDoc {
   datosAsociados: Record<string, unknown>;
   duracionMs: number | null;
   duracionMinutos: number | null;
-  tipoActuacion: "NORMAL" | "COMPENSATORIA";
+  tipoActuacion:
+    | "NORMAL"
+    | "COMPENSATORIA"
+    | "ACUSE_DIGITAL"
+    | "REGISTRAL"
+    | "FINANCIERO"
+    | "CALCULO_PLAZO"
+    | "HABILITACION"
+    | "EVALUACION_ACADEMICA"
+    | "DICTAMEN"
+    | "PROYECCION_RESOLUTIVA"
+    | "FIRMA_DIGITAL"
+    | "NOTIFICACION"
+    | "CIERRE"
+    | "CUSTODIA";
+  origen?: string;
+  unidadOrganica?: string | null;
+  rol?: string | null;
 }

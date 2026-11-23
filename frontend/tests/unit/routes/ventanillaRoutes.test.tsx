@@ -16,6 +16,7 @@ vi.mock("../../../src/pages/HomePage", () => ({ default: () => <p>Inicio públic
 vi.mock("../../../src/pages/tramite/TramitePage", () => ({ default: () => <p>Mesa de partes virtual</p> }));
 vi.mock("../../../src/pages/tramite/ConsultaPublicaPage", () => ({ default: () => <p>Consulta pública</p> }));
 vi.mock("../../../src/pages/casilla/CasillaElectronicaPage", () => ({ default: () => <p>Casilla electrónica</p> }));
+vi.mock("../../../src/pages/casilla/CasillaLoginPage", () => ({ default: () => <p>Login casilla</p> }));
 
 const rutasVentanilla = ["/tramite/ventanilla-presencial", "/ventanilla"];
 const originalAdapter = apiClient.defaults.adapter;
@@ -118,13 +119,19 @@ describe("Rutas de Ventanilla Presencial en AppRouter", () => {
     ["/mesa-partes", "Mesa de partes virtual", "/mesa-partes"],
     ["/consulta", "Consulta pública", "/consulta"],
     ["/consulta/CUT-DEL-DOBLE", "Consulta pública", "/consulta/CUT-DEL-DOBLE"],
-    ["/casilla", "Casilla electrónica", "/casilla"],
-    ["/casilla-electronica", "Casilla electrónica", "/casilla-electronica"],
+    ["/casilla/login", "Login casilla", "/casilla/login"],
   ])("conserva el acceso sin sesión a %s", async (ruta, pagina, destino) => {
     abrir(ruta);
     expect(await screen.findByText(pagina)).toBeInTheDocument();
     expect(screen.getByTestId("ruta")).toHaveTextContent(destino);
     expect(screen.queryByText("Login institucional")).not.toBeInTheDocument();
     expect(screen.queryByText("Acceso denegado")).not.toBeInTheDocument();
+  });
+
+  it.each(["/casilla", "/casilla-electronica"])("protege %s sin sesión redirigiendo al login de casilla", async (ruta) => {
+    abrir(ruta);
+    expect(await screen.findByText("Login casilla")).toBeInTheDocument();
+    expect(screen.getByTestId("ruta")).toHaveTextContent(/^\/casilla\/login$/);
+    expect(screen.queryByText("Casilla electrónica")).not.toBeInTheDocument();
   });
 });

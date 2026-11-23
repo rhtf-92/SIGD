@@ -6,6 +6,8 @@ import { contextMiddleware } from './middleware/context-middleware.js';
 import { errorMiddleware } from './middleware/error-middleware.js';
 import { crearRouterReferencia } from './referencia/expediente.router.js';
 import { crearRouterResoluciones } from './domains/docucore/resoluciones.controller.js';
+import { crearRouterCertificadoIngles } from './domains/docucore/certificadoIngles.controller.js';
+import { crearRouterCertificadoEstudios } from './domains/docucore/certificadoEstudios.controller.js';
 import { crearUsuariosAdminRouter, exigirAdministracionUsuarios } from './domains/organicore/usuariosAdmin.routes.js';
 import { crearUsuariosAdminService } from './domains/organicore/usuariosAdmin.service.js';
 
@@ -25,6 +27,7 @@ import { crearRouterIdenticore } from './domains/identicore/identicore.router.js
 import type { AlmacenOtp, EntregaOtp } from './domains/identicore/identidadOtp.service.js';
 import type { CacheDistribuida } from './domains/identicore/ubigeo.service.js';
 import { crearRouterRutaDoc } from './domains/rutadoc/rutadoc.router.js';
+import { crearRouterMesaPartes } from './domains/rutadoc/mesaPartes.router.js';
 import type { ObtenerActorRutaDoc } from './domains/rutadoc/rutadoc.controller.js';
 import type {
   FolioCompensationPort,
@@ -55,6 +58,7 @@ import { crearRouterRealtime } from './modules/corelink/realtime.routes.js';
 // Módulos IdentiCore Auth y Casilla
 import { crearRouterAuth } from './domains/identicore/auth.router.js';
 import { crearRouterCasilla } from './domains/identicore/casilla.router.js';
+import { crearRouterCorreos } from './domains/identicore/correos.router.js';
 
 // Módulo Almacenamiento S3 MinIO
 import { crearRouterStorage } from './core/storage/storage.router.js';
@@ -361,6 +365,7 @@ export function construirApp(
   app.use('/api', routerAuth);
   app.use(routerAuth);
   app.use('/api/v1', crearRouterCasilla(pool));
+  app.use('/api/v1', crearRouterCorreos(pool));
   app.use('/api/v1/tramites/publico', crearRouterRadicacionPublica(pool));
   const routerStorage = crearRouterStorage(pool);
   app.use('/api/v1', routerStorage);
@@ -388,6 +393,9 @@ export function construirApp(
   );
   app.use('/api/v1', crearRouterReportes(pool, actorProviderReportesEfectivo, opts.mgdCache));
   app.use('/api/v1/resoluciones', crearRouterResoluciones(pool));
+  app.use('/api/v1/mesa-partes', crearRouterMesaPartes(pool, actorProviderRutaDocEfectivo));
+  app.use('/api/v1/certificados-ingles', crearRouterCertificadoIngles(pool, actorProviderRutaDocEfectivo));
+  app.use('/api/v1/certificados-estudios', crearRouterCertificadoEstudios(pool, actorProviderRutaDocEfectivo));
   app.use('/api/v1/firma', crearFirmaRouter(servicio, pool, jwtActorProvider));
 
   /*

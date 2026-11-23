@@ -19,7 +19,7 @@ export async function insertarEvento(
      VALUES ($1, $2, $3, $4, 'PENDIENTE')
      RETURNING id_evento`,
     [
-      contexto?.correlation_id ?? null,
+      contexto?.correlation_id ?? crypto.randomUUID(),
       params.agregado,
       params.tipo_evento,
       JSON.stringify(params.payload),

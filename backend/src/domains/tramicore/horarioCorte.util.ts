@@ -30,6 +30,12 @@ export const MINUTOS_CORTE = 16 * 60 + 30;
 /** Minutos desde medianoche de la apertura: 08:00. */
 export const MINUTOS_APERTURA = 8 * 60;
 
+/** Segundos desde medianoche del horario de corte: 16:30:00 (16 * 3600 + 30 * 60 = 59400). */
+export const SEGUNDOS_CORTE = 16 * 3600 + 30 * 60;
+
+/** Segundos desde medianoche de la apertura: 08:00:00 (8 * 3600 = 28800). */
+export const SEGUNDOS_APERTURA = 8 * 3600;
+
 /** Desplazamiento de `America/Lima` respecto a UTC, en horas. */
 export const OFFSET_HORARIO_LIMA = -5;
 
@@ -40,6 +46,7 @@ export interface PartesFechaLima {
   dia: number;
   hora: number;
   minuto: number;
+  segundo: number;
   diaSemana: number;
 }
 
@@ -51,12 +58,15 @@ export interface ResultadoHorarioCorte {
   fechaLegal: string;
   /** Dia habil, dentro de 08:00 y 16:30. */
   dentroDeHorario: boolean;
+  dentroDeJornada?: boolean;
   /** El envio cayo en sabado, domingo o feriado. */
   diaNoHabil: boolean;
   /** El envio supero las 16:30. */
   despuesDelCorte: boolean;
   /** Se aplico la proyeccion al dia habil siguiente. */
   requiereProyeccion: boolean;
+  diferido?: boolean;
+  motivoDiferimiento?: 'FUERA_HORARIO' | 'FIN_DE_SEMANA' | 'FERIADO';
 }
 
 const formateadorLima = new Intl.DateTimeFormat('en-CA', {
@@ -66,6 +76,7 @@ const formateadorLima = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
   hour: '2-digit',
   minute: '2-digit',
+  second: '2-digit',
   hourCycle: 'h23',
   weekday: 'short',
 });
@@ -96,6 +107,7 @@ export function obtenerPartesLima(instante: Date): PartesFechaLima {
     dia,
     hora: Number(partes.hour),
     minuto: Number(partes.minute),
+    segundo: Number(partes.second || 0),
     diaSemana,
   };
 }
@@ -163,20 +175,38 @@ export function calcularHorarioCorte(
 
   const diaNoHabil = partes.diaSemana === 0 || partes.diaSemana === 6
     || setFeriados.has(partes.fecha);
-  const despuesDelCorte = partes.hora * 60 + partes.minuto >= MINUTOS_CORTE;
+  const segundosDelDia = partes.hora * 3600 + partes.minuto * 60 + partes.segundo;
+  // Regla legal y de Tesorería: 16:30:00 es el último instante permitido de jornada.
+  // A partir de 16:30:01 se computa como posterior al corte y se proyecta al siguiente día hábil.
+  const despuesDelCorte = segundosDelDia > SEGUNDOS_CORTE;
+  const antesDeApertura = segundosDelDia < SEGUNDOS_APERTURA;
   const requiereProyeccion = diaNoHabil || despuesDelCorte;
+
+  let motivoDiferimiento: 'FUERA_HORARIO' | 'FIN_DE_SEMANA' | 'FERIADO' | undefined;
+  if (partes.diaSemana === 0 || partes.diaSemana === 6) {
+    motivoDiferimiento = 'FIN_DE_SEMANA';
+  } else if (setFeriados.has(partes.fecha)) {
+    motivoDiferimiento = 'FERIADO';
+  } else if (despuesDelCorte || antesDeApertura) {
+    motivoDiferimiento = 'FUERA_HORARIO';
+  }
 
   const fechaLegal = requiereProyeccion
     ? siguienteDiaHabil(partes.fecha, setFeriados)
     : partes.fecha;
 
+  const dentroDeHorario = !diaNoHabil && !despuesDelCorte && !antesDeApertura;
+
   return {
     envioReal,
     radicacionLegal: aperturaEnLima(fechaLegal),
     fechaLegal,
-    dentroDeHorario: !requiereProyeccion,
+    dentroDeHorario,
+    dentroDeJornada: dentroDeHorario,
     diaNoHabil,
     despuesDelCorte,
     requiereProyeccion,
+    diferido: requiereProyeccion,
+    motivoDiferimiento,
   };
 }

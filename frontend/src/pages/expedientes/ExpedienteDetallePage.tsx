@@ -5,6 +5,7 @@ import { adaptarErrorAccion } from "../../utils/expedienteActions";
 
 import ExpedienteTimeline from "../../components/expedientes/ExpedienteTimeline";
 import ExpedienteClasificacion from "../../components/expedientes/ExpedienteClasificacion";
+import { ChecklistTupa } from "../../components/expedientes/ChecklistTupa";
 import ExpedienteVersiones from "../../components/expedientes/ExpedienteVersiones";
 import ExpedienteMetadatos from "../../components/expedientes/ExpedienteMetadatos";
 import DerivacionModal from "../../components/expedientes/DerivacionModal";
@@ -16,7 +17,12 @@ import DesgloseModal from "../../components/expedientes/DesgloseModal";
 import DigitalizacionModal from "../../components/expedientes/DigitalizacionModal";
 import ExpedienteActionToast from "../../components/expedientes/ExpedienteActionToast";
 import AsignarEvaluadorModal from "../../components/expedientes/AsignarEvaluadorModal";
+import { RecepcionFormalModal } from "../../components/expedientes/RecepcionFormalModal";
+import { RechazoExpedienteModal } from "../../components/expedientes/RechazoExpedienteModal";
 import { DespachoResolutivoSeccion } from "../../components/expedientes/DespachoResolutivoSeccion";
+import { CertificadoInglesPanel } from "../../components/expedientes/CertificadoInglesPanel";
+import { CertificadoEstudiosPanel } from "../../components/expedientes/CertificadoEstudiosPanel";
+import { AnotacionesInternasSeccion } from "../../components/expedientes/AnotacionesInternasSeccion";
 import { elevarExpedienteAFirma } from "../../api/expedienteActions";
 import { obtenerEvaluadorActivo, listarHistorialEvaluadores } from "../../api/evaluadoresApi";
 
@@ -91,7 +97,13 @@ export function VisorPdfExpediente({
   const [descargando, setDescargando] = useState(false);
   const indiceActual = seleccionado < pdfs.length ? seleccionado : 0;
   const documento = pdfs[indiceActual] ?? pdfs[0];
-  const esResolucion = Boolean(documento && (documento.nombre.toUpperCase().startsWith("RD-") || documento.nombre.toUpperCase().includes("RESOLUCION")));
+  const esResolucion = Boolean(
+    documento &&
+      (documento.nombre.toUpperCase().startsWith("RD-") ||
+        documento.nombre.toUpperCase().includes("RESOLUCION") ||
+        documento.nombre.toUpperCase().startsWith("BORR-CERT-") ||
+        documento.nombre.toUpperCase().startsWith("CERT-"))
+  );
   const [recurso, setRecurso] = useState<{ estado: "inactivo" | "cargando" | "error" | "listo"; url?: string; mensaje?: string }>({
     estado: abiertoInicial ? "cargando" : "inactivo",
   });
@@ -837,6 +849,8 @@ export default function ExpedienteDetallePage() {
   const [mensajeAlerta, setMensajeAlerta] = useState<{ tipo: "exito" | "error"; texto: string } | null>(null);
 
   const [modalActivo, setModalActivo] = useState<"derivacion" | "observacion" | "subsanacion" | "acumulacion" | null>(null);
+  const [modalRecepcionFormal, setModalRecepcionFormal] = useState(false);
+  const [modalRechazo, setModalRechazo] = useState(false);
   const usuarioArchivo = useAuthStore((state) => state.usuario);
   const [modalArchivar, setModalArchivar] = useState(false);
   const [modalDigitalizar, setModalDigitalizar] = useState(false);
@@ -879,6 +893,7 @@ export default function ExpedienteDetallePage() {
   const puedeRecepcionar = tieneFacultad("EXPEDIENTE_RECEPCIONAR");
   const puedeDigitalizar = tieneFacultad("EXPEDIENTE_ADJUNTAR");
   const puedeDerivar = tieneFacultad("EXPEDIENTE_DERIVAR");
+  const pagoPendiente = Boolean(expediente?.ordenPagoInfo?.pendienteVerificacion);
 
   const esGestorApoyo = useMemo(() => {
     const roles = Array.isArray(usuarioArchivo?.roles) ? usuarioArchivo.roles : [];
@@ -1050,6 +1065,11 @@ export default function ExpedienteDetallePage() {
             return {
               destinos: [{ area_destino_id: entrada.unidadDestinoId, es_copia: false }],
               proveido: entrada.proveido || "Derivación de expediente",
+              tipo_documento_sustento: entrada.tipoDocumentoSustento || "PROVEIDO",
+              numero_documento_sustento: entrada.numeroDocumentoSustento || undefined,
+              prioridad: entrada.prioridad || "NORMAL",
+              plazo_dias: entrada.plazoDias || undefined,
+              instrucciones: entrada.instrucciones || undefined,
             };
           },
         },
@@ -1193,7 +1213,11 @@ export default function ExpedienteDetallePage() {
             >
               ← Volver a la Bandeja
             </button>
-            <p className="text-xs text-slate-500">Plazo de atención no disponible</p>
+            <p className="text-xs text-slate-500">
+              {expediente?.tipoTramiteCodigo === "SUZ26-006"
+                ? "Procedimiento TUPA SUZ26-006 · Plazo referencial: 5 días hábiles"
+                : "Plazo de atención no disponible"}
+            </p>
           </div>
 
           <p className="text-sm font-bold text-blue-700">SIGD · IESTP "Suiza"</p>
@@ -1229,18 +1253,49 @@ export default function ExpedienteDetallePage() {
                     <span>👤 {evaluadorActivo ? "Reasignar Evaluador" : "Asignar Evaluador"}</span>
                   </button>
                 )}
-                {puedeRecepcionar && !estadoSinActuacion && ["REGISTRADO", "DERIVADO"].includes(expediente.estadoActual) && (
+                {puedeRecepcionar && !estadoSinActuacion && ["REGISTRADO", "DERIVADO", "SUBSANADO"].includes(expediente.estadoActual) && (
+                  (() => {
+                    const bloqueadoHabilitacion = expediente.estadoActual === "REGISTRADO" && expediente.habilitacionInfo && !expediente.habilitacionInfo.habilitado;
+                    return (
+                      <button
+                        type="button"
+                        disabled={recepcionando || Boolean(bloqueadoHabilitacion)}
+                        title={
+                          bloqueadoHabilitacion
+                            ? `Recepción en espera legal: restan ${expediente.habilitacionInfo?.diasHabilesRestantes ?? 0} días hábiles (hasta ${expediente.habilitacionInfo?.fechaHabilitacion ?? ''})`
+                            : "Confirmar la recepción formal del expediente en esta unidad orgánica"
+                        }
+                        onClick={() => {
+                          if (expediente.estadoActual === "REGISTRADO") {
+                            setModalRecepcionFormal(true);
+                          } else {
+                            void ejecutarRecepcion();
+                          }
+                        }}
+                        className={`rounded-lg px-3.5 py-2 text-xs font-semibold shadow-sm transition ${
+                          bloqueadoHabilitacion
+                            ? "bg-slate-300 text-slate-500 cursor-not-allowed"
+                            : "bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 cursor-pointer"
+                        }`}
+                      >
+                        {recepcionando ? "Recepcionando…" : (bloqueadoHabilitacion ? "⏳ En Espera Legal" : "✓ Recepcionar Expediente")}
+                      </button>
+                    );
+                  })()
+                )}
+                {!estadoSinActuacion && ["REGISTRADO", "RECEPCIONADO", "EN_CALIFICACION", "OBSERVADO"].includes(expediente.estadoActual) && (
                   <button
                     type="button"
-                    disabled={recepcionando}
-                    title="Confirmar la recepción formal del expediente en esta unidad orgánica"
-                    onClick={ejecutarRecepcion}
-                    className="rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
+                    title="Declarar Inadmisibilidad o Rechazo fundamentado del trámite (Arts. 136 y 142 LPAG)"
+                    onClick={() => setModalRechazo(true)}
+                    className="rounded-lg bg-rose-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-800 flex items-center gap-1.5 cursor-pointer"
                   >
-                    {recepcionando ? "Recepcionando…" : "✓ Recepcionar Expediente"}
+                    <span>🚫 Rechazar / Inadmisible</span>
                   </button>
                 )}
-                {!estadoSinActuacion && expediente.estadoActual === "EN_REVISION" && (
+                {!estadoSinActuacion &&
+                  expediente.estadoActual === "EN_REVISION" &&
+                  expediente.tipoTramiteCodigo !== "SUZ26-006" && (
                   <button
                     type="button"
                     title="Proyectar Resolución Directoral para este expediente en DocuCore"
@@ -1263,18 +1318,20 @@ export default function ExpedienteDetallePage() {
                 {puedeDerivar && (
                   <button
                     type="button"
-                    disabled={unidadesDestino.length === 0 || estadoSinActuacion}
+                    disabled={unidadesDestino.length === 0 || estadoSinActuacion || pagoPendiente}
                     title={
-                      unidadesDestino.length === 0
+                      pagoPendiente
+                        ? "Derivación pausada: el expediente cuenta con una orden de pago pendiente de verificación en Tesorería"
+                        : unidadesDestino.length === 0
                         ? "No hay unidades de destino disponibles en el catálogo institucional"
                         : "Derivar expediente a otra unidad orgánica"
                     }
                     onClick={() => {
-                      if (!puedeDerivar) return;
+                      if (!puedeDerivar || pagoPendiente) return;
                       setModalActivo("derivacion");
                     }}
                     className={`rounded-lg bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-800 ${
-                      unidadesDestino.length === 0 ? "opacity-60 cursor-not-allowed" : ""
+                      unidadesDestino.length === 0 || pagoPendiente ? "opacity-60 cursor-not-allowed" : ""
                     }`}
                   >
                     Derivar Expediente
@@ -1339,6 +1396,82 @@ export default function ExpedienteDetallePage() {
             El estado informado no tiene una actuacion documentada coincidente. Requiere reconciliacion institucional antes de continuar.
           </p>
         )}
+        {expediente?.ordenPagoInfo?.pendienteVerificacion && (
+          <div
+            role="alert"
+            className="rounded-xl border border-amber-400 bg-amber-50 p-4 text-sm text-amber-900 shadow-xs flex items-start gap-3"
+          >
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <p className="font-bold text-amber-950">
+                TRÁMITE SUJETO A PAGO — CONTROL OBLIGATORIO DE TESORERÍA:
+              </p>
+              <p className="mt-1 text-xs text-amber-900 leading-relaxed">
+                Este expediente cuenta con una orden de pago pendiente de verificación en Tesorería
+                {expediente.ordenPagoInfo.importe > 0 ? ` (Monto: S/ ${expediente.ordenPagoInfo.importe.toFixed(2)})` : ""}.
+                La derivación y atención administrativa ordinaria están pausadas hasta la confirmación de la recaudación en caja institucional conforme al Art. 53 del TUPA institucional y la Directiva de Recaudación.
+              </p>
+            </div>
+          </div>
+        )}
+        {expediente?.ordenPagoInfo?.pagoVerificado && (
+          <div
+            className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-900 shadow-xs flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-base text-emerald-600 font-bold">✓</span>
+              <span>
+                <strong>Pago Verificado en Tesorería:</strong> {expediente.ordenPagoInfo.reciboNumero ? `Recibo N° ${expediente.ordenPagoInfo.reciboNumero}` : "Recibo institucional confirmado"}
+                {expediente.ordenPagoInfo.importe > 0 ? ` · Importe: S/ ${expediente.ordenPagoInfo.importe.toFixed(2)}` : ""}
+              </span>
+            </div>
+            <span className="inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+              Caja Certificada
+            </span>
+          </div>
+        )}
+        {expediente?.habilitacionInfo && !expediente.habilitacionInfo.habilitado && expediente.estadoActual === "REGISTRADO" && (
+          <div
+            role="alert"
+            className="rounded-xl border border-blue-300 bg-blue-50/80 p-4 text-sm text-blue-900 shadow-xs flex items-start gap-3"
+          >
+            <span className="text-2xl">⏳</span>
+            <div className="space-y-1">
+              <p className="font-bold text-blue-950">
+                ESTADO: EN ESPERA LEGAL — CÓMPUTO DE 15 DÍAS HÁBILES (ART. 143 LPAG)
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-blue-900 mt-2">
+                <div><span className="font-semibold">Fecha de confirmación de pago:</span> {expediente.habilitacionInfo.fechaConfirmacionPago ? new Date(expediente.habilitacionInfo.fechaConfirmacionPago).toLocaleDateString("es-PE") : "Confirmado"}</div>
+                <div><span className="font-semibold">Inicio del cómputo:</span> {expediente.habilitacionInfo.fechaInicioComputo || "Siguiente día hábil"}</div>
+                <div><span className="font-semibold">Fecha de habilitación calculada:</span> <strong>{expediente.habilitacionInfo.fechaHabilitacion}</strong></div>
+                <div><span className="font-semibold">Días hábiles restantes:</span> <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-blue-200 text-blue-900">{expediente.habilitacionInfo.diasHabilesRestantes} días hábiles</span></div>
+              </div>
+              <p className="mt-1 text-[11px] text-blue-800 italic">
+                * Conforme al Art. 143 del TUO de la Ley N° 27444, se excluyen sábados, domingos y feriados aplicables. La recepción formal en Mesa de Partes permanece bloqueada hasta el cumplimiento íntegro del plazo.
+              </p>
+            </div>
+          </div>
+        )}
+        {expediente?.habilitacionInfo && expediente.habilitacionInfo.habilitado && expediente.habilitacionInfo.requierePago && expediente.estadoActual === "REGISTRADO" && (
+          <div
+            role="alert"
+            className="rounded-xl border border-emerald-300 bg-emerald-50/80 p-4 text-sm text-emerald-900 shadow-xs flex items-start gap-3"
+          >
+            <span className="text-2xl">✓</span>
+            <div className="space-y-1">
+              <p className="font-bold text-emerald-950">
+                ESTADO: EXPEDIENTE HABILITADO — PLAZO LEGAL DE 15 DÍAS HÁBILES CUMPLIDO
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-emerald-900 mt-2">
+                <div><span className="font-semibold">Fecha de pago:</span> {expediente.habilitacionInfo.fechaConfirmacionPago ? new Date(expediente.habilitacionInfo.fechaConfirmacionPago).toLocaleDateString("es-PE") : "Confirmado"}</div>
+                <div><span className="font-semibold">Habilitado desde:</span> {expediente.habilitacionInfo.fechaHabilitacion} (0 días hábiles restantes)</div>
+              </div>
+              <p className="mt-1 text-xs text-emerald-800">
+                El plazo obligatorio de espera legal ha culminado satisfactoriamente. El expediente se encuentra plenamente autorizado para recepción formal en Mesa de Partes.
+              </p>
+            </div>
+          </div>
+        )}
         {expediente?.acumulacionInfo?.esAccesorio && (
           <div
             role="alert"
@@ -1372,6 +1505,9 @@ export default function ExpedienteDetallePage() {
         {expediente && (
           <>
             <ExpedienteMetadatos expediente={expediente} />
+
+            {/* Sección de Calificación Administrativa (TUPA) */}
+            <ChecklistTupa expedienteId={expediente.idExpediente} />
 
             {/* Sección de Asignación Operativa de Evaluador (RutaDoc) */}
             <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -1529,6 +1665,34 @@ export default function ExpedienteDetallePage() {
               </div>
             </section>
             <SeccionClasificacionCCD expediente={expediente} />
+
+            {/* Sección de Anotaciones Internas de Seguimiento Institucional */}
+            <AnotacionesInternasSeccion
+              expedienteId={expediente.idExpediente}
+              evaluadorActivo={evaluadorActivo}
+            />
+
+            {/* Sección especializada SUZ26-006: Certificado de Inglés (Opción A) */}
+            {expediente.tipoTramiteCodigo === "SUZ26-006" && (
+              <CertificadoInglesPanel
+                expediente={expediente}
+                esSecretarioAcademico={Boolean(usuarioArchivo?.roles?.includes("SECRETARIO"))}
+                esDirectorAutorizado={esFirmanteAutorizado}
+                onElevarAFirma={handleElevarAFirma}
+                onAbrirDerivacion={puedeDerivar && !pagoPendiente ? () => setModalActivo("derivacion") : undefined}
+              />
+            )}
+
+            {/* Sección especializada SUZ26-034: Certificado de Estudios Superiores (6 semestres) */}
+            {(expediente.tipoTramiteCodigo === "SUZ26-034" || expediente.tipoTramiteCodigo === "SUZ26-035") && (
+              <CertificadoEstudiosPanel
+                expediente={expediente}
+                esSecretarioAcademico={Boolean(usuarioArchivo?.roles?.includes("SECRETARIO"))}
+                esDirectorAutorizado={esFirmanteAutorizado}
+                onElevarAFirma={handleElevarAFirma}
+                onAbrirDerivacion={puedeDerivar && !pagoPendiente ? () => setModalActivo("derivacion") : undefined}
+              />
+            )}
 
             {/* Sección de Despacho Resolutivo y Validez Legal (TSK-DEV-05.1) */}
             <DespachoResolutivoSeccion
@@ -1836,6 +2000,41 @@ export default function ExpedienteDetallePage() {
                     texto: evaluadorActivo
                       ? "Docente evaluador reasignado exitosamente. Se preservó la trazabilidad cuádruple."
                       : "Docente evaluador asignado exitosamente al expediente.",
+                  });
+                }}
+              />
+            )}
+
+            {modalRecepcionFormal && (
+              <RecepcionFormalModal
+                expedienteId={expediente.idExpediente}
+                cut={expediente.cut}
+                asunto={expediente.asunto}
+                canalSugerido={(expediente as any)?.canalIngreso ?? 'MESA_VIRTUAL'}
+                onCerrar={() => setModalRecepcionFormal(false)}
+                onExito={() => {
+                  void queryClient.invalidateQueries({ queryKey: ["expedientes"] });
+                  void queryClient.invalidateQueries({ queryKey: ["expediente", id] });
+                  void queryClient.invalidateQueries({ queryKey: ["expedientes", id, "timeline"] });
+                  void queryClient.invalidateQueries({ queryKey: ["trazabilidad", id] });
+                }}
+              />
+            )}
+
+            {modalRechazo && (
+              <RechazoExpedienteModal
+                expedienteId={expediente.idExpediente}
+                cut={expediente.cut}
+                onCerrar={() => setModalRechazo(false)}
+                onExito={() => {
+                  setModalRechazo(false);
+                  void queryClient.invalidateQueries({ queryKey: ["expedientes"] });
+                  void queryClient.invalidateQueries({ queryKey: ["expediente", id] });
+                  void queryClient.invalidateQueries({ queryKey: ["expedientes", id, "timeline"] });
+                  void queryClient.invalidateQueries({ queryKey: ["trazabilidad", id] });
+                  setMensajeAlerta({
+                    tipo: "exito",
+                    texto: "Expediente declarado inadmisible / rechazado formalmente con notificación en Casilla.",
                   });
                 }}
               />

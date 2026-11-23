@@ -330,7 +330,7 @@ export async function esSuperAdmin(pool: Pool, idUsuario: string): Promise<boole
   }
 }
 
-export const ROLES_FIRMA = ['DIRECTOR', 'ADMINISTRADOR'] as const;
+export const ROLES_FIRMA = ['DIRECTOR'] as const;
 
 export interface FacultadFirma {
   puedeFirmar: boolean;
@@ -342,7 +342,7 @@ export interface FacultadFirma {
 
 /**
  * Verifica las facultades legales de despacho del funcionario (Art. 5 del
- * Reglamento de Firmas): rol institucional DIRECTOR/ADMINISTRADOR o facultad de
+ * Reglamento de Firmas): rol institucional DIRECTOR o facultad de
  * despacho vigente en `sigd_org.facultad_despacho`, incluidas las suplencias
  * registradas en `sigd_org.encargatura_despacho`.
  */
@@ -436,12 +436,23 @@ export async function verificarFacultadFirma(
   }
 
   const rolFirmante = [...rolesGlobales].some((rol) => (ROLES_FIRMA as readonly string[]).includes(rol));
+  const tieneRolDirector = roles.has('DIRECTOR');
+  const tieneEncargatura = resultado.rows.some((r) => r.rol_codigo === null && r.vigente);
+
+  // Segregación institucional: ADMINISTRADOR es un rol técnico de plataforma/usuarios sin facultades de firma.
+  // La firma institucional de resoluciones requiere rol DIRECTOR o encargo formal de despacho.
+  const habilitadoParaFirmar = tieneRolDirector || tieneEncargatura;
+  const puedeFirmar = habilitadoParaFirmar && (rolFirmante || facultadGlobal || tipos.size > 0);
+
+  if (!habilitadoParaFirmar && (roles.has('ADMINISTRADOR') || roles.size > 0)) {
+    motivo ??= 'El usuario no posee rol DIRECTOR ni encargatura de despacho vigente para suscribir resoluciones.';
+  }
 
   return {
-    puedeFirmar: rolFirmante || facultadGlobal || tipos.size > 0,
+    puedeFirmar,
     roles: [...roles],
-    facultadGlobal: facultadGlobal || rolFirmante,
-    tiposAutorizados: [...tipos],
+    facultadGlobal: puedeFirmar && (facultadGlobal || rolFirmante),
+    tiposAutorizados: puedeFirmar ? [...tipos] : [],
     motivo,
   };
 }

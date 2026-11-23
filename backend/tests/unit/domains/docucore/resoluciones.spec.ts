@@ -181,11 +181,11 @@ describe('AF-24 — Bloqueo B: Despacho Proyección de Resoluciones & Compatibil
     });
 
     it('3.2 Controlador REST traduce la incompatibilidad de esquema a HTTP 503 con formato RFC 7807', async () => {
-      const token = firmarTokenAcceso({ sub: '10000000-0000-4000-8000-000000000001', roles: ['ADMINISTRADOR'] });
+      const token = firmarTokenAcceso({ sub: '10000000-0000-4000-8000-000000000001', roles: ['DIRECTOR'] });
       const mockPool = {
         query: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('AS roles')) {
-            return { rows: [{ roles: ['ADMINISTRADOR'], permisos: [{ codigo: 'ADMIN_USUARIOS', ambito: 'GLOBAL', areaId: null }] }] };
+            return { rows: [{ roles: ['DIRECTOR'], permisos: [{ codigo: 'FIRMA_FIRMAR', ambito: 'GLOBAL', areaId: null }] }] };
           }
           return { rows: [{ existe_proyecto: null, existe_secuencia: null }] };
         }),
@@ -284,6 +284,40 @@ describe('AF-24 — Bloqueo B: Despacho Proyección de Resoluciones & Compatibil
         });
 
       expect(respuesta.status).toBe(403);
+    });
+
+    it('3.6 Deniega la proyección de resoluciones al rol ADMINISTRADOR con HTTP 403 (segregación de funciones)', async () => {
+      const token = firmarTokenAcceso({ sub: '10000000-0000-4000-8000-000000000001', roles: ['ADMINISTRADOR'] });
+      const mockPool = {
+        query: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('AS roles')) {
+            return { rows: [{ roles: ['ADMINISTRADOR'], permisos: [{ codigo: 'ADMIN_USUARIOS', ambito: 'GLOBAL', areaId: null }] }] };
+          }
+          return { rows: [] };
+        }),
+      } as unknown as Pool;
+
+      const app = express();
+      app.use(express.json());
+      app.use('/api/v1/resoluciones', crearRouterResoluciones(mockPool));
+      app.use(errorMiddleware);
+
+      const respuesta = await request(app)
+        .post('/api/v1/resoluciones/proyectar')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          expedienteId: '99999999-8888-4777-8666-555555555555',
+          tipoResolucion: 'DIRECTORAL_ADMINISTRATIVA',
+          visto: 'El informe técnico administrativo N° 012-2026...',
+          considerandos: ['Considerando administrativo.'],
+          articulos: [{ numero: 1, texto: 'AUTORIZAR.' }],
+        });
+
+      expect(respuesta.status).toBe(403);
+      expect(respuesta.body).toMatchObject({
+        code: 'FORBIDDEN',
+        detail: expect.stringContaining('facultades para proyectar'),
+      });
     });
   });
 

@@ -17,6 +17,11 @@ export interface SolicitudDerivacion {
   readonly expediente: ExpedienteAccionReferencia;
   readonly unidadDestinoId: string;
   readonly proveido: string;
+  readonly tipoDocumentoSustento?: "PROVEIDO" | "MEMORANDO" | "OFICIO" | "INFORME";
+  readonly numeroDocumentoSustento?: string;
+  readonly prioridad?: "NORMAL" | "URGENTE" | "MUY_URGENTE";
+  readonly plazoDias?: number;
+  readonly instrucciones?: string;
 }
 
 export interface SolicitudObservacion {

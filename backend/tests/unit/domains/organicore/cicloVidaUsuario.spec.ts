@@ -157,7 +157,7 @@ describe('SIGD — Ciclo de Vida del Usuario y Asignación de Roles (15 Escenari
 
     const resultado = await service.asignarRol(USUARIO_ID, ROL_ESPECIALISTA_ID, ADMIN_ID);
     expect(resultado).toBeDefined();
-    expect(insertURParams).toEqual([USUARIO_ID, ROL_ESPECIALISTA_ID, AREA_ID]);
+    expect(insertURParams).toEqual([USUARIO_ID, ROL_ESPECIALISTA_ID, AREA_ID, expect.any(String)]);
   });
 
   // Escenario 9: asignarRol global ADMINISTRADOR deja area_id = null (H2)
@@ -198,7 +198,7 @@ describe('SIGD — Ciclo de Vida del Usuario y Asignación de Roles (15 Escenari
     const service = crearUsuariosAdminService({ connect: async () => ({ query, release }) } as unknown as Pool);
 
     await service.asignarRol(USUARIO_ID, ROL_ADMIN_ID, ADMIN_ID);
-    expect(insertURParams).toEqual([USUARIO_ID, ROL_ADMIN_ID, null]);
+    expect(insertURParams).toEqual([USUARIO_ID, ROL_ADMIN_ID, null, expect.any(String)]);
   });
 
   // Escenario 10: asignarRol rechaza roles externos CIUDADANO y ESTUDIANTE

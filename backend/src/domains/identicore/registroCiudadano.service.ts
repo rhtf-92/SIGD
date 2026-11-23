@@ -1,8 +1,9 @@
 import crypto from 'node:crypto';
 import { Argon2Service } from './argon2.service.js';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { AppError, ConflictError, NotFoundError, ValidationError } from '../../shared/domain/errors/index.js';
 import { insertarEvento } from '../../audit/evento-outbox.repository.js';
+import { cifrarTokenPayload } from '../../core/security/cifrado-payload.js';
 import type {
   RegistroCiudadanoInput,
   RegistroPersonaJuridicaInput,
@@ -31,10 +32,13 @@ interface ExisteResult {
 
 export interface RegistroResult {
   idPersona: string;
-  idUsuario?: string;
-  correo?: string;
-  tokenVerificacion?: string;
+  idUsuario: string;
+  idCasilla: string;
+  cvdCasilla: string;
+  correo: string;
   mensaje: string;
+  activo: true;
+  casillaHabilitada: true;
 }
 
 export class RegistroCiudadanoService {
@@ -430,11 +434,11 @@ export class RegistroCiudadanoService {
         );
       }
 
-      // La cuenta ciudadana se crea en estado inactivo (activo = false)
-      // esperando la verificación del correo electrónico institucional.
+      // La cuenta ciudadana se crea en estado ACTIVO (activo = true)
+      // conforme a la decisión institucional de activación automática y habilitación inmediata.
       const cuenta = await cliente.query<IdResult>(
         `INSERT INTO sigd_auth.cuenta_usuario (id_persona, usuario, correo, password_hash, activo)
-         VALUES ($1::uuid, $2, $3, $4, FALSE)
+         VALUES ($1::uuid, $2, $3, $4, TRUE)
          RETURNING id_usuario::text AS id`,
         [personaId, datos.numeroDocumento, datos.correo, passwordHash],
       );
@@ -449,17 +453,85 @@ export class RegistroCiudadanoService {
         await cliente.query(`INSERT INTO sigd_auth.perfil_usuario (id_usuario, telefono) VALUES ($1::uuid,$2)`, [usuarioId, datos.celular]);
       }
 
-      // Asignación de rol canónico CIUDADANO en sigd_org.usuario_rol
-      const rolCiudadano = await cliente.query(
-        `INSERT INTO sigd_org.usuario_rol (id_usuario, rol_id, area_id)
-         SELECT $1::uuid, rol_id, NULL
-           FROM sigd_org.rol_sistema
-          WHERE codigo = 'CIUDADANO' AND vigente = TRUE
-         ON CONFLICT DO NOTHING`,
-        [usuarioId],
+      // 5. Vinculación institucional canónica y asignación del rol CIUDADANO (Migración 24)
+      // 5.1. Resolver inequívocamente la institución IESTP Suiza
+      const institucionRes = await cliente.query<{ institucion_id: string }>(
+        `SELECT institucion_id
+           FROM sigd_org.institucion
+          WHERE codigo = 'IESTP_SUIZA' AND activo = TRUE`,
       );
-      if (rolCiudadano.rowCount !== 1) throw new AppError({ status: 503, code: 'CITIZEN_ROLE_NOT_CONFIGURED',
-        message: 'El registro ciudadano no está disponible temporalmente.' });
+      if (institucionRes.rows.length !== 1) {
+        throw new AppError({
+          status: 503,
+          code: 'INSTITUTION_NOT_CONFIGURED',
+          message: 'La institución IESTP «Suiza» no está configurada o activa para el registro de ciudadanos.',
+        });
+      }
+      const institucionId = institucionRes.rows[0].institucion_id;
+
+      // 5.2. Crear membresía en sigd_auth.usuario_institucion (condición previa obligatoria para FK en usuario_rol)
+      await cliente.query(
+        `INSERT INTO sigd_auth.usuario_institucion (id_usuario, institucion_id, activo)
+         VALUES ($1::uuid, $2::uuid, TRUE)
+         ON CONFLICT (id_usuario, institucion_id) DO NOTHING`,
+        [usuarioId, institucionId],
+      );
+
+      // Verificar que la membresía institucional existe y está activa
+      const membresiaRes = await cliente.query<{ activo: boolean }>(
+        `SELECT activo
+           FROM sigd_auth.usuario_institucion
+          WHERE id_usuario = $1::uuid AND institucion_id = $2::uuid`,
+        [usuarioId, institucionId],
+      );
+      if (!membresiaRes.rows[0]?.activo) {
+        throw new AppError({
+          status: 503,
+          code: 'INSTITUTIONAL_MEMBERSHIP_INACTIVE',
+          message: 'No se pudo establecer la vinculación institucional activa para el usuario.',
+        });
+      }
+
+      // 5.3. Obtener rol_id canónico de CIUDADANO
+      const rolRes = await cliente.query<{ rol_id: string }>(
+        `SELECT rol_id
+           FROM sigd_org.rol_sistema
+          WHERE codigo = 'CIUDADANO' AND vigente = TRUE`,
+      );
+      if (rolRes.rows.length !== 1) {
+        throw new AppError({
+          status: 503,
+          code: 'CITIZEN_ROLE_NOT_CONFIGURED',
+          message: 'El registro ciudadano no está disponible temporalmente.',
+        });
+      }
+      const rolId = rolRes.rows[0].rol_id;
+
+      // 5.4. Asignar rol CIUDADANO en sigd_org.usuario_rol
+      await cliente.query(
+        `INSERT INTO sigd_org.usuario_rol (id_usuario, rol_id, area_id, institucion_id)
+         VALUES ($1::uuid, $2::uuid, NULL, $3::uuid)
+         ON CONFLICT DO NOTHING`,
+        [usuarioId, rolId, institucionId],
+      );
+
+      // 5.5. Verificar formalmente que la asignación institucional esperada existe y está vigente
+      const rolVerifRes = await cliente.query<{ id_usuario_rol: string }>(
+        `SELECT ur.id_usuario_rol
+           FROM sigd_org.usuario_rol ur
+          WHERE ur.id_usuario = $1::uuid
+            AND ur.rol_id = $2::uuid
+            AND ur.institucion_id = $3::uuid
+            AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > CURRENT_TIMESTAMP)`,
+        [usuarioId, rolId, institucionId],
+      );
+      if (rolVerifRes.rows.length === 0) {
+        throw new AppError({
+          status: 503,
+          code: 'CITIZEN_ROLE_NOT_CONFIGURED',
+          message: 'El registro ciudadano no está disponible temporalmente.',
+        });
+      }
 
       // Consentimientos normativos Ley N° 29733 (sigd_auth.consentimiento_datos)
       await cliente.query(
@@ -480,29 +552,29 @@ export class RegistroCiudadanoService {
         );
       }
 
-      // Generación de token criptográficamente seguro para verificación de correo (24h vigencia)
-      const tokenRaw = crypto.randomBytes(32).toString('hex');
-      const tokenHash = crypto.createHash('sha256').update(tokenRaw).digest('hex');
-      const expiraEn = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      // Inicialización formal de la Casilla Electrónica Institucional y emisión del acto de apertura
+      // dentro de la misma transacción (BEGIN ... COMMIT), mediante la operación canónica compartida.
+      const casillaApertura = await this.abrirCasillaElectronicaEnTransaccion(cliente, {
+        usuarioId,
+        usuario: datos.numeroDocumento,
+        correo: datos.correo,
+      });
 
-      await cliente.query(
-        `INSERT INTO sigd_auth.token_verificacion_correo
-           (id_usuario, correo, token_hash, tipo, expira_en)
-         VALUES ($1::uuid, $2, $3, 'ACTIVACION_CUENTA', $4)`,
-        [usuarioId, datos.correo, tokenHash, expiraEn],
-      );
+      const nombreTitular = datos.tipoPersona === 'NATURAL'
+        ? [datos.nombres, datos.apellidoPaterno, datos.apellidoMaterno].filter(Boolean).join(' ')
+        : (datos.razonSocial ?? datos.numeroDocumento);
 
-      // Publicación en Transactional Outbox para despacho asíncrono de correo
+      // Publicación en Transactional Outbox del evento canónico de activación de cuenta
       await insertarEvento(cliente, {
         agregado: 'cuenta_usuario',
-        tipo_evento: 'verificacion_correo_solicitada',
+        tipo_evento: 'cuenta_activada',
         payload: {
           idUsuario: usuarioId,
+          idCasilla: casillaApertura.idCasilla,
+          cvdCasilla: casillaApertura.cvdCasilla,
           correo: datos.correo,
-          nombreCompleto: datos.nombres,
-          tipoPersona: datos.tipoPersona,
-          token: tokenRaw,
-          expiraEn: expiraEn.toISOString(),
+          titular: nombreTitular,
+          fechaActivacion: new Date().toISOString(),
         },
       });
 
@@ -523,7 +595,11 @@ export class RegistroCiudadanoService {
         verificacionRepresentante: datos.tipoPersona === 'JURIDICA' && datos.verificacionTitularidad ? 'CONTROL_CONTACTO_REPRESENTANTE_OTP_DECLARACION_NO_VERIFICA_SUNARP' : null,
         partidaRegistral: datos.partidaRegistral,
         ipAddress: datos.ipAddress,
-        activo: false,
+        activo: true,
+        correoVerificado: false,
+        casillaHabilitada: true,
+        idCasilla: casillaApertura.idCasilla,
+        cvdCasilla: casillaApertura.cvdCasilla,
       };
 
       await cliente.query(
@@ -544,9 +620,12 @@ export class RegistroCiudadanoService {
       return {
         idPersona: personaId,
         idUsuario: usuarioId,
+        idCasilla: casillaApertura.idCasilla,
+        cvdCasilla: casillaApertura.cvdCasilla,
         correo: datos.correo,
-        tokenVerificacion: tokenRaw,
         mensaje: 'Registro exitoso',
+        activo: true,
+        casillaHabilitada: true,
       };
     } catch (error) {
       if (transaccionAbierta) await cliente.query('ROLLBACK');
@@ -655,23 +734,12 @@ export class RegistroCiudadanoService {
       );
 
       // Inicializar formalmente la Casilla Electrónica Institucional con el acto de apertura
-      const cuerpoCasilla = {
-        mensaje: 'Bienvenido al Sistema Integral de Gestión Documentaria del IESTP Público Suiza. Su Casilla Electrónica Institucional ha sido habilitada conforme al TUO de la Ley N° 27444. A través de este canal oficial se realizarán las notificaciones legales y administrativas de sus trámites con plena validez procesal.',
-        tipo: 'APERTURA_CASILLA',
-        fechaActivacion: new Date().toISOString(),
+      // reutilizando la operación canónica compartida sobre el PoolClient transaccional.
+      const casillaApertura = await this.abrirCasillaElectronicaEnTransaccion(cliente, {
+        usuarioId: fila.id_usuario,
         usuario: fila.usuario,
         correo: fila.correo,
-      };
-      const hashCasilla = crypto.createHash('sha256').update(JSON.stringify(cuerpoCasilla)).digest('hex');
-      const cvdCasilla = `CVD-CASILLA-${fila.id_usuario.slice(0, 8).toUpperCase()}`;
-
-      await cliente.query(
-        `INSERT INTO sigd_auth.notificacion_casilla
-           (usuario_id, correo_destinatario, cut, asunto, tipo_acto, numero_documento, cuerpo, referencia, estado, fecha_deposito, hash_sha256, cvd)
-         VALUES
-           ($1, $2, NULL, 'Bienvenida a su Casilla Electrónica Institucional - IESTP Suiza', 'Apertura de Casilla Electrónica', 'CASILLA-APERTURA-' || to_char(now(), 'YYYYMMDD'), $3::jsonb, 'Ley N° 27444 / TUO', 'NO_LEIDO', now(), $4, $5)`,
-        [fila.id_usuario, fila.correo, JSON.stringify(cuerpoCasilla), hashCasilla, cvdCasilla],
-      );
+      });
 
       // Encolar evento outbox
       await insertarEvento(cliente, {
@@ -679,6 +747,8 @@ export class RegistroCiudadanoService {
         tipo_evento: 'cuenta_activada',
         payload: {
           idUsuario: fila.id_usuario,
+          idCasilla: casillaApertura.idCasilla,
+          cvdCasilla: casillaApertura.cvdCasilla,
           correo: fila.correo,
           titular: fila.titular,
           fechaActivacion: new Date().toISOString(),
@@ -726,7 +796,6 @@ export class RegistroCiudadanoService {
     exito: boolean;
     mensaje: string;
     correo?: string;
-    tokenVerificacion?: string;
   }> {
     if (!identificador || typeof identificador !== 'string' || identificador.trim().length < 3) {
       throw new ValidationError({
@@ -798,6 +867,8 @@ export class RegistroCiudadanoService {
         [user.id_usuario, user.correo, tokenHash, expiraEn],
       );
 
+      const tokenCifrado = cifrarTokenPayload(tokenRaw);
+
       await insertarEvento(cliente, {
         agregado: 'cuenta_usuario',
         tipo_evento: 'verificacion_correo_solicitada',
@@ -805,7 +876,7 @@ export class RegistroCiudadanoService {
           idUsuario: user.id_usuario,
           correo: user.correo,
           titular: user.titular,
-          token: tokenRaw,
+          tokenCifrado,
           expiraEn: expiraEn.toISOString(),
           reenvio: true,
         },
@@ -833,7 +904,6 @@ export class RegistroCiudadanoService {
         exito: true,
         mensaje: 'Se ha enviado un nuevo enlace de activación a su correo electrónico.',
         correo: user.correo,
-        tokenVerificacion: tokenRaw,
       };
     } catch (error) {
       if (transaccionAbierta) await cliente.query('ROLLBACK');
@@ -841,6 +911,79 @@ export class RegistroCiudadanoService {
     } finally {
       cliente.release();
     }
+  }
+
+  /**
+   * Operación canónica, atómica e idempotente de apertura formal de la Casilla Electrónica
+   * Institucional sobre el PoolClient compartido de la transacción activa.
+   * Garantiza:
+   * - Emisión del acto de apertura y notificación inaugural en sigd_auth.notificacion_casilla.
+   * - Cálculo de hash SHA-256 y Código de Verificación Digital (CVD) canónico.
+   * - Idempotencia estricta (reutiliza la apertura previa si ya existe, sin duplicar).
+   * - Falla cerrada (fail-closed): si no se persiste la apertura, revierte toda la transacción.
+   */
+  private async abrirCasillaElectronicaEnTransaccion(
+    cliente: PoolClient,
+    params: {
+      usuarioId: string;
+      usuario: string;
+      correo: string;
+    },
+  ): Promise<{ idCasilla: string; cvdCasilla: string; hashSha256: string }> {
+    const existente = await cliente.query<{ id: string; cvd: string; hash_sha256: string }>(
+      `SELECT id::text AS id, cvd, hash_sha256
+         FROM sigd_auth.notificacion_casilla
+        WHERE usuario_id = $1::uuid
+          AND tipo_acto = 'Apertura de Casilla Electrónica'
+        LIMIT 1
+        FOR UPDATE`,
+      [params.usuarioId],
+    );
+    if (existente.rows[0]?.id && existente.rows[0]?.cvd && existente.rows[0]?.hash_sha256) {
+      return {
+        idCasilla: existente.rows[0].id,
+        cvdCasilla: existente.rows[0].cvd,
+        hashSha256: existente.rows[0].hash_sha256,
+      };
+    }
+
+    const cuerpoCasilla = {
+      mensaje: 'Bienvenido al Sistema Integral de Gestión Documentaria del IESTP Público Suiza. Su Casilla Electrónica Institucional ha sido habilitada conforme al TUO de la Ley N° 27444. A través de este canal oficial se realizarán las notificaciones legales y administrativas de sus trámites con plena validez procesal.',
+      tipo: 'APERTURA_CASILLA',
+      fechaActivacion: new Date().toISOString(),
+      usuario: params.usuario,
+      correo: params.correo,
+    };
+    const hashCasilla = crypto.createHash('sha256').update(JSON.stringify(cuerpoCasilla)).digest('hex');
+    const cvdCasilla = `CVD-CASILLA-${params.usuarioId.slice(0, 8).toUpperCase()}`;
+
+    const insertada = await cliente.query<{ id: string; cvd: string; hash_sha256: string }>(
+      `INSERT INTO sigd_auth.notificacion_casilla
+         (usuario_id, correo_destinatario, cut, asunto, tipo_acto, numero_documento, cuerpo, referencia, estado, fecha_deposito, hash_sha256, cvd)
+       SELECT $1::uuid, $2, NULL, 'Bienvenida a su Casilla Electrónica Institucional - IESTP Suiza', 'Apertura de Casilla Electrónica',
+              'CASILLA-APERTURA-' || to_char(now(), 'YYYYMMDD'), $3::jsonb, 'Ley N° 27444 / TUO', 'NO_LEIDO', now(), $4, $5
+        WHERE NOT EXISTS (
+          SELECT 1 FROM sigd_auth.notificacion_casilla
+           WHERE usuario_id = $1::uuid AND tipo_acto = 'Apertura de Casilla Electrónica'
+        )
+       RETURNING id::text AS id, cvd, hash_sha256`,
+      [params.usuarioId, params.correo, JSON.stringify(cuerpoCasilla), hashCasilla, cvdCasilla],
+    );
+
+    const fila = insertada.rows[0];
+    if (!fila?.id || !fila.cvd || !fila.hash_sha256) {
+      throw new AppError({
+        status: 503,
+        code: 'CASILLA_OPENING_FAILED',
+        message: 'No se pudo completar la apertura formal de la Casilla Electrónica Institucional.',
+      });
+    }
+
+    return {
+      idCasilla: fila.id,
+      cvdCasilla: fila.cvd,
+      hashSha256: fila.hash_sha256,
+    };
   }
 
   async capacidadesRegistro(): Promise<{ domicilio: boolean; verificacionContacto: boolean }> {

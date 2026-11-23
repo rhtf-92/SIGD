@@ -16,6 +16,22 @@ export const RecepcionarExpedienteSchema = z
       .trim()
       .max(1000, { message: 'Las observaciones no pueden exceder los 1000 caracteres.' })
       .optional(),
+    canalRecepcion: z
+      .enum(['MESA_PRESENCIAL', 'MESA_VIRTUAL'])
+      .optional(),
+    cantidadFolios: z
+      .number()
+      .int()
+      .positive({ message: 'La cantidad de folios debe ser un número entero positivo.' })
+      .optional(),
+    cantidadDocumentos: z
+      .number()
+      .int()
+      .positive({ message: 'La cantidad de documentos debe ser un número entero positivo.' })
+      .optional(),
+    generarCargo: z
+      .boolean()
+      .optional(),
   })
   .strict();
 

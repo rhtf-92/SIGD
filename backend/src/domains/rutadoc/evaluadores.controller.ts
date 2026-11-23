@@ -12,6 +12,11 @@ import {
   EmitirDictamenSchema,
   FiltrosBandejaDocenteSchema,
 } from './dto/evaluacionDocente.dto.js';
+import { CrearAnotacionInternaSchema } from './dto/anotacionesInternas.dto.js';
+import {
+  registrarAnotacionInterna,
+  listarAnotacionesInternas,
+} from './anotacionesInternas.service.js';
 import {
   asignarEvaluador,
   reasignarEvaluador,
@@ -417,6 +422,60 @@ export function crearRouterEvaluadores(
       } finally {
         cliente.release();
       }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // HITO 8: Módulo de Anotaciones Internas de Seguimiento Académico
+  router.post('/:id/anotaciones-internas', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const expedienteId = String(req.params.id);
+      if (!z.string().uuid().safeParse(expedienteId).success) {
+        throw new ValidationError({
+          invalidParams: [{ name: 'id', reason: 'Identificador de expediente inválido.' }],
+        });
+      }
+
+      const actor = await proveedorActor.obtenerActor(req);
+      if (!actor) throw new UnauthorizedError();
+
+      const datos = CrearAnotacionInternaSchema.parse(req.body);
+      const cliente = await pool.connect();
+      try {
+        await cliente.query('BEGIN');
+        const anotacion = await registrarAnotacionInterna(cliente, expedienteId, actor, datos);
+        await cliente.query('COMMIT');
+        res.status(201).json({
+          ok: true,
+          mensaje: 'Anotación interna registrada exitosamente.',
+          anotacion,
+        });
+      } catch (err) {
+        await cliente.query('ROLLBACK').catch(() => {});
+        throw err;
+      } finally {
+        cliente.release();
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/:id/anotaciones-internas', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const expedienteId = String(req.params.id);
+      if (!z.string().uuid().safeParse(expedienteId).success) {
+        throw new ValidationError({
+          invalidParams: [{ name: 'id', reason: 'Identificador de expediente inválido.' }],
+        });
+      }
+
+      const actor = await proveedorActor.obtenerActor(req);
+      if (!actor) throw new UnauthorizedError();
+
+      const resultado = await listarAnotacionesInternas(pool, expedienteId, actor);
+      res.status(200).json(resultado);
     } catch (error) {
       next(error);
     }

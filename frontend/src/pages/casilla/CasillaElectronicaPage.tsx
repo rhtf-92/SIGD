@@ -5,7 +5,8 @@
  */
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { LogOut } from "lucide-react";
 
 import NotificationList from "../../components/casilla/NotificacionList";
 import NotificacionDetailModal from "../../components/casilla/NotificacionDetailModal";
@@ -15,6 +16,19 @@ import { CasillaBadgeRealtime } from "../../components/casilla/CasillaBadgeRealt
 
 export default function CasillaElectronicaPage() {
   const [mostrarBannerInfo, setMostrarBannerInfo] = useState(true);
+  const navigate = useNavigate();
+  const cerrarSesion = useAuthStore((state) => state.cerrarSesion);
+  const [cerrandoSesion, setCerrandoSesion] = useState(false);
+
+  async function handleCerrarSesion() {
+    if (cerrandoSesion) return;
+    setCerrandoSesion(true);
+    try {
+      await cerrarSesion();
+    } finally {
+      navigate("/casilla/login", { replace: true });
+    }
+  }
   const nombreUsuario = useAuthStore((state) => state.usuario?.nombreCompleto);
   const {
     filtros,
@@ -106,7 +120,16 @@ export default function CasillaElectronicaPage() {
                   </div>
                 </div>
               </div>
-
+              <button
+                type="button"
+                onClick={handleCerrarSesion}
+                disabled={cerrandoSesion}
+                className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-red-200 bg-red-50/80 px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-red-700 transition hover:bg-red-100 hover:text-red-800 disabled:opacity-50 cursor-pointer"
+                title="Cerrar sesión de la Casilla"
+              >
+                <LogOut className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>{cerrandoSesion ? "Cerrando…" : "Cerrar sesión"}</span>
+              </button>
               <Link
                 to="/"
                 className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 hover:border-slate-400 active:scale-98"

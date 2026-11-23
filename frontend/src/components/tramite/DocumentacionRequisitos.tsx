@@ -1,6 +1,7 @@
 import type { ChangeEvent } from 'react';
 import type { DocumentacionTramite, ClasificacionAdjunto } from '../../types/documentacionTramite';
 import type { ArchivoTramite } from '../../types/tramiteWizardState';
+import { autoAsociarArchivosRequisitos, evaluarRequisitosTramite } from '../../services/documentacionTramiteService';
 
 export interface DestinoCarga {
   clasificacion: ClasificacionAdjunto;
@@ -18,6 +19,8 @@ interface Props {
 export function DocumentacionRequisitos({ detalle, archivos, disabled, adjuntar }: Props) {
   const esPendienteValidacion = detalle.estadoValidacion === 'PENDIENTE_VALIDACION_DOCUMENTAL';
   const sinAnexos = Boolean(detalle.sinAnexosEspecificos || detalle.anexos.length === 0);
+  const archivosAsociados = autoAsociarArchivosRequisitos(detalle, archivos);
+  const evaluaciones = evaluarRequisitosTramite(detalle, archivosAsociados);
 
   return (
     <section className="mt-3 space-y-3 text-sm" aria-label="Requisitos y tarifa del procedimiento">
@@ -81,6 +84,24 @@ export function DocumentacionRequisitos({ detalle, archivos, disabled, adjuntar 
         )}
       </div>
 
+      {(detalle.codigo === 'SUZ26-006' || detalle.codigoVisible === 'SUZ26-006') && (
+        <div role="status" className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-950 space-y-1">
+          <p className="font-bold">Certificado de Inglés — Opción A (Estudios culminados y aprobados en el IESTP Suiza)</p>
+          <p className="text-indigo-900">
+            El solicitante únicamente debe adjuntar su Solicitud Única de Trámite (FUT) en PDF y realizar el pago del derecho de tramitación (S/ 100.00 en Tesorería) luego de obtener el CUT. Conforme al Principio de No Duplicación (TUO Ley N° 27444, Art. 48), no adjunte boletas de notas ni certificados previos: Secretaría Académica verificará internamente de oficio los antecedentes académicos de inglés registrados en la institución antes de la emisión y firma digital por Dirección General.
+          </p>
+        </div>
+      )}
+
+      {(detalle.codigo === 'SUZ26-034' || detalle.codigo === 'SUZ26-035' || detalle.codigoVisible === 'SUZ26-034') && (
+        <div role="status" className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-950 space-y-1">
+          <p className="font-bold">Certificado de Estudios Superiores (6 semestres) — IESTP Suiza (TUPA 2026, Pág. 4)</p>
+          <p className="text-indigo-900">
+            El solicitante únicamente debe adjuntar su Solicitud Única de Trámite (FUT) en PDF y realizar el pago del derecho de tramitación (S/ 124.00 en Tesorería) luego de obtener el CUT. Conforme al Principio de No Duplicación (TUO Ley N° 27444, Art. 48), no debe adjuntar certificados de semestres anteriores ni actas de notas: Secretaría Académica verificará internamente de oficio los registros institucionales de los 6 semestres académicos cursados y aprobados antes de la emisión y firma digital por Dirección General.
+          </p>
+        </div>
+      )}
+
       {/* Aviso transparente si está pendiente de validación */}
       {esPendienteValidacion && (
         <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900 flex items-start gap-2">
@@ -120,7 +141,8 @@ export function DocumentacionRequisitos({ detalle, archivos, disabled, adjuntar 
           )}
 
           {requisitos.map((r) => {
-            const adjuntos = archivos.filter((a) => a.requisitoId === r.id);
+            const adjuntos = archivosAsociados.filter((a) => a.requisitoId === r.id);
+            const evaluacion = evaluaciones.find((e) => e.id === r.id);
             const nombre = r.nombre.replace(/\s*\(la fuente no establece obligatoriedad de adjuntarla\)\s*$/i, '');
 
             return (
@@ -155,20 +177,50 @@ export function DocumentacionRequisitos({ detalle, archivos, disabled, adjuntar 
                   </p>
                 )}
 
-                <p className="text-xs" role="status">
-                  {adjuntos.length ? (
-                    <span className="text-emerald-700 font-medium">
-                      ✓ Cargado ({adjuntos.length}): {adjuntos.map((a) => a.nombre).join(', ')}
-                    </span>
-                  ) : r.obligatorio ? (
-                    <span className="text-amber-800">⚠️ Pendiente de adjuntar</span>
-                  ) : (
-                    <span className="text-slate-500">Sin adjuntar (opcional)</span>
+                <div className="pt-0.5" role="status">
+                  {evaluacion?.estado === 'PRESENTADO' && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
+                        <svg className="w-3.5 h-3.5 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                        PRESENTADO
+                      </span>
+                      <span className="text-xs text-emerald-900 font-medium">
+                        Archivo: {adjuntos.map((a) => a.nombre).join(', ')} ({adjuntos.map((a) => `${a.paginas ?? 1} pág.`).join(', ')})
+                      </span>
+                    </div>
                   )}
-                </p>
+
+                  {evaluacion?.estado === 'OBSERVADO' && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-xs font-bold text-amber-900">
+                        ⚠️ OBSERVADO
+                      </span>
+                      <span className="text-xs text-amber-900 font-medium">
+                        {evaluacion.motivoObservacion}
+                      </span>
+                    </div>
+                  )}
+
+                  {evaluacion?.estado === 'PENDIENTE' && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`inline-flex items-center gap-1 rounded px-2.5 py-0.5 text-xs font-bold ${
+                        r.obligatorio
+                          ? 'bg-amber-100 border border-amber-300 text-amber-900'
+                          : 'bg-slate-100 border border-slate-300 text-slate-700'
+                      }`}>
+                        {r.obligatorio ? '⚠️ PENDIENTE' : 'PENDIENTE (OPCIONAL)'}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {r.obligatorio ? 'Documento obligatorio pendiente de adjuntar.' : 'Documento facultativo sin adjuntar.'}
+                      </span>
+                    </div>
+                  )}
+                </div>
 
                 <label className="block mt-2 text-xs font-medium text-blue-800">
-                  Adjuntar PDF: {nombre}
+                  {adjuntos.length ? `Reemplazar / Adjuntar PDF: ${nombre}` : `Adjuntar PDF: ${nombre}`}
                   <input
                     aria-label={`Adjuntar PDF: ${nombre}`}
                     type="file"

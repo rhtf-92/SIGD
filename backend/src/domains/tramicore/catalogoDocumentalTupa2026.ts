@@ -309,35 +309,35 @@ export const CATALOGO_DOCUMENTAL_TUPA_2026: readonly ConfiguracionDocumentalProc
     "rubro": "Proyectos Productivos — Venta de servicios",
     "paginaFuente": 1,
     "costoFuente": "S/ 100.00",
-    "estadoValidacion": "PENDIENTE_VALIDACION_DOCUMENTAL",
+    "estadoValidacion": "VALIDADO",
     "sinAnexosEspecificos": true,
-    "observacionInstitucional": "Procedimiento registrado en el TUPA 2026 (Página 1). Requisitos específicos y unidad responsable pendiente de validación institucional; se admite radicación con Solicitud General (FUT) sin bloquear el trámite.",
+    "observacionInstitucional": "Opción A — Emisión de certificado por estudios de inglés culminados y aprobados en el propio IESTP Suiza. El ciudadano radica FUT en Mesa de Partes y cancela el derecho en Tesorería (S/ 100.00 — B/V). Secretaría Académica verifica internamente los antecedentes académicos institucionales y Dirección General aprueba y suscribe digitalmente el certificado. Parámetro operativo: plazo referencial 5 días hábiles y silencio positivo (el TUPA 2026 pág. 1 consigna derecho de pago S/ 100.00 en Tesorería y emisión de B/V).",
     "unidadRecepcion": "Mesa de Partes (MP)",
-    "unidadResponsable": "Secretaría Académica (SEC) — Pendiente de validación institucional",
-    "autoridadResolutiva": "Secretaría Académica / Dirección General (Pendiente de formalización)",
-    "plazoDias": null,
-    "silencioAdministrativo": "PENDIENTE_VALIDACION",
+    "unidadResponsable": "Secretaría Académica (SEC)",
+    "autoridadResolutiva": "Dirección General (DG)",
+    "plazoDias": 5,
+    "silencioAdministrativo": "POSITIVO",
     "versionTupa": "TUPA-2026-V1",
     "requisitos": [
       {
         "id": "REQ-SUZ26-006-FUT",
         "codigo": "FUT",
         "nombre": "Solicitud Formal Única de Trámite (FUT)",
-        "descripcion": "Formulario oficial debidamente llenado con datos de identificación y petitorio claro.",
+        "descripcion": "Formulario oficial debidamente llenado con datos de identificación y petitorio claro de emisión de Certificado de Inglés por estudios culminados y aprobados en el IESTP Suiza.",
         "obligatorio": true,
         "clasificacion": "EXPEDIENTE",
         "formatosAdmitidos": [
           "application/pdf"
         ],
-        "observaciones": "Documento principal de radicación exigido para formalizar el inicio del expediente.",
+        "observaciones": "Documento principal de radicación. No requiere adjuntar notas ni constancias internas: Secretaría Académica verifica el historial institucional directamente.",
         "fuente": "TUPA 2026 IESTP Suiza, Página 1",
-        "estadoValidacion": "PENDIENTE_VALIDACION",
+        "estadoValidacion": "VALIDADO_OFICIAL",
         "versionTupa": "TUPA-2026-V1",
         "tipoOrigen": "ESTANDAR_GENERAL"
       }
     ],
     "anexos": [],
-    "unidadResponsableVerificada": false
+    "unidadResponsableVerificada": true
   },
   {
     "codigoInterno": "SUZ26-007",
@@ -1390,14 +1390,14 @@ export const CATALOGO_DOCUMENTAL_TUPA_2026: readonly ConfiguracionDocumentalProc
     "rubro": "Ingresos Propios — Servicios Académicos; Proceso de Titulación",
     "paginaFuente": 4,
     "costoFuente": "S/ 124.00 (2.24 % UIT vigente)",
-    "estadoValidacion": "PENDIENTE_VALIDACION_DOCUMENTAL",
+    "estadoValidacion": "VALIDADO",
     "sinAnexosEspecificos": true,
-    "observacionInstitucional": "Procedimiento registrado en el TUPA 2026 (Página 4). Requisitos específicos y unidad responsable pendiente de validación institucional; se admite radicación con Solicitud General (FUT) sin bloquear el trámite.",
+    "observacionInstitucional": "Procedimiento institucional SUZ26-034 conforme al TUPA 2026 (Página 4). Certificado de Estudios Superiores (6 semestres), derecho de tramitación S/ 124.00, calificación por Secretaría Académica y suscripción digital por Dirección General.",
     "unidadRecepcion": "Mesa de Partes (MP)",
     "unidadResponsable": "Secretaría Académica (SEC)",
     "autoridadResolutiva": "Dirección General (DG)",
-    "plazoDias": null,
-    "silencioAdministrativo": "PENDIENTE_VALIDACION",
+    "plazoDias": 30,
+    "silencioAdministrativo": "NEGATIVO",
     "versionTupa": "TUPA-2026-V1",
     "requisitos": [
       {
@@ -1412,13 +1412,31 @@ export const CATALOGO_DOCUMENTAL_TUPA_2026: readonly ConfiguracionDocumentalProc
         ],
         "observaciones": "Documento principal de radicación exigido para formalizar el inicio del expediente.",
         "fuente": "TUPA 2026 IESTP Suiza, Página 4",
-        "estadoValidacion": "PENDIENTE_VALIDACION",
+        "estadoValidacion": "VALIDADO_OFICIAL",
+        "versionTupa": "TUPA-2026-V1",
+        "tipoOrigen": "ESTANDAR_GENERAL"
+      },
+      {
+        "id": "REQ-SUZ26-035-COMPROBANTE",
+        "codigo": "COMPROBANTE_PAGO",
+        "nombre": "Comprobante de Pago por Derecho de Trámite",
+        "descripcion": "Comprobante emitido por Tesorería o entidad recaudadora autorizada (S/ 124.00 · 2.24% UIT).",
+        "obligatorio": false,
+        "clasificacion": "EXPEDIENTE",
+        "formatosAdmitidos": [
+          "application/pdf",
+          "image/jpeg",
+          "image/png"
+        ],
+        "observaciones": "Verificación y conciliación de pago a cargo de Tesorería del IESTP Suiza.",
+        "fuente": "TUPA 2026 IESTP Suiza, Página 4",
+        "estadoValidacion": "VALIDADO_OFICIAL",
         "versionTupa": "TUPA-2026-V1",
         "tipoOrigen": "ESTANDAR_GENERAL"
       }
     ],
     "anexos": [],
-    "unidadResponsableVerificada": false
+    "unidadResponsableVerificada": true
   },
   {
     "codigoInterno": "SUZ26-036",

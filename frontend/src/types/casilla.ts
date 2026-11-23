@@ -62,6 +62,7 @@ export interface AcuseNotificacion {
   entidadEmisora: string | null;
   unidadEmisora: string | null;
   fechaEfectoLegal: string | null;
+  fechaInicioImpugnacion?: string | null;
   plazoImpugnacionDiasHabiles: number | null;
   fechaLimiteImpugnacion?: string;
   ipRegistro?: string;
@@ -81,6 +82,13 @@ export interface Notificacion {
   fechaDepositoIso: string; // Timestamp ISO-8601 de depósito en buzón
   fechaLecturaIso?: string | null; // Primer acceso
   fechaNotificadoIso?: string | null; // Perfeccionamiento con acuse
+  fechaEfectoLegal?: string | null; // Fecha de eficacia legal (Art. 25 LPAG y Art. 5.2 Ley N° 31736)
+  fechaInicioImpugnacion?: string | null; // Día 1 de cómputo de plazos (Art. 5.3 Ley N° 31736)
+  plazoImpugnacionDiasHabiles?: number | null; // 15 días hábiles perentorios (Art. 207.2 D.S. N° 006-2026-JUS)
+  fechaLimiteImpugnacion?: string | null; // Fecha límite de interposición de recursos
+  validezLegalMensaje?: string | null; // Fundamentación legal del cómputo
+  plazoConfirmacionDiasHabiles?: number; // 5 días hábiles para confirmar recepción (Art. 5.6 Ley N° 31736)
+  fechaLimiteConfirmacion?: string | null; // Vencimiento del plazo de confirmación
   requiereAcuse: boolean;
   documentoUrl?: string | null;
   actoAdministrativo: ActoAdministrativo;

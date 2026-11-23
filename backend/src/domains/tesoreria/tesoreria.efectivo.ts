@@ -46,10 +46,10 @@ export class TesoreriaEfectivo {
  async abrir(actor:ActorTesoreria,d:z.infer<typeof aperturaCajaSchema>){
   exigir(actor,'TESORERIA_PAGO_REGISTRAR');
   return this.repo.transaccion(async c=>{
-   await c.query("SELECT pg_advisory_xact_lock(hashtextextended('tesoreria-apertura',0))");
-   const previa=(await c.query('SELECT * FROM sigd_tes.caja WHERE clave_solicitud=$1',[d.claveSolicitud])).rows[0];
+   const previa=(await c.query('SELECT * FROM sigd_tes.caja WHERE clave_solicitud=$1 FOR UPDATE',[d.claveSolicitud])).rows[0];
    if(previa){if(previa.abierta_por!==actor.usuario||previa.saldo_inicial!==d.saldoInicial)fallo('CLAVE_REUTILIZADA','La clave identifica otra apertura.',409);return previa;}
-   if((await c.query('SELECT 1 FROM sigd_tes.caja WHERE cerrada_en IS NULL')).rowCount)fallo('CAJA_ABIERTA','Ya existe una caja abierta.',409);
+   const abierta=(await c.query('SELECT id FROM sigd_tes.caja WHERE cerrada_en IS NULL FOR UPDATE')).rows[0];
+   if(abierta)fallo('CAJA_ABIERTA','Ya existe una caja abierta.',409);
    const caja=(await c.query('INSERT INTO sigd_tes.caja(clave_solicitud,abierta_por,saldo_inicial,demostracion) VALUES($1,$2,$3,$4) RETURNING *',[d.claveSolicitud,actor.usuario,d.saldoInicial,await this.demo(c)])).rows[0];
    await this.repo.hecho(c,'caja',caja.id,actor.usuario,'CAJA_ABIERTA','Saldo inicial declarado: '+d.saldoInicial);return caja;
   });
@@ -86,6 +86,16 @@ export class TesoreriaEfectivo {
    const o=(await c.query('SELECT * FROM sigd_tes.orden_pago WHERE id=$1 FOR UPDATE',[d.ordenId])).rows[0];
    if(!o)fallo('NO_ENCONTRADO','No existe la orden.',404);
    if(o.ciudadano_id===actor.usuario)fallo('OPERACION_PROPIA','No puede cobrar una orden propia.',403);
+   const appPrevia = (await c.query<{ expediente_id: string; estado: string; estado_plazo: string | null }>(
+     `SELECT a.expediente_id, e.estado, e.estado_plazo
+      FROM sigd_tes.aplicacion_pago a
+      JOIN sigd_tra.expediente e ON e.expediente_id = a.expediente_id
+      WHERE a.orden_id = $1 LIMIT 1`,
+     [o.id]
+   )).rows[0];
+   if (appPrevia && (appPrevia.estado === 'ARCHIVADO' || appPrevia.estado_plazo === 'VENCIDO')) {
+     fallo('EXPEDIENTE_PLAZO_PAGO_VENCIDO', 'El plazo de 15 días hábiles para el pago ha vencido y el expediente se encuentra archivado.', 409);
+   }
    const pagosPrevios=(await c.query('SELECT id,estado,referencia,fecha_operacion,importe_aplicado::text importe,numero_recibo FROM sigd_tes.pago WHERE orden_id=$1 ORDER BY fecha_operacion,id FOR UPDATE',[o.id])).rows;
    const confirmados=pagosPrevios.filter(p=>p.estado==='VERIFICADO');
    let autorizacionId:string|null=null;
@@ -111,7 +121,16 @@ export class TesoreriaEfectivo {
     VALUES($1,'CAJA','IESTP SUIZA - CAJA',$2,clock_timestamp(),$3,$4,'VERIFICADO',$4,clock_timestamp(),$5,$6,$7,$8,$9,$10,$11) RETURNING *`,[o.id,referencia,doc,actor.usuario,caja.id,d.efectivoRecibido,vuelto,o.importe,numero,demo,autorizacionId])).rows[0];
    if(autorizacionId){const consumida=await c.query('UPDATE sigd_tes.autorizacion_pago_adicional SET consumida_en=clock_timestamp() WHERE id=$1 AND confirmada_en IS NOT NULL AND consumida_en IS NULL RETURNING id',[autorizacionId]);if(!consumida.rowCount)fallo('AUTORIZACION_REUTILIZADA','La autorización ya fue consumida.',409);}
    await c.query("INSERT INTO sigd_tes.movimiento_caja(caja_id,tipo,importe,pago_id,actor_id) VALUES($1,'INGRESO',$2,$3,$4)",[caja.id,o.importe,p.id,actor.usuario]);
-   await this.repo.hecho(c,'pago',p.id,actor.usuario,'PAGO_VERIFICADO',(demo?'DEMOSTRACION: ':'')+'Recepción de efectivo confirmada; recibo interno '+referencia,o.id);return p;
+   await this.repo.hecho(c,'pago',p.id,actor.usuario,'PAGO_VERIFICADO',(demo?'DEMOSTRACION: ':'')+'Recepción de efectivo confirmada; recibo interno '+referencia,o.id);
+   if (appPrevia) {
+     try {
+       const { obtenerOActualizarHabilitacion } = await import('../tramicore/computoPlazo15Dias.service.js');
+       await obtenerOActualizarHabilitacion(c, appPrevia.expediente_id);
+     } catch (err) {
+       console.error('[TesoreriaEfectivo] Error al actualizar habilitacion de expediente:', err);
+     }
+   }
+   return p;
   });
  }
  /** Invocada dentro de la misma transacción que cambia DEVUELTA y publica Outbox. */

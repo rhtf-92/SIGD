@@ -49,7 +49,10 @@ export const naturalSchema = z
     domicilio: z.object({
       departamentoCodigo: z.string(),
       provinciaCodigo: z.string(),
-      distritoCodigo: z.string(),
+      distritoCodigo: z
+        .string()
+        .min(1, { message: "Debe seleccionar el distrito de residencia" })
+        .regex(/^[0-9]{6}$/, { message: "Código de UBIGEO de distrito debe tener exactamente 6 dígitos numéricos" }),
       direccionExacta: z
         .string()
         .min(5, {
@@ -161,7 +164,10 @@ export const juridicalSchema = z
     domicilio: z.object({
       departamentoCodigo: z.string(),
       provinciaCodigo: z.string(),
-      distritoCodigo: z.string(),
+      distritoCodigo: z
+        .string()
+        .min(1, { message: "Debe seleccionar el distrito de residencia" })
+        .regex(/^[0-9]{6}$/, { message: "Código de UBIGEO de distrito debe tener exactamente 6 dígitos numéricos" }),
       direccionExacta: z
         .string()
         .min(5, {

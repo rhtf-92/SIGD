@@ -188,7 +188,8 @@ export function crearRouterAuth(pool: Pool): Router {
         LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = c.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
         LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
         LEFT JOIN sigd_auth.perfil_usuario p ON p.id_usuario = c.id_usuario
-       WHERE (c.usuario = $1 OR c.correo = $1)
+        LEFT JOIN sigd_auth.correos_adicionales ca ON c.id_usuario = ca.id_usuario AND LOWER(ca.correo) = LOWER($1) AND ca.verificado = TRUE
+       WHERE (c.usuario = $1 OR LOWER(c.correo) = LOWER($1) OR ca.id_correo_adicional IS NOT NULL)
        LIMIT 1;
     `;
 
@@ -635,7 +636,7 @@ export function crearRouterAuth(pool: Pool): Router {
       contextosDisponibles: contextos.length > 0 ? contextos : undefined,
       identidad: {
         tipoPersona: usuario.tipo_persona,
-        tipoDocumento: usuario.tipo_documento,
+        tipoDocumento: usuario.tipo_documento ?? (usuario.id_documento && usuario.id_documento.length === 11 ? 'RUC' : (usuario.tipo_persona === 'JURIDICA' ? 'RUC' : 'DNI')),
         numeroDocumento: usuario.id_documento,
         nombres: usuario.nombres,
         apellidos: usuario.apellidos,

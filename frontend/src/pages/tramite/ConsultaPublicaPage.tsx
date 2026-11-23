@@ -60,8 +60,20 @@ export default function ConsultaPublicaPage() {
     setError(null);
 
     try {
+      let tokenSeguimiento: string | null = null;
+      if (typeof window !== 'undefined' && window.location.hash) {
+        const hashStr = window.location.hash.slice(1);
+        const params = new URLSearchParams(hashStr);
+        tokenSeguimiento = params.get('token') ?? params.get('constancia');
+      }
+      const headers: Record<string, string> = {};
+      if (tokenSeguimiento && /^[0-9a-f]{64}$/i.test(tokenSeguimiento)) {
+        headers['X-SIGD-Public-Tracking-Token'] = tokenSeguimiento;
+        headers['X-SIGD-Tracking-Token'] = tokenSeguimiento;
+      }
       const res = await apiClient.get<DtoConsultaPublica>(
-        `/api/v1/tramites/consulta-publica/${encodeURIComponent(trimmed)}`
+        `/api/v1/tramites/consulta-publica/${encodeURIComponent(trimmed)}`,
+        { headers }
       );
       setResultado(res.data);
     } catch (err: unknown) {

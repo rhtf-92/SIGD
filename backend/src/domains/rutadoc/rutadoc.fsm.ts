@@ -14,7 +14,9 @@ export const ESTADOS_RUTADOC = Object.freeze([
   'ARCHIVADO',
 ] as const);
 
-export type EstadoRutaDoc = (typeof ESTADOS_RUTADOC)[number];
+export const ESTADOS_COMPLEMENTARIOS = Object.freeze(['ATENDIDO'] as const);
+
+export type EstadoRutaDoc = (typeof ESTADOS_RUTADOC)[number] | (typeof ESTADOS_COMPLEMENTARIOS)[number];
 
 /**
  * Se conservan los códigos compatibles del SQL anterior. REGISTRO_EXTERNO
@@ -35,7 +37,9 @@ export const EVENTOS_RUTADOC = Object.freeze([
   'CIERRE',
 ] as const);
 
-export type EventoRutaDoc = (typeof EVENTOS_RUTADOC)[number];
+export const EVENTOS_COMPLEMENTARIOS = Object.freeze(['ATENCION_TECNICA'] as const);
+
+export type EventoRutaDoc = (typeof EVENTOS_RUTADOC)[number] | (typeof EVENTOS_COMPLEMENTARIOS)[number];
 
 /**
  * Decisiones de transición no literales del plan:
@@ -50,7 +54,7 @@ export type EventoRutaDoc = (typeof EVENTOS_RUTADOC)[number];
  * Cada fila está congelada, además del contenedor, para impedir mutaciones.
  */
 export const TRANSICIONES_RUTADOC: Readonly<
-  Record<EstadoRutaDoc, Readonly<Partial<Record<EventoRutaDoc, EstadoRutaDoc>>>>
+  Record<(typeof ESTADOS_RUTADOC)[number], Readonly<Partial<Record<(typeof EVENTOS_RUTADOC)[number], EstadoRutaDoc>>>>
 > = Object.freeze({
   REGISTRADO: Object.freeze({ RECEPCION: 'RECEPCIONADO' }),
   RECEPCIONADO: Object.freeze({ INICIAR_CALIFICACION: 'EN_CALIFICACION' }),
@@ -72,19 +76,31 @@ export const TRANSICIONES_RUTADOC: Readonly<
   ARCHIVADO: Object.freeze({}),
 });
 
+export const TRANSICIONES_COMPLEMENTARIAS: Readonly<
+  Record<(typeof ESTADOS_COMPLEMENTARIOS)[number], Readonly<Partial<Record<EventoRutaDoc, EstadoRutaDoc>>>>
+> = Object.freeze({
+  ATENDIDO: Object.freeze({
+    DERIVACION: 'DERIVADO',
+    ENVIAR_A_FIRMA: 'EN_FIRMA',
+  }),
+});
+
 export function esEstadoRutaDoc(valor: unknown): valor is EstadoRutaDoc {
-  return typeof valor === 'string' && ESTADOS_RUTADOC.some((estado) => estado === valor);
+  return typeof valor === 'string' && (ESTADOS_RUTADOC.some((estado) => estado === valor) || valor === 'ATENDIDO');
 }
 
 export function esEventoRutaDoc(valor: unknown): valor is EventoRutaDoc {
-  return typeof valor === 'string' && EVENTOS_RUTADOC.some((evento) => evento === valor);
+  return typeof valor === 'string' && (EVENTOS_RUTADOC.some((evento) => evento === valor) || valor === 'ATENCION_TECNICA');
 }
 
 export function puedeTransicionar(estadoActual: unknown, evento: unknown): boolean {
+  if (estadoActual === 'EN_REVISION' && evento === 'ATENCION_TECNICA') return true;
+  if (estadoActual === 'ATENDIDO' && (evento === 'ENVIAR_A_FIRMA' || evento === 'DERIVACION')) return true;
   return (
     esEstadoRutaDoc(estadoActual) &&
     esEventoRutaDoc(evento) &&
-    TRANSICIONES_RUTADOC[estadoActual][evento] !== undefined
+    estadoActual in TRANSICIONES_RUTADOC &&
+    (TRANSICIONES_RUTADOC as any)[estadoActual]?.[evento] !== undefined
   );
 }
 
@@ -100,11 +116,15 @@ export class EstadoTransicionInvalidaError extends AppError {
 
 /** Función pura: devuelve el destino o rechaza toda pareja no definida. */
 export function obtenerSiguienteEstado(estadoActual: unknown, evento: unknown): EstadoRutaDoc {
+  if (estadoActual === 'EN_REVISION' && evento === 'ATENCION_TECNICA') return 'ATENDIDO';
+  if (estadoActual === 'ATENDIDO' && evento === 'ENVIAR_A_FIRMA') return 'EN_FIRMA';
+  if (estadoActual === 'ATENDIDO' && evento === 'DERIVACION') return 'DERIVADO';
+
   if (!esEstadoRutaDoc(estadoActual) || !esEventoRutaDoc(evento)) {
     throw new EstadoTransicionInvalidaError();
   }
 
-  const siguiente = TRANSICIONES_RUTADOC[estadoActual][evento];
+  const siguiente = (TRANSICIONES_RUTADOC as any)[estadoActual]?.[evento];
   if (siguiente === undefined) {
     throw new EstadoTransicionInvalidaError();
   }

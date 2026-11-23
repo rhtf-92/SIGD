@@ -3,7 +3,7 @@ import { ValidationError, NotFoundError } from '../../shared/domain/errors/index
 import type { RadicacionVirtualInput } from './tramites.schemas.js';
 import { TesoreriaService } from '../tesoreria/tesoreria.service.js';
 import { TesoreriaRepository } from '../tesoreria/tesoreria.repository.js';
-import { CATALOGO_DOCUMENTAL_POR_CODIGO } from './catalogoDocumentalTupa2026.js';
+import { CATALOGO_DOCUMENTAL_TUPA_2026, CATALOGO_DOCUMENTAL_POR_CODIGO } from './catalogoDocumentalTupa2026.js';
 
 type Consulta = Pick<Pool, 'query'>;
 export type ClasificacionAdjunto = 'EXPEDIENTE' | 'ANEXO';
@@ -62,7 +62,8 @@ export async function obtenerDocumentacionTramite(pool: Pool, id: string) {
   ]);
 
   const tramite = catalogoTesoreria.find((t) => t.id === id);
-  const configDoc = CATALOGO_DOCUMENTAL_POR_CODIGO.get(procDb.codigo);
+  const configDoc = CATALOGO_DOCUMENTAL_TUPA_2026.find((c) => c.codigoInterno === procDb.codigo)
+    ?? CATALOGO_DOCUMENTAL_POR_CODIGO.get(procDb.codigo);
 
   const tipoFut = tiposGeneralesRes.rows.find((t) => t.codigo === 'FUT');
   const tipoAnexo = tiposGeneralesRes.rows.find((t) => t.codigo === 'ANEXO');
@@ -129,7 +130,9 @@ export async function validarDocumentacionTramite(c: Consulta, datos: Radicacion
       'SELECT codigo FROM sigd_doc.tipo_tramite_tupa WHERE tipo_tramite_id=$1::uuid',
       [datos.idTipoTramiteTupa]
     )).rows[0];
-    const configDoc = proc ? CATALOGO_DOCUMENTAL_POR_CODIGO.get(proc.codigo) : undefined;
+    const configDoc = proc
+      ? (CATALOGO_DOCUMENTAL_TUPA_2026.find((c) => c.codigoInterno === proc.codigo) ?? CATALOGO_DOCUMENTAL_POR_CODIGO.get(proc.codigo))
+      : undefined;
     if (configDoc) {
       const tipoFut = tiposGenerales.find(t => t.codigo === 'FUT');
       const tipoAnx = tiposGenerales.find(t => t.codigo === 'ANEXO');
@@ -150,10 +153,22 @@ export async function validarDocumentacionTramite(c: Consulta, datos: Radicacion
   const fallar = (reason: string): never => { throw new ValidationError({ invalidParams: [{ name: 'documentos', reason }] }); };
   if (!datos.documentos.some(d => d.clasificacion === 'EXPEDIENTE')) fallar('Adjunte al menos un PDF clasificado como EXPEDIENTE.');
   
+  const asignados = new Set<string>();
   const documentosClasificados: DocumentoClasificado[] = datos.documentos.map(doc => {
     if (!doc.clasificacion) return fallar('Clasifique todos los archivos como EXPEDIENTE o ANEXO.');
-    const requisito = doc.requisitoId ? requisitos.find(r => r.id === doc.requisitoId) : undefined;
-    if (doc.requisitoId && !requisito) return fallar('El requisito indicado no pertenece al procedimiento o corresponde a Tesorería.');
+    let requisito = doc.requisitoId ? requisitos.find(r => r.id === doc.requisitoId) : undefined;
+    if (doc.requisitoId && !requisito) {
+      if (doc.requisitoId.includes('FUT')) {
+        requisito = requisitos.find(r => (r.codigo === 'FUT' || r.clasificacion === 'EXPEDIENTE') && !asignados.has(r.id));
+      } else {
+        const codigoBuscado = doc.requisitoId.replace(/^(REQ|ANX)-[^-]+-/, '');
+        requisito = requisitos.find(r => r.codigo === codigoBuscado && !asignados.has(r.id));
+      }
+      if (!requisito) return fallar('El requisito indicado no pertenece al procedimiento o corresponde a Tesorería.');
+    }
+    if (requisito) {
+      asignados.add(requisito.id);
+    }
     if (requisito && requisito.clasificacion !== doc.clasificacion) return fallar(`Revise la clasificación de ${requisito.nombre}.`);
     if (requisito?.tipos.some(t => t.condicion !== null)) return fallar(`La condición documental de ${requisito.nombre} requiere validación institucional.`);
     const permitidos = requisito && requisito.tipos.length > 0

@@ -251,6 +251,44 @@ export default function NotificacionDetailModal({
             </div>
           </section>
 
+          {/* Cómputo de Plazos Administrativos (D.S. N° 006-2026-JUS y Ley N° 31736) */}
+          {(notificacion.fechaEfectoLegal || notificacion.validezLegalMensaje) && (
+            <section className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4 space-y-2 text-xs">
+              <h4 className="font-bold text-blue-950 flex items-center gap-1.5">
+                <svg className="h-4 w-4 text-blue-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Efectos Legales y Cómputo de Plazos (D.S. N° 006-2026-JUS y Ley N° 31736)
+              </h4>
+              <div className="grid gap-3 sm:grid-cols-3 pt-1">
+                <div>
+                  <p className="font-semibold text-slate-600">Fecha de Eficacia (Art. 25 LPAG):</p>
+                  <p className="mt-0.5 font-medium text-slate-900">
+                    {notificacion.fechaEfectoLegal ? formatIsoFecha(notificacion.fechaEfectoLegal) : "Conforme a regla de depósito"}
+                  </p>
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-600">Inicio de Cómputo - Día 1 (Art. 5.3):</p>
+                  <p className="mt-0.5 font-medium text-slate-900">
+                    {notificacion.fechaInicioImpugnacion ? formatIsoFecha(notificacion.fechaInicioImpugnacion) : (notificacion.fechaEfectoLegal ? formatIsoFecha(notificacion.fechaEfectoLegal) : "Día de eficacia")}
+                  </p>
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-600">Límite Impugnación (Art. 207.2):</p>
+                  <p className="mt-0.5 font-bold text-blue-900">
+                    {notificacion.fechaLimiteImpugnacion ? formatIsoFecha(notificacion.fechaLimiteImpugnacion) : "15 días hábiles"}
+                    {notificacion.plazoImpugnacionDiasHabiles ? ` (${notificacion.plazoImpugnacionDiasHabiles} días hábiles)` : ""}
+                  </p>
+                </div>
+              </div>
+              {notificacion.validezLegalMensaje && (
+                <p className="mt-1 text-[11px] text-blue-800 leading-relaxed bg-white/70 p-2.5 rounded-xl border border-blue-100">
+                  {notificacion.validezLegalMensaje}
+                </p>
+              )}
+            </section>
+          )}
+
           {/* Asunto y Contenido del Acto Administrativo */}
           <section className="space-y-3">
             <h3 className="text-sm font-bold uppercase tracking-wider text-blue-900 flex items-center gap-2">
@@ -443,22 +481,52 @@ export default function NotificacionDetailModal({
             </h3>
             {acuse ? (
               <div className="rounded-2xl border border-emerald-300 bg-emerald-50/50 p-5 space-y-3">
-                <h4 className="text-sm font-bold text-emerald-950">Registro persistido</h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-emerald-950 flex items-center gap-2">
+                    <svg className="h-4 w-4 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Registro de Acuse Legal Certificado
+                  </h4>
+                  {acuse.cvdAcuse && (
+                    <span className="rounded-md bg-emerald-100 px-2 py-0.5 font-mono text-[11px] font-bold text-emerald-800 border border-emerald-200">
+                      {acuse.cvdAcuse}
+                    </span>
+                  )}
+                </div>
                 <dl className="grid gap-3 text-xs sm:grid-cols-2">
-                  <div><dt className="font-semibold text-slate-500">Identificador</dt><dd>{acuse.idAcuse}</dd></div>
-                  <div><dt className="font-semibold text-slate-500">Fecha y hora</dt><dd>{acuse.timestampGeneracionIso ?? "No registrada"}</dd></div>
-                  <div><dt className="font-semibold text-slate-500">Hash del registro</dt><dd className="break-all font-mono">{acuse.hashSha256Acuse ?? "No registrado"}</dd></div>
-                  <div><dt className="font-semibold text-slate-500">Destinatario</dt><dd>{acuse.destinatario.direccionCasilla ?? "No registrado"}</dd></div>
+                  <div><dt className="font-semibold text-slate-500">Identificador</dt><dd className="font-mono font-medium text-slate-900">{acuse.idAcuse}</dd></div>
+                  <div><dt className="font-semibold text-slate-500">Fecha y hora</dt><dd className="font-medium text-slate-900">{acuse.timestampGeneracionIso ?? "No registrada"}</dd></div>
+                  <div><dt className="font-semibold text-slate-500">Destinatario</dt><dd className="font-medium text-slate-900">{acuse.destinatario.nombresCompletos ?? acuse.destinatario.direccionCasilla ?? "No registrado"}</dd></div>
+                  <div><dt className="font-semibold text-slate-500">Documento de Identidad</dt><dd className="font-mono text-slate-900">{acuse.destinatario.tipoDocumento ?? "DOC"}: {acuse.destinatario.numeroDocumento ?? "No registrado"}</dd></div>
+                  {acuse.fechaEfectoLegal && (
+                    <div><dt className="font-semibold text-slate-500">Fecha Efecto Legal (Art. 25 LPAG)</dt><dd className="font-medium text-slate-900">{formatIsoFecha(acuse.fechaEfectoLegal)}</dd></div>
+                  )}
+                  {acuse.fechaLimiteImpugnacion && (
+                    <div><dt className="font-semibold text-slate-500">Límite Impugnación (15 días - Art. 207.2)</dt><dd className="font-bold text-emerald-900">{formatIsoFecha(acuse.fechaLimiteImpugnacion)}</dd></div>
+                  )}
+                  <div className="sm:col-span-2"><dt className="font-semibold text-slate-500">Hash del registro</dt><dd className="break-all font-mono text-[11px] bg-emerald-100/60 p-2 rounded-lg border border-emerald-200/80">{acuse.hashSha256Acuse ?? "No registrado"}</dd></div>
                 </dl>
-                <p className="text-xs text-slate-600">CVD, efectos legales y plazos no están registrados en el modelo de Casilla.</p>
-                <p className="text-xs text-slate-600">No hay una referencia de documento PDF asociada a este registro.</p>
+                {acuse.validezLegalMensaje && (
+                  <p className="text-xs text-slate-700 bg-white/70 p-2.5 rounded-lg border border-emerald-100">
+                    <span className="font-semibold text-emerald-950">Fundamentación Legal: </span>
+                    {acuse.validezLegalMensaje}
+                  </p>
+                )}
+                {!acuse.documentoUrl && (
+                  <p className="text-xs text-slate-600">No hay una referencia de documento PDF asociada a este registro.</p>
+                )}
                 <button
                   type="button"
                   disabled={descargando || !acuse.documentoUrl}
                   onClick={() => void descargar(() => casillaService.descargarAcuse(acuse))}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 px-4 py-2.5 text-xs font-bold text-white shadow-xs transition disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  PDF de acuse no disponible
+                  {descargando
+                    ? "Descargando..."
+                    : acuse.documentoUrl
+                      ? "Descargar Certificado de Acuse Legal (.PDF)"
+                      : "PDF de acuse no disponible"}
                 </button>
               </div>
             ) : (

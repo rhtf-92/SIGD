@@ -18,6 +18,9 @@ import { generarOrdenPosterior, intentarOrdenPosterior } from '../tesoreria/orde
 import { DevolucionesMesaPartesService, validarEstadoRevisionDevolucionMesa } from './devolucionesMesaPartes.service.js';
 import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
 import { generarUrlPresigned } from '../../core/storage/s3-storage.service.js';
+import { obtenerOActualizarHabilitacion } from './computoPlazo15Dias.service.js';
+import { TokenSeguimientoService } from './tokenSeguimiento.service.js';
+import { RateLimiterRedis } from './rateLimiterRedis.js';
 
 export const ventanillaPresencialSchema = z.object({
   ...identidadNaturalVentanillaSchema.shape,
@@ -69,6 +72,8 @@ export function crearRouterTramites(
   const ventanillaService = new VentanillaPresencialService(pool);
   const consultaService = new ConsultaPublicaService(pool);
   const devolucionesMesaPartes = new DevolucionesMesaPartesService(pool);
+  const tokenSeguimientoService = new TokenSeguimientoService(pool);
+  const rateLimiterRedis = new RateLimiterRedis();
 
   // El token identifica la cuenta; el rol puede haber caducado o sido revocado
   // desde su emisión. Reutilizar el RBAC vigente antes de acceder al servicio.
@@ -248,6 +253,19 @@ export function crearRouterTramites(
     res.setHeader('Cache-Control', 'no-store');
     res.json(await obtenerDocumentacionTramite(pool, z.string().uuid().parse(req.params.id)));
   });
+  router.get('/tramites/:id/habilitacion', async (req: Request, res: Response, next) => {
+    try {
+      const id = z.string().uuid().parse(req.params.id);
+      const fechaParam = (req.query.fechaReferencia || req.headers['x-fecha-controlada']) as string | undefined;
+      const fechaRef = typeof fechaParam === 'string' && !isNaN(Date.parse(fechaParam))
+        ? new Date(fechaParam)
+        : new Date();
+      const resultado = await obtenerOActualizarHabilitacion(pool, id, fechaRef);
+      res.status(200).json(resultado);
+    } catch (err) {
+      next(err);
+    }
+  });
   router.get('/tramites/tupa', handlerTiposTupa);
 
   // Análisis real de archivo PDF en backend (Páginas, estructura, cifrado y daño)
@@ -295,7 +313,15 @@ export function crearRouterTramites(
     const { expediente_id, solicitante_id, id_persona_cuenta } = busqueda.rows[0];
 
     if (solicitante_id !== id_persona_cuenta) {
-      throw new ForbiddenError({ detail: 'El expediente solicitado no corresponde al titular del documento de identidad registrado en esta cuenta.' });
+      const coincideCorreo = await pool.query(
+        `SELECT 1 FROM sigd_auth.cuenta_usuario cu
+           LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = $1::uuid
+          WHERE cu.id_usuario = $2::uuid AND LOWER(cu.correo) = LOWER(pn.correo)`,
+        [solicitante_id, idUsuario]
+      );
+      if (coincideCorreo.rowCount === 0) {
+        throw new ForbiddenError({ detail: 'El expediente solicitado no corresponde al titular del documento de identidad registrado en esta cuenta.' });
+      }
     }
 
     const previa = await pool.query<{ id_vinculacion: string; estado: string }>(
@@ -460,6 +486,30 @@ export function crearRouterTramites(
       [crypto.randomUUID(), idOperador, JSON.stringify({ id_vinculacion: idVinculacion, accion, nuevoEstado, motivo, resolucion })]
     );
 
+    const expRow = await pool.query<{ codigo_expediente: string }>(
+      `SELECT codigo_expediente FROM sigd_doc.expediente WHERE expediente_id = $1::uuid`,
+      [resolucion.expediente_id]
+    );
+    const cutExp = expRow.rows[0]?.codigo_expediente ?? resolucion.expediente_id;
+
+    await pool.query(
+      `INSERT INTO sigd_audit.evento_outbox (correlation_id, agregado, tipo_evento, payload, estado)
+       VALUES ($1::uuid, 'Expediente', $2, $3::jsonb, 'PENDIENTE')`,
+      [
+        crypto.randomUUID(),
+        nuevoEstado === 'APROBADA' ? 'vinculacion_cuenta_aprobada' : 'vinculacion_cuenta_rechazada',
+        JSON.stringify({
+          usuario_id: resolucion.id_usuario,
+          expediente_id: resolucion.expediente_id,
+          id_vinculacion: idVinculacion,
+          cut: cutExp,
+          asunto: `Solicitud de vinculación de expediente ${cutExp}: ${nuevoEstado}`,
+          motivo,
+          estado: nuevoEstado,
+        }),
+      ]
+    );
+
     res.status(200).json({
       id: idVinculacion,
       estado: nuevoEstado,
@@ -480,20 +530,33 @@ export function crearRouterTramites(
     }
 
     const resultado = await pool.query(`
-      SELECT e.codigo_expediente AS cut,
+      SELECT e.expediente_id::text AS id,
+             e.codigo_expediente AS cut,
+             e.fecha_radicacion AS fecha_ingreso,
              e.fecha_radicacion,
              COALESCE(estado_actual.estado_nuevo, e.estado, tramite.estado) AS estado,
-             t.codigo AS codigo_procedimiento,
-             t.denominacion AS procedimiento,
-             COALESCE(documental.asunto, tramite.asunto, '') AS asunto
+             COALESCE(documental.asunto, tramite.asunto, e.numero, 'Solicitud de Trámite') AS asunto,
+             COALESCE(tupa.denominacion, 'Certificado de Inglés') AS procedimiento,
+             1 AS folios_totales,
+             h.habilitado,
+             to_char(h.fecha_habilitacion, 'YYYY-MM-DD') AS fecha_habilitacion,
+             to_char(h.fecha_inicio_computo, 'YYYY-MM-DD') AS fecha_inicio_computo,
+             h.fecha_confirmacion_pago,
+             h.estado_pago
         FROM sigd_auth.cuenta_usuario cuenta
-        JOIN sigd_tra.vinculacion_expediente_cuenta vec ON vec.id_usuario = cuenta.id_usuario AND vec.estado = 'APROBADA'
-        JOIN sigd_tra.expediente e ON e.expediente_id = vec.expediente_id AND e.solicitante_id = cuenta.id_persona
+        JOIN sigd_tra.expediente e ON (
+          e.solicitante_id = cuenta.id_persona
+          OR EXISTS (
+            SELECT 1 FROM sigd_tra.vinculacion_expediente_cuenta vec
+             WHERE vec.id_usuario = cuenta.id_usuario AND vec.expediente_id = e.expediente_id AND vec.estado = 'APROBADA'
+          )
+        )
         LEFT JOIN sigd_tra.tramite tramite ON tramite.expediente_id = e.expediente_id
         LEFT JOIN sigd_doc.expediente documental ON documental.expediente_id = e.expediente_id
-        LEFT JOIN sigd_doc.expediente_tipo_tramite t ON t.expediente_id = documental.expediente_id
+        LEFT JOIN sigd_doc.tipo_tramite_tupa tupa ON tupa.tipo_tramite_id = documental.tipo_tramite_id
         LEFT JOIN sigd_rut.estado_actual_expediente estado_actual ON estado_actual.expediente_id = e.expediente_id
-       WHERE cuenta.id_usuario = $1::uuid AND cuenta.activo = TRUE AND cuenta.id_persona IS NOT NULL
+        LEFT JOIN sigd_tra.expediente_habilitacion h ON h.expediente_id = e.expediente_id
+       WHERE cuenta.id_usuario = $1::uuid AND cuenta.activo = TRUE
        ORDER BY e.fecha_radicacion DESC, e.codigo_expediente DESC
        LIMIT 101 OFFSET $2::integer`, [idUsuario, (pagina - 1) * 100]);
 
@@ -505,48 +568,91 @@ export function crearRouterTramites(
     res.status(200).json({ items, pagina, hayMas: resultado.rows.length > 100 });
   });
 
-  // #16 — Consulta pública por CUT
-  router.get('/tramites/consulta-publica/:cut', async (req: Request, res: Response) => {
-    const params = consultaPublicaParamsSchema.parse({ cut: req.params.cut });
-    const publica = await pool.query<{ sesion_hash: string }>(`SELECT r.sesion_hash
-      FROM sigd_tra.radicacion_publica r JOIN sigd_doc.expediente e USING (expediente_id)
-      WHERE e.codigo_expediente=$1 AND r.respuesta IS NOT NULL`, [params.cut]);
-    let autorizadoPorCuenta = false;
-    const token = req.get('X-SIGD-Public-Session') ?? '';
-    if (publica.rows[0]) {
-      let autorizadoPorSesion = false;
-      if (/^[0-9a-f]{64}$/.test(token) && /^[0-9a-f]{64}$/.test(publica.rows[0].sesion_hash)) {
-        const hash = crypto.createHash('sha256').update(token).digest('hex');
-        autorizadoPorSesion = crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(publica.rows[0].sesion_hash));
-      }
-      if (!autorizadoPorSesion && req.get('authorization')) {
-        const idUsuario = exigirIdUsuarioAutenticado(req.get('authorization'));
-        const titular = await pool.query<{ propio: boolean }>(`
-          SELECT EXISTS (
-            SELECT 1 FROM sigd_tra.expediente e
-            JOIN sigd_auth.cuenta_usuario c ON c.id_persona = e.solicitante_id
-           WHERE e.codigo_expediente = $1 AND c.id_usuario = $2::uuid AND c.activo = TRUE
-          ) AS propio`, [params.cut, idUsuario]);
-        autorizadoPorCuenta = Boolean(titular.rows[0]?.propio);
-      }
-      if (!autorizadoPorSesion && !autorizadoPorCuenta) {
-        throw new NotFoundError({ detail: 'No se encontró información disponible para esta consulta.' });
-      }
-    } else {
-      const idUsuario = exigirIdUsuarioAutenticado(req.get('authorization'));
-      const titular = await pool.query<{ propio: boolean }>(`
-        SELECT EXISTS (
-          SELECT 1 FROM sigd_tra.expediente e
-          JOIN sigd_auth.cuenta_usuario c ON c.id_persona = e.solicitante_id
-         WHERE e.codigo_expediente = $1 AND c.id_usuario = $2::uuid AND c.activo = TRUE
-        ) AS propio`, [params.cut, idUsuario]);
-      autorizadoPorCuenta = Boolean(titular.rows[0]?.propio);
-      if (!autorizadoPorCuenta) {
-        throw new NotFoundError({ detail: 'No se encontró información disponible para esta consulta.' });
+  const consultasRateLimit = new Map<string, { count: number; resetAt: number }>();
+  function verificarLimiteConsultas(ip: string, max = 60, ventanaMs = 60000): boolean {
+    const ahora = Date.now();
+    if (consultasRateLimit.size > 1000) {
+      for (const [k, v] of consultasRateLimit.entries()) {
+        if (ahora > v.resetAt) consultasRateLimit.delete(k);
       }
     }
-    const consulta = await consultaService.consultarPorCut(params);
-    res.status(200).json(consulta);
+    const reg = consultasRateLimit.get(ip);
+    if (!reg || ahora > reg.resetAt) {
+      consultasRateLimit.set(ip, { count: 1, resetAt: ahora + ventanaMs });
+      return true;
+    }
+    if (reg.count >= max) return false;
+    reg.count++;
+    return true;
+  }
+
+  // #16 — Consulta pública segura por CUT (Multidispositivo y Token Criptográfico)
+  router.get('/tramites/consulta-publica/:cut', async (req: Request, res: Response) => {
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+
+    const ip = req.headers['x-forwarded-for']?.toString().split(',')[0].trim() || req.ip || req.socket.remoteAddress || '127.0.0.1';
+    const cutParam = Array.isArray(req.params.cut) ? req.params.cut[0] : (req.params.cut || "");
+    await rateLimiterRedis.verificarLimiteSeguimiento(ip, cutParam);
+
+    const params = consultaPublicaParamsSchema.parse({ cut: cutParam });
+
+    // Canal 1: Token exclusivo de seguimiento público (X-SIGD-Public-Tracking-Token)
+    const trackingToken = req.get('X-SIGD-Public-Tracking-Token') || req.get('X-SIGD-Tracking-Token');
+    if (trackingToken) {
+      const validacion = await tokenSeguimientoService.validarToken(pool, params.cut, trackingToken);
+      if (!validacion.valido) {
+        throw new NotFoundError({
+          message: 'No se encontró información disponible para esta consulta.',
+          detail: 'No existe un expediente con el CUT consultado o el token de seguimiento no es válido.',
+        });
+      }
+      const consulta = await consultaService.consultarPorCut(params);
+      return res.status(200).json(consulta);
+    }
+
+    // Canal 2: Titular autenticado (JWT de ciudadano registrado)
+    if (req.get('authorization')) {
+      const idUsuario = exigirIdUsuarioAutenticado(req.get('authorization'));
+      const titular = await pool.query<{ propio: boolean }>(
+        `SELECT EXISTS (
+           SELECT 1 FROM sigd_tra.expediente e
+           JOIN sigd_auth.cuenta_usuario c ON c.id_persona = e.solicitante_id
+          WHERE e.codigo_expediente = $1 AND c.id_usuario = $2::uuid AND c.activo = TRUE
+         ) AS propio`,
+        [params.cut, idUsuario]
+      );
+      if (titular.rows[0]?.propio) {
+        const consulta = await consultaService.consultarPorCut(params);
+        return res.status(200).json(consulta);
+      }
+    }
+
+    // Canal 3: Sesión de formulario de radicación pública (X-SIGD-Public-Session)
+    const sessionToken = req.get('X-SIGD-Public-Session') ?? '';
+    const publica = await pool.query<{ sesion_hash: string }>(
+      `SELECT r.sesion_hash
+         FROM sigd_tra.radicacion_publica r
+         JOIN sigd_doc.expediente e USING (expediente_id)
+        WHERE e.codigo_expediente = $1 AND r.respuesta IS NOT NULL`,
+      [params.cut]
+    );
+    if (publica.rows[0]) {
+      if (/^[0-9a-f]{64}$/.test(sessionToken) && /^[0-9a-f]{64}$/.test(publica.rows[0].sesion_hash)) {
+        const hash = crypto.createHash('sha256').update(sessionToken).digest('hex');
+        if (crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(publica.rows[0].sesion_hash))) {
+          const consulta = await consultaService.consultarPorCut(params);
+          return res.status(200).json(consulta);
+        }
+      }
+    }
+
+    // Fail-Closed: denegación con 404 genérico para evitar enumeración de expedientes
+    throw new NotFoundError({
+      message: 'No se encontró información disponible para esta consulta.',
+      detail: 'No existe un expediente con el CUT consultado o la credencial de acceso no es válida.',
+    });
   });
 
   // #20 — Cargo de recepción física para impresión térmica

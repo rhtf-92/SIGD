@@ -51,9 +51,9 @@ type PersonaJuridica = {
 };
 
 const crearUbigeo = (): Ubigeo => ({
-  departamentoCodigo: "1501",
-  provinciaCodigo: "150101",
-  distritoCodigo: "15010101",
+  departamentoCodigo: "15",
+  provinciaCodigo: "1501",
+  distritoCodigo: "150101",
   direccionExacta: "Av. Arequipa 123",
   referencia: "Cerca de la plaza de armas",
 });

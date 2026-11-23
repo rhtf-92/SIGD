@@ -9,10 +9,29 @@ export const EVENTO_CASILLA = 'casilla_notificacion';
 export const EVENTO_TRANSICION = 'expediente_transicion';
 export const EVENTO_SLA = 'sla_alerta';
 
+export const EVENTOS_SENSIBLES_BLOQUEADOS = new Set([
+  'verificacion_correo_solicitada',
+]);
+
 const EVENTO_A_CANAL: Record<string, CanalSse> = {
   [EVENTO_CASILLA]: 'casilla',
   [EVENTO_TRANSICION]: 'expedientes',
   [EVENTO_SLA]: 'sla',
+  'radicacion_exitosa': 'expedientes',
+  'ExpedienteRecepcionado': 'expedientes',
+  'expediente_recepcionado': 'expedientes',
+  'ExpedienteDerivado': 'expedientes',
+  'expediente_derivado': 'expedientes',
+  'expediente_observado': 'expedientes',
+  'TramiteSubsanado': 'expedientes',
+  'TramiteSubsanadoEstudiante': 'expedientes',
+  'tramite_subsanado': 'expedientes',
+  'vinculacion_cuenta_aprobada': 'expedientes',
+  'vinculacion_cuenta_rechazada': 'expedientes',
+  'resolucion_emitida': 'expedientes',
+  'expediente_resuelto': 'expedientes',
+  'certificado_emitido': 'expedientes',
+  'cuenta_activada': 'casilla',
 };
 
 export const HEARTBEAT_SEGUNDOS = 15;
@@ -57,7 +76,14 @@ export class BusSse extends EventEmitter {
   }
 
   emitirEvento(evento: string, datos: unknown): void {
+    if (EVENTOS_SENSIBLES_BLOQUEADOS.has(evento)) {
+      return;
+    }
     const canal = EVENTO_A_CANAL[evento];
+    if (!canal) {
+      return;
+    }
+
     this.contadorEvento += 1;
     const idEvento = this.contadorEvento;
     const carga = JSON.stringify(datos);
@@ -65,7 +91,7 @@ export class BusSse extends EventEmitter {
     this.registrarEnBuffer({ id: idEvento, evento, carga });
 
     for (const suscriptor of this.suscriptores.values()) {
-      if (canal && !suscriptor.canales.has(canal)) continue;
+      if (!suscriptor.canales.has(canal)) continue;
       this.escribir(suscriptor.res, `id: ${idEvento}\nevent: ${evento}\ndata: ${carga}\n\n`);
     }
   }
@@ -79,8 +105,9 @@ export class BusSse extends EventEmitter {
     const reproducidos: number[] = [];
 
     for (const entrada of pendientes) {
+      if (EVENTOS_SENSIBLES_BLOQUEADOS.has(entrada.evento)) continue;
       const canal = EVENTO_A_CANAL[entrada.evento];
-      if (canal && !canales.has(canal)) continue;
+      if (!canal || !canales.has(canal)) continue;
       this.escribir(res, `id: ${entrada.id}\nevent: ${entrada.evento}\ndata: ${entrada.carga}\n\n`);
       reproducidos.push(entrada.id);
     }

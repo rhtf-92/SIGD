@@ -10,6 +10,13 @@ interface FilaBandeja {
   fecha_ingreso?: Date | string | null;
   estado_actual: EstadoRutaDoc;
   area_actual_id: string | null;
+  habilitado?: boolean | null;
+  estado_pago?: string | null;
+  fecha_habilitacion?: Date | string | null;
+  fecha_inicio_computo?: Date | string | null;
+  fecha_confirmacion_pago?: Date | string | null;
+  dias_habiles_restantes?: number | null;
+  hab_actualizado_en?: Date | string | null;
 }
 
 interface FilaBandejaConContadores {
@@ -50,7 +57,8 @@ const BASE = `
       FROM sigd_tra.asiento_registro
      WHERE anulado = FALSE
      ORDER BY expediente_id, numero_registro ASC
-  ) ar ON ar.expediente_id = e.expediente_id`;
+  ) ar ON ar.expediente_id = e.expediente_id
+  LEFT JOIN sigd_tra.expediente_habilitacion hab ON hab.expediente_id = e.expediente_id`;
 
 // Physical reception is distinct from the projected legal start of deadlines.
 // No fallback to now(), a placeholder, or the legal date for missing receipts.
@@ -76,7 +84,10 @@ export const SQL_LISTAR_RUTADOC = `
          COALESCE(t.asunto, ar.asunto, '') AS asunto, e.fecha_radicacion,
          ${FECHA_INGRESO_SQL} AS fecha_ingreso,
          COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
-         (${AREA_EFECTIVA_SQL}) AS area_actual_id
+         (${AREA_EFECTIVA_SQL}) AS area_actual_id,
+         hab.habilitado, hab.estado_pago, hab.fecha_habilitacion,
+         hab.fecha_inicio_computo, hab.fecha_confirmacion_pago,
+         hab.dias_habiles_regla AS dias_habiles_restantes, hab.actualizado_en AS hab_actualizado_en
   ${BASE} ${FILTROS}
     AND COALESCE(ultimo.estado_nuevo, 'REGISTRADO') = ANY($7::text[])
     AND ($8::timestamptz IS NULL OR
@@ -93,6 +104,7 @@ const COLUMNAS_CONTEO = `
   count(*) FILTER (WHERE ultimo.estado_nuevo = 'OBSERVADO')::integer AS "OBSERVADO",
   count(*) FILTER (WHERE ultimo.estado_nuevo = 'SUBSANADO')::integer AS "SUBSANADO",
   count(*) FILTER (WHERE ultimo.estado_nuevo = 'EN_FIRMA')::integer AS "EN_FIRMA",
+  count(*) FILTER (WHERE ultimo.estado_nuevo = 'ATENDIDO')::integer AS "ATENDIDO",
   count(*) FILTER (WHERE ultimo.estado_nuevo = 'RESUELTO')::integer AS "RESUELTO",
   count(*) FILTER (WHERE ultimo.estado_nuevo = 'ARCHIVADO')::integer AS "ARCHIVADO"`;
 
@@ -147,7 +159,7 @@ export const SQL_BANDEJA_LOCAL_RUTADOC = `
              'PENDIENTES', q."REGISTRADO" + q."RECEPCIONADO" + q."EN_CALIFICACION",
              'EN_TRAMITE', q."EN_REVISION" + q."OBSERVADO" + q."SUBSANADO",
              'DERIVADOS', q."DERIVADO", 'POR_FIRMAR', q."EN_FIRMA",
-             'ATENDIDOS', q."RESUELTO", 'ARCHIVADOS', q."ARCHIVADO")
+             'ATENDIDOS', q."RESUELTO" + COALESCE(q."ATENDIDO", 0), 'ARCHIVADOS', q."ARCHIVADO")
              FROM (${SQL_CONTADORES_SIN_TERMINO_RUTADOC}) q)
          END AS contadores`;
 
@@ -160,6 +172,15 @@ function mapearResumen(fila: FilaBandeja): ExpedienteResumen {
     fechaIngreso: fila.fecha_ingreso == null ? null : new Date(fila.fecha_ingreso).toISOString(),
     estadoActual: fila.estado_actual,
     areaActualId: fila.area_actual_id,
+    habilitacionInfo: fila.habilitado !== undefined && fila.habilitado !== null ? {
+      habilitado: Boolean(fila.habilitado),
+      estadoPago: fila.estado_pago ?? 'NO_REQUIERE',
+      fechaHabilitacion: fila.fecha_habilitacion ? new Date(fila.fecha_habilitacion).toISOString() : null,
+      fechaInicioComputo: fila.fecha_inicio_computo ? new Date(fila.fecha_inicio_computo).toISOString() : null,
+      fechaConfirmacionPago: fila.fecha_confirmacion_pago ? new Date(fila.fecha_confirmacion_pago).toISOString() : null,
+      diasHabilesRestantes: fila.dias_habiles_restantes ?? 0,
+      computoRealizadoEn: fila.hab_actualizado_en ? new Date(fila.hab_actualizado_en).toISOString() : new Date().toISOString(),
+    } : null,
   };
 }
 
@@ -259,44 +280,52 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
       }));
     }
 
-    const infoAcumulacion = await this.pool.query<{
-      id_acumulacion: string;
-      expediente_principal_id: string;
-      principal_codigo: string;
-      expediente_accesorio_id: string;
-      accesorio_codigo: string;
-      acto_resolutivo: string;
-      fecha_acumulacion: Date;
-      rol: 'PRINCIPAL' | 'ACCESORIO';
-    }>(`
-      SELECT a.id_acumulacion::text,
-             a.expediente_principal::text AS expediente_principal_id,
-             ep.codigo_expediente AS principal_codigo,
-             a.expediente_accesorio::text AS expediente_accesorio_id,
-             ea.codigo_expediente AS accesorio_codigo,
-             a.acto_resolutivo,
-             a.fecha_acumulacion,
-             CASE WHEN a.expediente_principal = $1::uuid THEN 'PRINCIPAL' ELSE 'ACCESORIO' END AS rol
-        FROM sigd_tra.expediente_acumulacion a
-        JOIN sigd_tra.expediente ep ON ep.expediente_id = a.expediente_principal
-        JOIN sigd_tra.expediente ea ON ea.expediente_id = a.expediente_accesorio
-       WHERE (a.expediente_principal = $1::uuid OR a.expediente_accesorio = $1::uuid)
-         AND a.estado = 'ACUMULADO'
-       ORDER BY a.fecha_acumulacion DESC
-       LIMIT 1`, [idExpediente]);
+    let acumulacionInfo: ExpedienteDetalle['acumulacionInfo'] = null;
+    const existeAcumulacion = await this.pool.query<{ existe: string | null }>(
+      "SELECT to_regclass('sigd_tra.expediente_acumulacion')::text AS existe",
+    );
+    if (existeAcumulacion.rows[0]?.existe) {
+      const infoAcumulacion = await this.pool.query<{
+        id_acumulacion: string;
+        expediente_principal_id: string;
+        principal_codigo: string;
+        expediente_accesorio_id: string;
+        accesorio_codigo: string;
+        acto_resolutivo: string;
+        fecha_acumulacion: Date;
+        rol: 'PRINCIPAL' | 'ACCESORIO';
+      }>(`
+        SELECT a.id_acumulacion::text,
+               a.expediente_principal::text AS expediente_principal_id,
+               ep.codigo_expediente AS principal_codigo,
+               a.expediente_accesorio::text AS expediente_accesorio_id,
+               ea.codigo_expediente AS accesorio_codigo,
+               a.acto_resolutivo,
+               a.fecha_acumulacion,
+               CASE WHEN a.expediente_principal = $1::uuid THEN 'PRINCIPAL' ELSE 'ACCESORIO' END AS rol
+          FROM sigd_tra.expediente_acumulacion a
+          JOIN sigd_tra.expediente ep ON ep.expediente_id = a.expediente_principal
+          JOIN sigd_tra.expediente ea ON ea.expediente_id = a.expediente_accesorio
+         WHERE (a.expediente_principal = $1::uuid OR a.expediente_accesorio = $1::uuid)
+           AND a.estado = 'ACUMULADO'
+         ORDER BY a.fecha_acumulacion DESC
+         LIMIT 1`, [idExpediente]);
 
-    const acumulacionFila = infoAcumulacion.rows[0];
-    const acumulacionInfo = acumulacionFila ? {
-      idAcumulacion: acumulacionFila.id_acumulacion,
-      esAccesorio: acumulacionFila.rol === 'ACCESORIO',
-      esPrincipal: acumulacionFila.rol === 'PRINCIPAL',
-      expedientePrincipalId: acumulacionFila.expediente_principal_id,
-      expedientePrincipalCodigo: acumulacionFila.principal_codigo,
-      expedienteAccesorioId: acumulacionFila.expediente_accesorio_id,
-      expedienteAccesorioCodigo: acumulacionFila.accesorio_codigo,
-      actoResolutivo: acumulacionFila.acto_resolutivo,
-      fechaAcumulacion: acumulacionFila.fecha_acumulacion.toISOString(),
-    } : null;
+      const acumulacionFila = infoAcumulacion.rows[0];
+      if (acumulacionFila) {
+        acumulacionInfo = {
+          idAcumulacion: acumulacionFila.id_acumulacion,
+          esAccesorio: acumulacionFila.rol === 'ACCESORIO',
+          esPrincipal: acumulacionFila.rol === 'PRINCIPAL',
+          expedientePrincipalId: acumulacionFila.expediente_principal_id,
+          expedientePrincipalCodigo: acumulacionFila.principal_codigo,
+          expedienteAccesorioId: acumulacionFila.expediente_accesorio_id,
+          expedienteAccesorioCodigo: acumulacionFila.accesorio_codigo,
+          actoResolutivo: acumulacionFila.acto_resolutivo,
+          fechaAcumulacion: acumulacionFila.fecha_acumulacion.toISOString(),
+        };
+      }
+    }
 
     let resolucionInfo: ResolucionInfoRutaDoc | null = null;
     const existeResolucion = await this.pool.query<{ existe: string | null }>(
@@ -367,14 +396,212 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
       }
     }
 
+    let certificadoInglesInfo: ExpedienteDetalle['certificadoInglesInfo'] = null;
+    let tipoTramiteCodigo: string | null = null;
+    let tipoTramiteDenominacion: string | null = null;
+
+    const existeTupa = await this.pool.query<{ existe: string | null }>(
+      "SELECT to_regclass('sigd_doc.tipo_tramite_tupa')::text AS existe",
+    );
+    if (existeTupa.rows[0]?.existe) {
+      const procTupaRes = await this.pool.query<{ codigo: string; denominacion: string }>(
+        `SELECT tt.codigo, tt.denominacion
+           FROM sigd_doc.expediente doc_exp
+           JOIN sigd_doc.tipo_tramite_tupa tt ON tt.tipo_tramite_id = doc_exp.tipo_tramite_id
+          WHERE doc_exp.expediente_id = $1::uuid
+          LIMIT 1`,
+        [idExpediente],
+      );
+      if (procTupaRes.rows[0]) {
+        tipoTramiteCodigo = procTupaRes.rows[0].codigo;
+        tipoTramiteDenominacion = procTupaRes.rows[0].denominacion;
+      }
+    }
+
+    const existeCertIngles = await this.pool.query<{ existe: string | null }>(
+      "SELECT to_regclass('sigd_doc.certificado_ingles')::text AS existe",
+    );
+    if (existeCertIngles.rows[0]?.existe) {
+      const certRes = await this.pool.query<{
+        certificado_id: string;
+        numero_borrador: string;
+        numero_certificado: string | null;
+        estado: string;
+        titular_nombre: string;
+        nivel_estudios: string;
+        horas_academicas: number;
+        promedio_final: string;
+        numero_acta: string;
+        fecha_proyeccion: string;
+        firmante_nombre: string | null;
+        firmado_en: Date | null;
+        cvd: string | null;
+        hash_pades: string | null;
+        documento_adjunto_id: string | null;
+      }>(`
+        SELECT c.certificado_id::text, c.numero_borrador, c.numero_certificado, c.estado,
+               c.titular_nombre, c.nivel_estudios, c.horas_academicas, c.promedio_final::text,
+               c.numero_acta, c.fecha_proyeccion::text,
+               COALESCE(pn.nombre_completo, cu.usuario, fd.firmante) AS firmante_nombre,
+               c.firmado_en, fd.cvd, COALESCE(c.hash_pades, fd.sha256_firmado) AS hash_pades,
+               c.documento_adjunto_id::text
+          FROM sigd_doc.certificado_ingles c
+          LEFT JOIN sigd_auth.cuenta_usuario cu ON cu.id_usuario = c.firmado_por
+          LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = cu.id_persona
+          LEFT JOIN sigd_doc.firma_digital_documento fd
+            ON fd.documento_id = c.documento_adjunto_id AND fd.estado = 'FIRMADO_DIGITALMENTE'
+         WHERE c.expediente_id = $1::uuid AND c.estado <> 'ANULADO'
+         ORDER BY c.creado_en DESC
+         LIMIT 1`, [idExpediente]);
+
+      if (certRes.rows[0]) {
+        const c = certRes.rows[0];
+        certificadoInglesInfo = {
+          certificadoId: c.certificado_id,
+          numeroBorrador: c.numero_borrador,
+          numeroCertificado: c.numero_certificado,
+          estado: c.estado,
+          titularNombre: c.titular_nombre,
+          nivelEstudios: c.nivel_estudios,
+          horasAcademicas: c.horas_academicas,
+          promedioFinal: Number(c.promedio_final),
+          numeroActa: c.numero_acta,
+          fechaProyeccion: c.fecha_proyeccion,
+          firmanteNombre: c.firmante_nombre,
+          firmadoEn: c.firmado_en ? c.firmado_en.toISOString() : null,
+          cvd: c.cvd,
+          hashPades: c.hash_pades,
+          documentoAdjuntoId: c.documento_adjunto_id,
+        };
+      }
+    }
+
+    let ordenPagoInfo: ExpedienteDetalle['ordenPagoInfo'] = null;
+    const existeTes = await this.pool.query<{ existe: string | null }>(
+      "SELECT to_regclass('sigd_tes.aplicacion_pago')::text AS existe",
+    );
+    if (existeTes.rows[0]?.existe) {
+      const pagoRes = await this.pool.query<{
+        orden_id: string;
+        numero_orden: string;
+        importe: number;
+        concepto: string;
+        tiene_pago: boolean;
+        pago_verificado: boolean;
+        recibo_numero: string | null;
+      }>(`
+        SELECT o.id::text AS orden_id,
+               o.codigo AS numero_orden,
+               o.importe::float AS importe,
+               o.concepto,
+               EXISTS(SELECT 1 FROM sigd_tes.pago p WHERE p.orden_id = o.id) AS tiene_pago,
+               EXISTS(
+                 SELECT 1 FROM sigd_tes.pago p
+                  WHERE p.orden_id = o.id
+                    AND p.estado = 'VERIFICADO'
+                    AND NOT EXISTS(SELECT 1 FROM sigd_tes.devolucion d WHERE d.pago_id = p.id AND d.estado <> 'RECHAZADA')
+               ) AS pago_verificado,
+               (SELECT p.numero_recibo::text FROM sigd_tes.pago p WHERE p.orden_id = o.id LIMIT 1) AS recibo_numero
+          FROM sigd_tes.aplicacion_pago a
+          JOIN sigd_tes.orden_pago o ON o.id = a.orden_id
+         WHERE a.expediente_id = $1::uuid
+         LIMIT 1
+      `, [idExpediente]);
+      if (pagoRes.rows[0]) {
+        const row = pagoRes.rows[0];
+        ordenPagoInfo = {
+          ordenId: row.orden_id,
+          numeroOrden: row.numero_orden,
+          importe: row.importe,
+          estadoOrden: row.pago_verificado ? 'PAGADO' : 'PENDIENTE',
+          tienePago: Boolean(row.tiene_pago),
+          pagoVerificado: Boolean(row.pago_verificado),
+          reciboNumero: row.recibo_numero,
+          pendienteVerificacion: row.importe > 0 && !row.pago_verificado,
+        };
+      }
+    }
+
+    if (!ordenPagoInfo) {
+      const existeRadicacionPub = await this.pool.query<{ existe: string | null }>(
+        "SELECT to_regclass('sigd_tra.radicacion_publica')::text AS existe",
+      );
+      if (existeRadicacionPub.rows[0]?.existe) {
+        const radPubRes = await this.pool.query<{ pendiente: boolean }>(`
+          SELECT EXISTS(
+            SELECT 1 FROM sigd_tra.radicacion_publica
+             WHERE expediente_id = $1::uuid AND datos_declarados->>'estado_economico' = 'NO_VERIFICADO'
+          ) AS pendiente
+        `, [idExpediente]);
+        if (radPubRes.rows[0]?.pendiente) {
+          ordenPagoInfo = {
+            ordenId: '',
+            numeroOrden: 'DEMO-PENDIENTE',
+            importe: 0,
+            estadoOrden: 'PENDIENTE',
+            tienePago: false,
+            pagoVerificado: false,
+            reciboNumero: null,
+            pendienteVerificacion: true,
+          };
+        }
+      }
+    }
+
+    let habilitacionInfo: ExpedienteDetalle['habilitacionInfo'] = null;
+    const existeHab = await this.pool.query<{ existe: string | null }>(
+      "SELECT to_regclass('sigd_tra.expediente_habilitacion')::text AS existe",
+    );
+    if (existeHab.rows[0]?.existe) {
+      const habRes = await this.pool.query<{
+        requiere_pago: boolean;
+        estado_pago: string;
+        fecha_confirmacion_pago: Date | null;
+        fecha_inicio_computo: string | null;
+        fecha_habilitacion: string | null;
+        dias_habiles_regla: number;
+        habilitado: boolean;
+      }>(`
+        SELECT requiere_pago,
+               estado_pago,
+               fecha_confirmacion_pago,
+               to_char(fecha_inicio_computo, 'YYYY-MM-DD') AS fecha_inicio_computo,
+               to_char(fecha_habilitacion, 'YYYY-MM-DD') AS fecha_habilitacion,
+               dias_habiles_regla,
+               habilitado
+          FROM sigd_tra.expediente_habilitacion
+         WHERE expediente_id = $1::uuid
+         LIMIT 1
+      `, [idExpediente]);
+
+      if (habRes.rows[0]) {
+        const h = habRes.rows[0];
+        const nowIso = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+        const esCumplido = h.fecha_habilitacion ? nowIso >= h.fecha_habilitacion : h.habilitado;
+        habilitacionInfo = {
+          requierePago: h.requiere_pago,
+          estadoPago: h.estado_pago,
+          pagoVerificado: h.estado_pago === 'VERIFICADO',
+          fechaConfirmacionPago: h.fecha_confirmacion_pago ? h.fecha_confirmacion_pago.toISOString() : null,
+          fechaInicioComputo: h.fecha_inicio_computo,
+          fechaHabilitacion: h.fecha_habilitacion,
+          diasHabilesRestantes: esCumplido ? 0 : 15,
+          habilitado: esCumplido,
+          mensaje: esCumplido
+            ? 'Expediente habilitado para recepción formal por Mesa de Partes.'
+            : `Expediente en período obligatorio de espera legal de 15 días hábiles (habilitación: ${h.fecha_habilitacion}).`,
+        };
+      }
+    }
+
     const ultimoMovimiento: UltimoMovimiento | null = dato.id_movimiento && dato.evento && dato.fecha_hora && dato.usuario_operador_id
       ? { idMovimiento: dato.id_movimiento, evento: dato.evento,
           estadoNuevo: dato.estado_actual, fechaHora: dato.fecha_hora.toISOString(),
           usuarioOperadorId: dato.usuario_operador_id }
       : null;
     return {
-      ...mapearResumen(dato), solicitanteId: dato.solicitante_id,
-      resumenDocumentos, documentos, acumulacionInfo, resolucionInfo, ultimoMovimiento, sla: null,
+      ...mapearResumen(dato), tipoTramiteCodigo, tipoTramiteDenominacion, solicitanteId: dato.solicitante_id,
+      resumenDocumentos, documentos, acumulacionInfo, resolucionInfo, certificadoInglesInfo, ordenPagoInfo, habilitacionInfo, ultimoMovimiento, sla: null,
     };
   }
 }

@@ -457,44 +457,51 @@ export default function HomePage() {
 
               {/* Cuatro tarjetas de servicios públicos de ancho óptimo y homogéneo */}
               <div className="grid grid-cols-4 gap-5 lg:gap-6">
-                {SERVICIOS_PUBLICOS.map((card) => (
-                  <Link
-                    key={card.ruta}
-                    to={card.ruta}
-                    className="group flex flex-col justify-between bg-white rounded-[14px] border border-[#D7E8F8] shadow-[0_2px_10px_rgba(8,47,124,0.05)] hover:shadow-[0_8px_24px_rgba(8,47,124,0.12)] hover:-translate-y-1 transition duration-200 ease-out overflow-hidden min-h-[265px] lg:min-h-[275px] p-3 sm:p-3.5"
-                  >
-                    <div>
-                      {/* Fotografía panorámica con relación ~3.4:1 */}
-                      <div className="w-full h-[96px] sm:h-[102px] overflow-hidden rounded-[8px] bg-slate-100">
-                        <img
-                          src={card.imagen}
-                          alt={card.titulo}
-                          className="w-full h-full object-cover object-center group-hover:scale-102 transition duration-300"
-                        />
+                {SERVICIOS_PUBLICOS.map((card) => {
+                  const rutaDestino =
+                    card.titulo === "Casilla Electrónica"
+                      ? (isAuthenticated && esCiudadano ? "/casilla" : "/casilla/login")
+                      : card.ruta;
+
+                  return (
+                    <Link
+                      key={card.ruta}
+                      to={rutaDestino}
+                      className="group flex flex-col justify-between bg-white rounded-[14px] border border-[#D7E8F8] shadow-[0_2px_10px_rgba(8,47,124,0.05)] hover:shadow-[0_8px_24px_rgba(8,47,124,0.12)] hover:-translate-y-1 transition duration-200 ease-out overflow-hidden min-h-[265px] lg:min-h-[275px] p-3 sm:p-3.5"
+                    >
+                      <div>
+                        {/* Fotografía panorámica con relación ~3.4:1 */}
+                        <div className="w-full h-[96px] sm:h-[102px] overflow-hidden rounded-[8px] bg-slate-100">
+                          <img
+                            src={card.imagen}
+                            alt={card.titulo}
+                            className="w-full h-full object-cover object-center group-hover:scale-102 transition duration-300"
+                          />
+                        </div>
+
+                        {/* Textos de la tarjeta */}
+                        <div className="pt-3 px-1">
+                          <h3 className="text-[17.5px] sm:text-[18.5px] font-bold text-[#082F7C] leading-snug group-hover:text-[#005bb5] transition">
+                            {card.titulo}
+                          </h3>
+                          <p className="mt-1.5 text-[13.5px] sm:text-[14px] text-[#334E68] leading-relaxed">
+                            {card.descripcion}
+                          </p>
+                        </div>
                       </div>
 
-                      {/* Textos de la tarjeta */}
-                      <div className="pt-3 px-1">
-                        <h3 className="text-[17.5px] sm:text-[18.5px] font-bold text-[#082F7C] leading-snug group-hover:text-[#005bb5] transition">
-                          {card.titulo}
-                        </h3>
-                        <p className="mt-1.5 text-[13.5px] sm:text-[14px] text-[#334E68] leading-relaxed">
-                          {card.descripcion}
-                        </p>
+                      {/* CTA en la parte inferior alineado */}
+                      <div className="flex items-center justify-between pt-3 pb-1 px-1 border-t border-slate-100/70 mt-3">
+                        <span className="text-[14px] font-semibold text-[#005bb5] group-hover:underline">
+                          {card.accion}
+                        </span>
+                        <div className="w-9 h-9 rounded-full bg-[#0073E6] group-hover:bg-[#005bb5] flex items-center justify-center text-white shadow-sm transition shrink-0">
+                          <ArrowRight className="w-4 h-4" />
+                        </div>
                       </div>
-                    </div>
-
-                    {/* CTA en la parte inferior alineado */}
-                    <div className="flex items-center justify-between pt-3 pb-1 px-1 border-t border-slate-100/70 mt-3">
-                      <span className="text-[14px] font-semibold text-[#005bb5] group-hover:underline">
-                        {card.accion}
-                      </span>
-                      <div className="w-9 h-9 rounded-full bg-[#0073E6] group-hover:bg-[#005bb5] flex items-center justify-center text-white shadow-sm transition shrink-0">
-                        <ArrowRight className="w-4 h-4" />
-                      </div>
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           </section>

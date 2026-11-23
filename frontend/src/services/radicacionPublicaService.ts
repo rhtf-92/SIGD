@@ -29,15 +29,23 @@ export function completePublicSubmission(cut: string) {
 }
 export function publicTrackingHeaders(cut: string): Record<string, string> {
   try {
-    const fragment = new URLSearchParams(window.location.hash.slice(1)).get('constancia');
+    const hashStr = window.location.hash.slice(1);
+    const params = new URLSearchParams(hashStr);
+    const token = params.get('token') ?? params.get('constancia');
     const saved = JSON.parse(sessionStorage.getItem('SIGD_PUBLIC_LAST_RECEIPT') ?? 'null');
-    const token = fragment ?? (saved?.cut === cut ? saved.token : null);
-    return /^[0-9a-f]{64}$/.test(token ?? '') ? { 'X-SIGD-Public-Session': token } : {};
+    const candidate = token ?? (saved?.cut === cut ? saved.token : null);
+    if (/^[0-9a-f]{64}$/i.test(candidate ?? '')) {
+      return {
+        'X-SIGD-Public-Tracking-Token': candidate!,
+        'X-SIGD-Public-Session': candidate!,
+      };
+    }
+    return {};
   } catch { return {}; }
 }
-export function publicTrackingUrl(cut: string): string {
-  const token = memorySession?.token ?? publicTrackingHeaders(cut)['X-SIGD-Public-Session'];
-  return `${window.location.origin}/consulta/${encodeURIComponent(cut)}${token ? `#constancia=${token}` : ''}`;
+export function publicTrackingUrl(cut: string, token?: string): string {
+  const t = token ?? memorySession?.token;
+  return `${window.location.origin}/tramites/consulta-publica/${encodeURIComponent(cut)}${t ? `#token=${t}` : ''}`;
 }
 export async function publicRequest<T>(path: string, options: RequestInit = {}): Promise<{ status: number; data: T }> {
   const response = await fetch(`${env.apiBaseUrl}${ROOT}${path}`, { ...options, credentials: 'omit',

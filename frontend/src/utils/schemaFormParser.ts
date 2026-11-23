@@ -404,7 +404,6 @@ export const mockTupaSchema: JsonSchemaDraft2020_12 = {
       title: "Programa de Estudios",
       description: "Carrera técnica profesional cursada en el IESTP Suiza",
       enum: [
-        "Administración de Empresas",
         "Administración de Operaciones Turísticas",
         "Asistencia Administrativa",
         "Contabilidad",
@@ -412,9 +411,14 @@ export const mockTupaSchema: JsonSchemaDraft2020_12 = {
         "Desarrollo de Sistemas de Información",
         "Electricidad Industrial",
         "Enfermería Técnica",
+        "Gestión Administrativa",
         "Manejo Forestal",
-        "Mecánica Automotriz",
+        "Mecatrónica Automotriz",
         "Producción Agropecuaria",
+        // Denominaciones históricas para compatibilidad de registros anteriores
+        "Administración de Empresas",
+        "Computación e Informática",
+        "Mecánica Automotriz",
       ],
     },
   },

@@ -27,6 +27,10 @@ export function DespachoResolutivoSeccion({
   // La resolución puede provenir directamente del detalle o de la prop
   const resolucion = resolucionProp !== undefined ? resolucionProp : expediente.resolucionInfo;
 
+  if (expediente.tipoTramiteCodigo === "SUZ26-006" && !resolucion) {
+    return null;
+  }
+
   const estadoResolucion = resolucion?.estado?.toUpperCase() || "";
   const esFirmada = estadoResolucion === "FIRMADA";
   const esEnFirma = estadoResolucion === "EN_FIRMA" || expediente.estadoActual === "EN_FIRMA";

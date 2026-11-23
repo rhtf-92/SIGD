@@ -178,13 +178,22 @@ export function crearRouterStorage(pool?: Pool): Router {
   async function autorizarDocumento(bucket: string | null, key: string | null, res: Response, documentoId: string | null = null) {
     const identidad = res.locals.identidadStorage as { id_usuario: string; id_persona: string | null };
     const resultado = await pool!.query<{ documento_adjunto_id: string; expediente_id: string; sha256: string; s3_bucket: string; s3_key: string }>(
-      `SELECT a.documento_adjunto_id, a.expediente_id, a.sha256, a.s3_bucket, a.s3_key
+      `SELECT a.documento_adjunto_id,
+              a.expediente_id,
+              CASE WHEN $5::uuid IS NOT NULL THEN COALESCE(f.sha256_firmado, a.sha256)
+                   WHEN f.documento_id IS NOT NULL AND f.s3_bucket = $1 AND f.s3_key = $2 THEN f.sha256_firmado
+                   ELSE a.sha256 END AS sha256,
+              CASE WHEN $5::uuid IS NOT NULL THEN COALESCE(f.s3_bucket, a.s3_bucket)
+                   WHEN f.documento_id IS NOT NULL AND f.s3_bucket = $1 AND f.s3_key = $2 THEN f.s3_bucket
+                   ELSE a.s3_bucket END AS s3_bucket,
+              CASE WHEN $5::uuid IS NOT NULL THEN COALESCE(f.s3_key, a.s3_key)
+                   WHEN f.documento_id IS NOT NULL AND f.s3_bucket = $1 AND f.s3_key = $2 THEN f.s3_key
+                   ELSE a.s3_key END AS s3_key
          FROM sigd_doc.documento_adjunto a
          JOIN sigd_doc.expediente e ON e.expediente_id = a.expediente_id
+         LEFT JOIN sigd_doc.firma_digital_documento f ON f.documento_id = a.documento_adjunto_id
         WHERE ((($5::uuid IS NULL AND a.s3_bucket = $1 AND a.s3_key = $2)
-           OR EXISTS (SELECT 1 FROM sigd_doc.firma_digital_documento f
-                       WHERE f.documento_id = a.documento_adjunto_id
-                         AND $5::uuid IS NULL AND f.s3_bucket = $1 AND f.s3_key = $2))
+           OR ($5::uuid IS NULL AND f.documento_id IS NOT NULL AND f.s3_bucket = $1 AND f.s3_key = $2))
            OR ($5::uuid IS NOT NULL AND a.documento_adjunto_id = $5::uuid))
           AND (e.solicitante_id = $4::uuid OR EXISTS (
             SELECT 1 FROM sigd_org.usuario_rol ur

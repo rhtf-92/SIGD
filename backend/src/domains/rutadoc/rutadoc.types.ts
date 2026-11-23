@@ -28,6 +28,19 @@ export interface PosicionCursor {
   idExpediente: string;
 }
 
+export interface HabilitacionInfoResumen {
+  requierePago?: boolean;
+  estadoPago: string;
+  pagoVerificado?: boolean;
+  fechaConfirmacionPago?: string | null;
+  fechaInicioComputo?: string | null;
+  fechaHabilitacion?: string | null;
+  diasHabilesRestantes: number;
+  habilitado: boolean;
+  mensaje?: string;
+  computoRealizadoEn?: string;
+}
+
 export interface ExpedienteResumen {
   idExpediente: string;
   cut: string;
@@ -38,6 +51,7 @@ export interface ExpedienteResumen {
   estadoActual: EstadoRutaDoc;
   /** Procede de datos.areaId del último movimiento, si el escritor lo aporta. */
   areaActualId: string | null;
+  habilitacionInfo?: HabilitacionInfoResumen | null;
 }
 
 export interface UltimoMovimiento {
@@ -66,7 +80,38 @@ export interface ResolucionInfoRutaDoc {
   documentoAdjuntoId?: string | null;
 }
 
+export interface CertificadoInglesInfoRutaDoc {
+  certificadoId: string;
+  numeroBorrador: string;
+  numeroCertificado?: string | null;
+  estado: string;
+  titularNombre: string;
+  nivelEstudios: string;
+  horasAcademicas: number;
+  promedioFinal: number;
+  numeroActa: string;
+  fechaProyeccion: string;
+  firmanteNombre?: string | null;
+  firmadoEn?: string | null;
+  cvd?: string | null;
+  hashPades?: string | null;
+  documentoAdjuntoId?: string | null;
+}
+
+export interface OrdenPagoInfoRutaDoc {
+  ordenId: string;
+  numeroOrden: string;
+  importe: number;
+  estadoOrden: string;
+  tienePago: boolean;
+  pagoVerificado: boolean;
+  reciboNumero: string | null;
+  pendienteVerificacion: boolean;
+}
+
 export interface ExpedienteDetalle extends ExpedienteResumen {
+  tipoTramiteCodigo?: string | null;
+  tipoTramiteDenominacion?: string | null;
   /** UUID de sigd_tra.expediente.solicitante_id; el nombre requiere IdentiCore. */
   solicitanteId: string | null;
   resumenDocumentos: { cantidadDocumentos: number; totalFolios: number } | null;
@@ -92,6 +137,9 @@ export interface ExpedienteDetalle extends ExpedienteResumen {
     fechaAcumulacion: string;
   } | null;
   resolucionInfo?: ResolucionInfoRutaDoc | null;
+  certificadoInglesInfo?: CertificadoInglesInfoRutaDoc | null;
+  ordenPagoInfo?: OrdenPagoInfoRutaDoc | null;
+  habilitacionInfo?: HabilitacionInfoResumen | null;
   ultimoMovimiento: UltimoMovimiento | null;
   /** El cálculo SLA corresponde a otro entregable. */
   sla: null;

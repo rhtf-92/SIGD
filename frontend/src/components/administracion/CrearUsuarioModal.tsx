@@ -32,6 +32,7 @@ const initialForm = {
   correo: "",
   username: "",
   passwordInicial: "",
+  confirmarPassword: "",
   areaId: "",
   cargoId: "",
 };
@@ -304,6 +305,7 @@ export default function CrearUsuarioModal({
   const [errorGeneral, setErrorGeneral] = useState("");
   const [invalidos, setInvalidos] = useState<Record<string, string>>({});
   const [mostrarPassword, setMostrarPassword] = useState(false);
+  const [mostrarConfirmarPassword, setMostrarConfirmarPassword] = useState(false);
 
   // Estado de roles y permisos institucionales inicializado con rolesProps o rolesCatalogo
   const [rolesRbac, setRolesRbac] = useState<RolInstitucional[]>(() => {
@@ -424,10 +426,11 @@ export default function CrearUsuarioModal({
     }
 
     const correoLimpio = form.correo.trim().toLowerCase();
-    if (!/^[^\s@]+@(iestpsuiza|iestp-suiza)\.edu\.pe$/i.test(correoLimpio)) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(correoLimpio)) {
       setInvalidos(prev => ({
         ...prev,
-        correo: "El correo debe pertenecer obligatoriamente al dominio @iestpsuiza.edu.pe o @iestp-suiza.edu.pe.",
+        correo: "Ingrese una dirección de correo válida (ej. usuario@gmail.com o usuario@iestpsuiza.edu.pe).",
       }));
       return;
     }
@@ -459,7 +462,15 @@ export default function CrearUsuarioModal({
     if (form.passwordInicial.length < 8) {
       setInvalidos(prev => ({
         ...prev,
-        passwordInicial: "La contraseña inicial debe tener al menos 8 caracteres.",
+        passwordInicial: "La contraseña definitiva debe tener al menos 8 caracteres.",
+      }));
+      return;
+    }
+
+    if (form.confirmarPassword && form.passwordInicial !== form.confirmarPassword) {
+      setInvalidos(prev => ({
+        ...prev,
+        confirmarPassword: "Las contraseñas no coinciden. Verifique la confirmación.",
       }));
       return;
     }
@@ -689,7 +700,7 @@ export default function CrearUsuarioModal({
 
               <div className="sm:col-span-2">
                 <label htmlFor="crear-correo" className={labelBase}>
-                  Correo electrónico institucional <span aria-hidden="true" className="text-red-500">*</span>
+                  Correo electrónico (personal o institucional) <span aria-hidden="true" className="text-red-500">*</span>
                 </label>
                 <input
                   id="crear-correo"
@@ -700,13 +711,13 @@ export default function CrearUsuarioModal({
                   className={`${inputBase} ${invalidos.correo ? "border-red-500 ring-2 ring-red-100" : ""}`}
                   value={form.correo}
                   onChange={e => updateField("correo", e.target.value)}
-                  placeholder="usuario@iestpsuiza.edu.pe"
+                  placeholder="usuario@gmail.com o usuario@iestpsuiza.edu.pe"
                 />
                 {invalidos.correo ? (
                   <p className={errorBase}>{invalidos.correo}</p>
                 ) : (
                   <p className={helperBase}>
-                    Exclusivo del dominio oficial <strong>@iestpsuiza.edu.pe</strong> o <strong>@iestp-suiza.edu.pe</strong>.
+                    Admite correos personales (Gmail, Outlook, Yahoo, etc.) e institucionales oficiales.
                   </p>
                 )}
               </div>
@@ -799,7 +810,7 @@ export default function CrearUsuarioModal({
           />
 
           {/* =========================================================
-              SECCIÓN 4: CREDENCIALES INICIALES DE ACCESO
+              SECCIÓN 4: CREDENCIALES DEFINITIVAS DE ACCESO
               ========================================================= */}
           <fieldset className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6 transition hover:border-slate-300">
             <div className="flex items-center gap-2.5 mb-1">
@@ -809,11 +820,11 @@ export default function CrearUsuarioModal({
               </legend>
             </div>
             <p className="text-xs text-slate-500 mb-5 ml-8.5">
-              Nombre de usuario institucional y contraseña de primer ingreso (cifrada con Argon2id).
+              Nombre de usuario y contraseña permanente para el acceso directo al SIGD (cifrada con Argon2id).
             </p>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
+              <div className="sm:col-span-2">
                 <label htmlFor="crear-username" className={labelBase}>
                   Nombre de usuario <span aria-hidden="true" className="text-red-500">*</span>
                 </label>
@@ -829,7 +840,7 @@ export default function CrearUsuarioModal({
                   value={form.username}
                   onChange={e => updateField("username", e.target.value)}
                   autoComplete="off"
-                  placeholder="Ej. jperez"
+                  placeholder="Ej. tesorero.personal"
                 />
                 {invalidos.username ? (
                   <p className={errorBase}>{invalidos.username}</p>
@@ -840,7 +851,7 @@ export default function CrearUsuarioModal({
 
               <div>
                 <label htmlFor="crear-password" className={labelBase}>
-                  Contraseña inicial <span aria-hidden="true" className="text-red-500">*</span>
+                  Contraseña definitiva <span aria-hidden="true" className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -880,7 +891,52 @@ export default function CrearUsuarioModal({
                 ) : form.passwordInicial.length >= 8 ? (
                   <p className="mt-1.5 text-xs text-emerald-600 font-medium">✓ Mínimo 8 caracteres cumplido.</p>
                 ) : (
-                  <p className={helperBase}>Clave de primer acceso para el personal institucional.</p>
+                  <p className={helperBase}>Contraseña permanente para el acceso directo del usuario.</p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="crear-confirmar-password" className={labelBase}>
+                  Confirmar contraseña
+                </label>
+                <div className="relative">
+                  <input
+                    id="crear-confirmar-password"
+                    aria-label="Confirmar contraseña"
+                    disabled={pending}
+                    type={mostrarConfirmarPassword ? "text" : "password"}
+                    minLength={8}
+                    maxLength={128}
+                    className={`${inputBase} pr-10 ${invalidos.confirmarPassword ? "border-red-500 ring-2 ring-red-100" : ""}`}
+                    value={form.confirmarPassword}
+                    onChange={e => updateField("confirmarPassword", e.target.value)}
+                    autoComplete="new-password"
+                    placeholder="Repita la contraseña"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarConfirmarPassword(v => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700"
+                    aria-label={mostrarConfirmarPassword ? "Ocultar confirmación" : "Ver confirmación"}
+                  >
+                    {mostrarConfirmarPassword ? (
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                      </svg>
+                    ) : (
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                {invalidos.confirmarPassword ? (
+                  <p className={errorBase}>{invalidos.confirmarPassword}</p>
+                ) : form.confirmarPassword && form.confirmarPassword === form.passwordInicial ? (
+                  <p className="mt-1.5 text-xs text-emerald-600 font-medium">✓ Las contraseñas coinciden.</p>
+                ) : (
+                  <p className={helperBase}>Confirme la contraseña permanente.</p>
                 )}
               </div>
             </div>

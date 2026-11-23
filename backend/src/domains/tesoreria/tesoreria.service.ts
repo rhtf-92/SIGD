@@ -116,7 +116,7 @@ export class TesoreriaService {
       const r = (await c.query('SELECT * FROM sigd_tes.tarifa WHERE id=$1 FOR UPDATE', [id])).rows[0];
       if (!r) fallo('NO_ENCONTRADO','No se encontró la tarifa.',404);
       if (r.estado!=='PROPUESTA') fallo('ESTADO_INVALIDO','La tarifa ya fue evaluada.',409);
-      await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', ['tarifa:'+r.tipo_tramite_id]);
+      await c.query('SELECT tipo_tramite_id FROM sigd_doc.tipo_tramite_tupa WHERE tipo_tramite_id = $1 FOR UPDATE', [r.tipo_tramite_id]);
       if (aprobar && (await c.query(`SELECT 1 FROM sigd_tes.tarifa WHERE tipo_tramite_id=$1 AND estado='VALIDADA'
         AND daterange(vigente_desde,vigente_hasta,'[]') && daterange($2::date,$3::date,'[]')`, [r.tipo_tramite_id,r.vigente_desde,r.vigente_hasta])).rowCount)
         fallo('TARIFAS_SOLAPADAS','Ya existe una tarifa validada en ese periodo.',409);

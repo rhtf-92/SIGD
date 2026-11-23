@@ -10,8 +10,6 @@ import { z } from "zod";
  * - T-BE-OC-07: Validación de correo institucional
  */
 
-const DOMINIOS_INSTITUCIONALES = ["@iestpsuiza.edu.pe", "@iestp-suiza.edu.pe"];
-
 /**
  * Estados funcionales del usuario.
  */
@@ -22,27 +20,18 @@ export const estadoUsuarioSchema = z.enum([
 ]);
 
 /**
- * Correo institucional obligatorio.
- *
- * Válido:
- * usuario@iestpsuiza.edu.pe
- *
- * No válidos:
- * usuario@gmail.com
- * usuario@hotmail.com
+ * Validación de correo electrónico para cuentas de usuario.
+ * Admite dominios institucionales y personales (Gmail, Outlook, Hotmail, Yahoo, etc.).
+ * Normaliza espacios y mayúsculas/minúsculas.
  */
-export const correoInstitucionalSchema = z
+export const correoUsuarioSchema = z
   .string()
   .trim()
+  .toLowerCase()
   .email("El correo electrónico no tiene un formato válido")
-  .refine(
-    (correo: string) =>
-      DOMINIOS_INSTITUCIONALES.some((dom) => correo.toLowerCase().endsWith(dom)),
-    {
-      message:
-        "El correo debe pertenecer al dominio institucional (@iestpsuiza.edu.pe o @iestp-suiza.edu.pe)",
-    },
-  );
+  .max(254, "El correo electrónico no puede superar los 254 caracteres");
+
+export const correoInstitucionalSchema = correoUsuarioSchema;
 
 /**
  * GET /api/v1/admin/usuarios
@@ -131,7 +120,7 @@ export const crearUsuarioAdminSchema = z.object({
     .optional()
     .nullable(),
 
-  correo: correoInstitucionalSchema,
+  correo: correoUsuarioSchema,
 
   username: z
     .string()
@@ -209,7 +198,7 @@ const actualizarUsuarioAdminBaseSchema = z.object({
     .optional()
     .nullable(),
 
-  correo: correoInstitucionalSchema.optional(),
+  correo: correoUsuarioSchema.optional(),
 
   puestoLaboralId: z
     .string()

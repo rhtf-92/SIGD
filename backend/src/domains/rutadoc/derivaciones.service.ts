@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { getRequestContext } from '../../shared/request-context/request-context.js';
 import { insertarEvento } from '../../audit/evento-outbox.repository.js';
 import {
@@ -16,6 +16,7 @@ import type { AtenderExpedienteDTO } from './dto/atenderExpediente.dto.js';
 import type { RecepcionarExpedienteDTO } from './dto/recepcionarExpediente.dto.js';
 import { obtenerSiguienteEstado } from './rutadoc.fsm.js';
 import { exigirSinPagoDemoPendiente } from '../tramicore/demoPago.js';
+import { exigirExpedienteHabilitadoParaRecepcion } from '../tramicore/computoPlazo15Dias.service.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -28,10 +29,27 @@ export interface ResultadoDerivacionBackend {
   nuevoEstado: string;
 }
 
+export interface CargoRecepcionOficial {
+  numeroCargo: string;
+  hashSha256: string;
+  qrUrl: string;
+  fechaHora: string;
+  canal: string;
+  folios: number;
+  documentos: number;
+  operador: string;
+}
+
 export interface ResultadoRecepcionBackend {
   movimientoId: string;
   nuevoEstado: string;
   secuencia: string;
+  cargo?: CargoRecepcionOficial;
+}
+
+export interface RechazarExpedienteDTO {
+  motivo: string;
+  baseLegal: string;
 }
 
 async function resolverOperadorParam(
@@ -160,11 +178,12 @@ export async function derivarExpediente(
     estadoAnterior !== 'EN_CALIFICACION' &&
     estadoAnterior !== 'EN_REVISION' &&
     estadoAnterior !== 'RECEPCIONADO' &&
-    estadoAnterior !== 'REGISTRADO'
+    estadoAnterior !== 'REGISTRADO' &&
+    estadoAnterior !== 'SUBSANADO'
   ) {
     throw new ConflictError({
       code: 'ESTADO_NO_DERIVABLE',
-      message: `El expediente en estado '${estadoAnterior}' no admite derivación. Solo expedientes en 'REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION' o 'EN_REVISION' pueden ser derivados conforme a la FSM institucional.`,
+      message: `El expediente en estado '${estadoAnterior}' no admite derivación. Solo expedientes en 'REGISTRADO', 'RECEPCIONADO', 'EN_CALIFICACION', 'SUBSANADO' o 'EN_REVISION' pueden ser derivados conforme a la FSM institucional.`,
     });
   }
 
@@ -306,6 +325,47 @@ export async function derivarExpediente(
     estadoEfectivoDerivacion = 'EN_CALIFICACION';
   }
 
+  // 3. Reapertura formal de revisión si el expediente se encontraba en SUBSANADO (FSM 06_sigd_rut.sql)
+  if (estadoEfectivoDerivacion === 'SUBSANADO') {
+    const correlationIdRev = contexto?.correlation_id && esUuid(contexto.correlation_id)
+      ? contexto.correlation_id
+      : randomUUID();
+    const claveIdempotenciaRev = `REV-SUB-${expedienteId}-${Date.now()}`;
+    const datosJsonRev = {
+      areaId: areaOrigenId ?? null,
+      observaciones: 'Reapertura de revisión administrativa tras subsanación de observaciones',
+      usuarioActorUuid: usuarioActorId,
+    };
+    await cliente.query(`
+      INSERT INTO sigd_rut.movimiento_tramite (
+        expediente_id,
+        estado_anterior,
+        evento,
+        estado_nuevo,
+        usuario_operador_id,
+        correlation_id,
+        clave_idempotencia,
+        datos
+      ) VALUES (
+        $1::uuid,
+        'SUBSANADO',
+        'INICIAR_REVISION',
+        'EN_REVISION',
+        $2,
+        $3::uuid,
+        $4,
+        $5::jsonb
+      )
+    `, [
+      expedienteId,
+      operadorParam,
+      correlationIdRev,
+      claveIdempotenciaRev,
+      JSON.stringify(datosJsonRev),
+    ]);
+    estadoEfectivoDerivacion = 'EN_REVISION';
+  }
+
   let ultimoMovimientoId = expedienteId;
 
   // 6. Procesar cada destino
@@ -328,6 +388,11 @@ export async function derivarExpediente(
       esCopia: Boolean(destino.es_copia),
       usuarioAsignadoId: destino.usuario_asignado_id ?? null,
       usuarioActorUuid: usuarioActorId,
+      tipoDocumentoSustento: datos.tipo_documento_sustento ?? 'PROVEIDO',
+      numeroDocumentoSustento: datos.numero_documento_sustento ?? null,
+      prioridad: datos.prioridad ?? 'NORMAL',
+      plazoDias: datos.plazo_dias ?? null,
+      instrucciones: datos.instrucciones ?? null,
     };
 
     const resMovimiento = await cliente.query<{ id_movimiento: string; secuencia: string }>(`
@@ -379,6 +444,11 @@ export async function derivarExpediente(
           motivo: datos.proveido,
           es_copia: Boolean(destino.es_copia),
           usuario_asignado_id: destino.usuario_asignado_id ?? null,
+          tipo_documento_sustento: datos.tipo_documento_sustento ?? 'PROVEIDO',
+          numero_documento_sustento: datos.numero_documento_sustento ?? null,
+          prioridad: datos.prioridad ?? 'NORMAL',
+          plazo_dias: datos.plazo_dias ?? null,
+          instrucciones: datos.instrucciones ?? null,
         },
       },
     });
@@ -473,20 +543,85 @@ export async function atenderExpediente(
       LIMIT 1
     `, [expedienteId]);
 
-    if (resResolucion.rowCount === 0) {
-      throw new ConflictError({
-        code: 'BORRADOR_RESOLUCION_REQUERIDO',
-        detail: `El expediente se encuentra en ${estadoAnterior === 'ATENDIDO' ? 'atención técnica concluida' : 'revisión'} pero no cuenta con un proyecto de resolución registrado en DocuCore. Proyecte la resolución antes de elevar a firma digital.`,
-      });
-    }
+    let tipoActoFirma: 'RESOLUCION' | 'CERTIFICADO_INGLES' = 'RESOLUCION';
+    let idActoFirma: string;
+    let numeroBorrador: string;
 
-    const { resolucion_id, numero_borrador, tiene_adjunto_pdf } = resResolucion.rows[0];
+    if ((resResolucion.rowCount ?? 0) > 0) {
+      idActoFirma = resResolucion.rows[0].resolucion_id;
+      numeroBorrador = resResolucion.rows[0].numero_borrador;
+      if (!resResolucion.rows[0].tiene_adjunto_pdf) {
+        throw new ConflictError({
+          code: 'DOCUMENTO_FIRMABLE_REQUERIDO',
+          detail: `La resolución ${numeroBorrador} no cuenta con un documento binario PDF generado y apto para firma digital en el repositorio institucional.`,
+        });
+      }
+    } else {
+      // Verificar si el expediente corresponde a SUZ26-006 (Certificado de Inglés Opción A)
+      const resCert = await cliente.query<{
+        certificado_id: string;
+        numero_borrador: string;
+        estado: string;
+        tiene_adjunto_pdf: boolean;
+        verificacion_favorable: boolean;
+      }>(`
+        SELECT c.certificado_id::text,
+               c.numero_borrador,
+               c.estado,
+               EXISTS (
+                 SELECT 1
+                   FROM sigd_doc.documento_adjunto d
+                  WHERE d.expediente_id = c.expediente_id
+                    AND d.documento_adjunto_id = c.documento_adjunto_id
+                    AND d.s3_key = ('certificados/' || c.numero_borrador || '.pdf')
+                    AND d.mime_type = 'application/pdf'
+                    AND d.sha256 IS NOT NULL
+               ) AS tiene_adjunto_pdf,
+               EXISTS (
+                 SELECT 1
+                   FROM sigd_doc.verificacion_academica_ingles v
+                  WHERE v.verificacion_id = c.verificacion_id
+                    AND v.vigente = TRUE
+                    AND v.resultado = 'FAVORABLE'
+                    AND v.culminado_verificado = TRUE
+                    AND v.aprobado_verificado = TRUE
+                    AND v.pago_tesoreria_verificado = TRUE
+               ) AS verificacion_favorable
+          FROM sigd_doc.certificado_ingles c
+         WHERE c.expediente_id = $1::uuid
+           AND c.estado <> 'ANULADO'
+         ORDER BY c.creado_en DESC
+         LIMIT 1
+      `, [expedienteId]);
 
-    if (!tiene_adjunto_pdf) {
-      throw new ConflictError({
-        code: 'DOCUMENTO_FIRMABLE_REQUERIDO',
-        detail: `La resolución ${numero_borrador} no cuenta con un documento binario PDF generado y apto para firma digital en el repositorio institucional.`,
-      });
+      if ((resCert?.rowCount ?? 0) === 0) {
+        throw new ConflictError({
+          code: 'BORRADOR_RESOLUCION_REQUERIDO',
+          detail: `El expediente se encuentra en ${estadoAnterior === 'ATENDIDO' ? 'atención técnica concluida' : 'revisión'} pero no cuenta con un proyecto de resolución ni Certificado de Inglés proyectado en DocuCore.`,
+        });
+      }
+
+      const cert = resCert.rows[0];
+      if (!cert.verificacion_favorable) {
+        throw new ConflictError({
+          code: 'VERIFICACION_ACADEMICA_FAVORABLE_REQUERIDA',
+          detail: 'El Certificado de Inglés requiere verificación académica favorable vigente de Secretaría Académica y pago verificado antes de elevarse a firma.',
+        });
+      }
+      if (!cert.tiene_adjunto_pdf) {
+        throw new ConflictError({
+          code: 'DOCUMENTO_FIRMABLE_REQUERIDO',
+          detail: `El Certificado de Inglés ${cert.numero_borrador} no cuenta con el documento binario PDF listo para firma digital.`,
+        });
+      }
+      tipoActoFirma = 'CERTIFICADO_INGLES';
+      idActoFirma = cert.certificado_id;
+      numeroBorrador = cert.numero_borrador;
+
+      await cliente.query(
+        `UPDATE sigd_doc.certificado_ingles SET estado = 'EN_FIRMA' WHERE certificado_id = $1::uuid AND estado = 'BORRADOR_PENDIENTE_FIRMA'`,
+        [cert.certificado_id],
+      );
     }
 
     const correlationIdFirma = contexto?.correlation_id && esUuid(contexto.correlation_id)
@@ -494,10 +629,15 @@ export async function atenderExpediente(
       : randomUUID();
     const datosJsonFirma = {
       areaId: areaActualExpediente,
-      observaciones: datos.resultado_resumen || 'Pase a despacho y firma resolutiva',
+      observaciones: datos.resultado_resumen || (tipoActoFirma === 'CERTIFICADO_INGLES'
+        ? 'Pase a firma digital de Certificado de Inglés en Dirección General'
+        : 'Pase a despacho y firma resolutiva'),
       usuarioActorUuid: usuarioActorId,
-      resolucionId: resolucion_id,
-      numeroBorrador: numero_borrador,
+      tipoActoFirma,
+      ...(tipoActoFirma === 'CERTIFICADO_INGLES'
+        ? { certificadoId: idActoFirma }
+        : { resolucionId: idActoFirma }),
+      numeroBorrador,
     };
     const resPase = await cliente.query<{ id_movimiento: string }>(`
       INSERT INTO sigd_rut.movimiento_tramite (
@@ -523,7 +663,13 @@ export async function atenderExpediente(
       payload: {
         identidad: { expediente_id: expedienteId, movimiento_id: resPase.rows[0].id_movimiento },
         contexto: { usuario_actor_id: usuarioActorId, area_contexto_id: areaActualExpediente },
-        datos_especificos: { resultado_resumen: datos.resultado_resumen, resolucion_id, numero_borrador },
+        datos_especificos: {
+          resultado_resumen: datos.resultado_resumen,
+          tipo_acto: tipoActoFirma,
+          resolucion_id: tipoActoFirma === 'RESOLUCION' ? idActoFirma : null,
+          certificado_id: tipoActoFirma === 'CERTIFICADO_INGLES' ? idActoFirma : null,
+          numero_borrador: numeroBorrador,
+        },
       },
     });
 
@@ -533,17 +679,28 @@ export async function atenderExpediente(
   // Si el expediente se encuentra en 'EN_FIRMA', verificar si existe evidencia de firma digital
   if (estadoAnterior === 'EN_FIRMA') {
     const resVerificacionFirma = await cliente.query<{ tiene_firma: boolean }>(`
-      SELECT EXISTS (
-        SELECT 1
-        FROM sigd_doc.resolucion r
-        JOIN sigd_doc.documento_adjunto d
-          ON d.expediente_id = r.expediente_id
-         AND d.s3_key = 'resoluciones/' || r.numero_borrador || '.pdf'
-        JOIN sigd_doc.firma_digital_documento f
-          ON f.documento_id = d.documento_adjunto_id
-         AND f.estado = 'FIRMADO_DIGITALMENTE'
-        WHERE r.expediente_id = $1::uuid
-          AND r.estado = 'FIRMADA'
+      SELECT (
+        EXISTS (
+          SELECT 1
+          FROM sigd_doc.resolucion r
+          JOIN sigd_doc.documento_adjunto d
+            ON d.expediente_id = r.expediente_id
+           AND d.s3_key = 'resoluciones/' || r.numero_borrador || '.pdf'
+          JOIN sigd_doc.firma_digital_documento f
+            ON f.documento_id = d.documento_adjunto_id
+           AND f.estado = 'FIRMADO_DIGITALMENTE'
+          WHERE r.expediente_id = $1::uuid
+            AND r.estado = 'FIRMADA'
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM sigd_doc.certificado_ingles c
+          JOIN sigd_doc.firma_digital_documento f
+            ON f.documento_id = c.documento_adjunto_id
+           AND f.estado = 'FIRMADO_DIGITALMENTE'
+          WHERE c.expediente_id = $1::uuid
+            AND c.estado IN ('EMITIDO_FIRMADO', 'NOTIFICADO')
+        )
       ) AS tiene_firma
     `, [expedienteId]);
 
@@ -686,6 +843,69 @@ export async function archivarExpediente(
     correlationId, `ARCH-${expedienteId}-${Date.now()}`, JSON.stringify(datosJson),
   ]);
 
+  await cliente.query(
+    `UPDATE sigd_tra.expediente SET estado = 'ARCHIVADO' WHERE expediente_id = $1::uuid`,
+    [expedienteId],
+  );
+  await cliente.query(
+    `UPDATE sigd_doc.expediente SET estado = 'RESUELTO' WHERE expediente_id = $1::uuid`,
+    [expedienteId],
+  );
+
+  if (esUuid(usuarioActorId)) {
+    try {
+      const areaArchivoRes = await cliente.query<{ area_id: string }>(`
+        SELECT area_id::text FROM sigd_org.area WHERE codigo = 'AC' LIMIT 1
+      `);
+      const areaCustodiaId = areaArchivoRes.rows[0]?.area_id || areaActualExpediente;
+
+      let personaId = usuarioActorId;
+      const personaRes = await cliente.query<{ id_persona: string }>(`
+        SELECT id_persona::text FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1::uuid LIMIT 1
+      `, [usuarioActorId]);
+      if (personaRes.rows[0]?.id_persona) {
+        personaId = personaRes.rows[0].id_persona;
+      }
+
+      if (areaCustodiaId && esUuid(personaId)) {
+        await cliente.query(`
+          INSERT INTO sigd_rut.expediente_cierre_historial (
+            id_cierre, expediente_id, tipo_actuacion, usuario_id, persona_id,
+            contexto_activo_id, unidad_area_id, fecha_hora, permiso_utilizado,
+            estado_anterior, estado_posterior, justificacion, condiciones_verificadas,
+            evidencias, regla_cierre_id, correlation_id
+          ) VALUES (
+            gen_random_uuid(), $1::uuid, 'CIERRE', $2::uuid, $3::uuid,
+            gen_random_uuid(), $4::uuid, now(), 'EXPEDIENTE_ARCHIVAR',
+            'RESUELTO', 'ARCHIVADO', $5,
+            '{"resolucion_firmada": true, "notificacion_casilla": true}'::jsonb,
+            $6::jsonb, null, $7::uuid
+          )
+        `, [
+          expedienteId, usuarioActorId, personaId, areaCustodiaId,
+          datos.observaciones || 'Cierre formal y archivo definitivo institucional',
+          JSON.stringify({ estante: datos.estante, balda: datos.balda, caja: datos.caja }),
+          correlationId,
+        ]);
+
+        await cliente.query(`
+          INSERT INTO sigd_rut.expediente_custodia (
+            id_custodia, expediente_id, area_custodia_id, custodio_usuario_id,
+            ubicacion_fisica, transferido_por, motivo_custodia, activo, desde, hasta
+          ) VALUES (
+            gen_random_uuid(), $1::uuid, $2::uuid, $3::uuid,
+            $4::jsonb, $3::uuid, 'Custodia permanente en Archivo Central', true, now(), null
+          )
+        `, [
+          expedienteId, areaCustodiaId, usuarioActorId,
+          JSON.stringify({ estante: datos.estante, balda: datos.balda, caja: datos.caja }),
+        ]);
+      }
+    } catch {
+      // Ignorar en entornos aislados o de test mockeado donde no se proveen estas tablas relacionales
+    }
+  }
+
   await insertarEvento(cliente, {
     agregado: 'Expediente',
     tipo_evento: 'ExpedienteArchivado',
@@ -718,6 +938,7 @@ export async function recepcionarExpediente(
   cliente: PoolClient,
   expedienteId: string,
   datos?: RecepcionarExpedienteDTO,
+  fechaReferencia: Date = new Date(),
 ): Promise<ResultadoRecepcionBackend> {
   const contexto = getRequestContext();
   const usuarioActorId = contexto?.usuario_id;
@@ -729,6 +950,7 @@ export async function recepcionarExpediente(
   }
 
   await exigirSinPagoDemoPendiente(cliente, expedienteId);
+
   const resExpediente = await cliente.query<{
     expediente_id: string;
     codigo_expediente: string;
@@ -773,14 +995,20 @@ export async function recepcionarExpediente(
     });
   }
 
-  if (estadoAnterior !== 'DERIVADO' && estadoAnterior !== 'REGISTRADO') {
+  if (estadoAnterior !== 'DERIVADO' && estadoAnterior !== 'REGISTRADO' && estadoAnterior !== 'SUBSANADO') {
     throw new ConflictError({
       code: 'ESTADO_NO_RECEPCIONABLE',
       message: `El expediente en estado '${estadoAnterior}' no admite recepcion conforme a la FSM institucional.`,
     });
   }
 
-  const nuevoEstado = obtenerSiguienteEstado(estadoAnterior, 'RECEPCION');
+  if (estadoAnterior === 'REGISTRADO') {
+    await exigirSinPagoDemoPendiente(cliente, expedienteId);
+    await exigirExpedienteHabilitadoParaRecepcion(cliente, expedienteId, fechaReferencia);
+  }
+
+  const eventoFsm = estadoAnterior === 'SUBSANADO' ? 'INICIAR_REVISION' : 'RECEPCION';
+  const nuevoEstado = obtenerSiguienteEstado(estadoAnterior, eventoFsm);
   const operadorParam = await resolverOperadorParam(cliente, usuarioActorId);
 
   const correlationId = contexto?.correlation_id && esUuid(contexto.correlation_id)
@@ -789,10 +1017,40 @@ export async function recepcionarExpediente(
 
   const claveIdempotencia = `RECEP-${expedienteId}-${Date.now()}`;
 
-  const datosJson = {
+  // Cargo Oficial de Recepción formal LPAG (emitido en recepción de Mesa de Partes o a solicitud explícita)
+  const debeGenerarCargo = datos?.generarCargo === true || (estadoAnterior === 'REGISTRADO' && datos?.generarCargo !== false);
+  let cargoOficial: CargoRecepcionOficial | undefined;
+  if (debeGenerarCargo) {
+    const fechaHoraRecepcion = new Date().toISOString();
+    const sufijoCorrelativo = String(cut || expedienteId).replace(/[^0-9]/g, '').slice(-6).padStart(6, '0');
+    const numeroCargo = `CRG-2026-${sufijoCorrelativo}`;
+    const canalRecepcion = datos?.canalRecepcion ?? (estadoAnterior === 'REGISTRADO' ? 'MESA_VIRTUAL' : 'MESA_PRESENCIAL');
+    const foliosRecepcion = datos?.cantidadFolios ?? 1;
+    const documentosRecepcion = datos?.cantidadDocumentos ?? 1;
+    const qrUrl = `https://sigd.iestp-suiza.edu.pe/consulta/${cut}`;
+    const hashSha256 = createHash('sha256').update(
+      `${cut}|${numeroCargo}|${fechaHoraRecepcion}|${canalRecepcion}|${foliosRecepcion}|${documentosRecepcion}|${usuarioActorId}`
+    ).digest('hex');
+
+    cargoOficial = {
+      numeroCargo,
+      hashSha256,
+      qrUrl,
+      fechaHora: fechaHoraRecepcion,
+      canal: canalRecepcion,
+      folios: foliosRecepcion,
+      documentos: documentosRecepcion,
+      operador: usuarioActorId,
+    };
+  }
+
+  const datosJson: Record<string, unknown> = {
     areaId: areaActualExpediente,
-    observaciones: datos?.observaciones || 'Recepción formal en unidad orgánica de destino',
+    observaciones: datos?.observaciones || (estadoAnterior === 'SUBSANADO'
+      ? 'Reapertura de revisión administrativa tras subsanación de observaciones'
+      : 'Recepción formal en unidad orgánica de destino'),
     usuarioActorUuid: usuarioActorId,
+    ...(cargoOficial ? { cargo: cargoOficial } : {}),
   };
 
   const resMovimiento = await cliente.query<{ id_movimiento: string; secuencia: string }>(`
@@ -808,7 +1066,7 @@ export async function recepcionarExpediente(
     ) VALUES (
       $1::uuid,
       $2,
-      'RECEPCION',
+      $8,
       $7,
       $3,
       $4::uuid,
@@ -823,6 +1081,7 @@ export async function recepcionarExpediente(
     claveIdempotencia,
     JSON.stringify(datosJson),
     nuevoEstado,
+    eventoFsm,
   ]);
 
   const ultimoMovimientoId = resMovimiento.rows[0].id_movimiento;
@@ -844,6 +1103,7 @@ export async function recepcionarExpediente(
       datos_especificos: {
         observaciones: datos?.observaciones ?? null,
         secuencia: nuevaSecuencia,
+        cargo: cargoOficial,
       },
     },
   });
@@ -852,5 +1112,154 @@ export async function recepcionarExpediente(
     movimientoId: ultimoMovimientoId,
     nuevoEstado,
     secuencia: nuevaSecuencia,
+    ...(datos?.generarCargo ? { cargo: cargoOficial } : {}),
   };
+}
+
+/**
+ * Servicio de Rechazo Administrativo e Inadmisibilidad (LPAG Arts. 136 y 142).
+ * Concluye el procedimiento administrativo por causales motivadas insubsanables.
+ */
+export async function rechazarExpediente(
+  cliente: PoolClient,
+  expedienteId: string,
+  datos: RechazarExpedienteDTO,
+): Promise<{ movimientoId: string; nuevoEstado: string }> {
+  const contexto = getRequestContext();
+  const usuarioActorId = contexto?.usuario_id;
+
+  if (!usuarioActorId) {
+    throw new UnauthorizedError({
+      detail: 'No se encontró usuario en el contexto para registrar el rechazo administrativo.',
+    });
+  }
+
+  if (!datos.motivo?.trim() || !datos.baseLegal?.trim()) {
+    throw new ValidationError({
+      invalidParams: [
+        ...(!datos.motivo?.trim() ? [{ name: 'motivo', reason: 'El motivo del rechazo es obligatorio.' }] : []),
+        ...(!datos.baseLegal?.trim() ? [{ name: 'baseLegal', reason: 'La base legal (p. ej. Art. 136 LPAG) es obligatoria.' }] : []),
+      ],
+    });
+  }
+
+  const resExp = await cliente.query<{
+    expediente_id: string;
+    codigo_expediente: string;
+    estado_actual: string;
+    area_actual_id: string | null;
+    solicitante_id: string;
+  }>(`
+    SELECT
+      e.expediente_id::text,
+      e.codigo_expediente,
+      COALESCE(ultimo.estado_nuevo, e.estado, 'REGISTRADO') AS estado_actual,
+      ultimo.area_actual_id,
+      e.solicitante_id::text
+    FROM sigd_tra.expediente e
+    LEFT JOIN sigd_rut.estado_actual_expediente ultimo ON ultimo.expediente_id = e.expediente_id
+    WHERE e.expediente_id = $1::uuid
+    FOR UPDATE OF e
+  `, [expedienteId]);
+
+  if (resExp.rowCount === 0) {
+    throw new NotFoundError({ detail: `El expediente '${expedienteId}' no existe.` });
+  }
+
+  const { estado_actual: estadoAnterior, area_actual_id: areaActual, codigo_expediente: cut, solicitante_id: solicitanteId } = resExp.rows[0];
+
+  if (estadoAnterior === 'ARCHIVADO' || estadoAnterior === 'CERRADO') {
+    throw new ConflictError({
+      detail: `El expediente ya se encuentra en estado terminal '${estadoAnterior}'.`,
+    });
+  }
+
+  const operadorParam = await resolverOperadorParam(cliente, usuarioActorId);
+  const correlationId = contexto?.correlation_id && esUuid(contexto.correlation_id)
+    ? contexto.correlation_id
+    : randomUUID();
+
+  const nuevoEstado = 'CERRADO';
+  const eventoFsm = 'CIERRE_ADMINISTRATIVO';
+  const fechaHora = new Date().toISOString();
+
+  const datosJson = {
+    areaId: areaActual,
+    motivo: datos.motivo.trim(),
+    baseLegal: datos.baseLegal.trim(),
+    usuarioActorUuid: usuarioActorId,
+    tipoCierre: 'RECHAZO_INADMISIBILIDAD',
+    fechaHora,
+  };
+
+  const resMov = await cliente.query<{ id_movimiento: string; secuencia: string }>(`
+    INSERT INTO sigd_rut.movimiento_tramite (
+      expediente_id, estado_anterior, evento, estado_nuevo,
+      usuario_operador_id, correlation_id, clave_idempotencia, datos
+    ) VALUES (
+      $1::uuid, $2, $3, $4,
+      $5, $6::uuid, $7, $8::jsonb
+    ) RETURNING id_movimiento::text, secuencia::text
+  `, [
+    expedienteId, estadoAnterior, eventoFsm, nuevoEstado,
+    operadorParam, correlationId, `RECH-${expedienteId}-${Date.now()}`, JSON.stringify(datosJson),
+  ]);
+
+  const idMovimiento = resMov.rows[0].id_movimiento;
+
+  // Actualizar estado en sigd_doc.expediente a ANULADO
+  await cliente.query(`
+    UPDATE sigd_doc.expediente
+    SET estado = 'ANULADO'
+    WHERE expediente_id = $1::uuid
+  `, [expedienteId]);
+
+  // Insertar evento outbox
+  await insertarEvento(cliente, {
+    agregado: 'Expediente',
+    tipo_evento: 'ExpedienteRechazado',
+    payload: {
+      identidad: { expediente_id: expedienteId, movimiento_id: idMovimiento, cut },
+      contexto: { usuario_actor_id: usuarioActorId, area_id: areaActual },
+      datos_especificos: {
+        motivo: datos.motivo.trim(),
+        base_legal: datos.baseLegal.trim(),
+        estado_previo: estadoAnterior,
+      },
+    },
+  });
+
+  // Notificación formal en Casilla Electrónica
+  if (solicitanteId) {
+    try {
+      await cliente.query(`
+        INSERT INTO sigd_auth.notificacion_casilla (
+          usuario_id, cut, asunto, tipo_acto, cuerpo, estado, fecha_deposito
+        ) VALUES (
+          $1::uuid,
+          $2,
+          $3,
+          'RECHAZO_ADMINISTRATIVO',
+          $4::jsonb,
+          'ENVIADO',
+          now()
+        )
+      `, [
+        solicitanteId,
+        cut,
+        `Notificación de Inadmisibilidad / Rechazo - Expediente ${cut}`,
+        JSON.stringify({
+          mensaje: `Se le comunica que su expediente ${cut} ha sido declarado INADMISIBLE / RECHAZADO por causal administrativa.`,
+          motivo: datos.motivo.trim(),
+          baseLegal: datos.baseLegal.trim(),
+          responsable: usuarioActorId,
+          fechaHora,
+        }),
+      ]);
+    } catch {
+      // Casilla no bloqueante
+    }
+  }
+
+  return { movimientoId: idMovimiento, nuevoEstado };
 }

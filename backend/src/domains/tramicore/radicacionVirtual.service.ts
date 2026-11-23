@@ -12,9 +12,13 @@ import { admisibilidadPublica } from './admisibilidadPublica.js';
 import { omitirPagoDemo, MARCA_PAGO_DEMO } from './demoPago.js';
 import { AppError } from '../../shared/domain/errors/index.js';
 import { registrarMutacion } from '../../audit/bitacora-auditoria.repository.js';
+import { insertarEvento } from '../../audit/evento-outbox.repository.js';
 import { validarPagoRadicacion,consultarCondicionFinanciera } from '../tesoreria/tesoreria.radicacion.js';
 import { contarPaginasPdf } from './pdfFoliacion.js';
 import { CATALOGO_DOCUMENTAL_POR_CODIGO } from './catalogoDocumentalTupa2026.js';
+import { expedienteRequierePagoTupa, registrarInicioPlazoPago } from './computoPlazo15Dias.service.js';
+import { TokenSeguimientoService } from './tokenSeguimiento.service.js';
+import { cifrarSecreto } from '../../shared/crypto/cifradoOutbox.js';
 
 /**
  * T-BE-TC-02 y T-BE-TC-03 Â· Logica de negocio de la radicacion virtual
@@ -44,6 +48,8 @@ export interface ResultadoRadicacion {
     hashSha256: string;
     qrContenido: string;
   };
+  tokenSeguimiento?: string;
+  enlaceSeguro?: string;
 }
 
 interface FilaExpediente {
@@ -65,10 +71,12 @@ export type ProveedorFeriados = (clienteTransaccional?: PoolClient) => Promise<s
 export class RadicacionVirtualService {
   private readonly cutService: CutService;
   private readonly obtenerFeriados: ProveedorFeriados;
+  private readonly tokenSeguimientoService: TokenSeguimientoService;
 
   constructor(private readonly pool: Pool, obtenerFeriados?: ProveedorFeriados) {
     this.cutService = new CutService(pool);
     this.obtenerFeriados = obtenerFeriados ?? crearProveedorFeriados(pool);
+    this.tokenSeguimientoService = new TokenSeguimientoService(pool);
   }
 
   async radicar(datos: RadicacionVirtualInput, idUsuarioAutenticado: string, now: Date = new Date()): Promise<ResultadoRadicacion> {
@@ -159,7 +167,7 @@ export class RadicacionVirtualService {
       await this.insertarAdjuntos(cliente, expediente.expediente_id, datos, clasificacion.documentosClasificados, archivos, idUsuarioAutenticado);
       const cargo = await this.emitirCargoDigital(cliente, expediente.expediente_id, { ...datos, totalFolios }, now, cut, idPersona);
 
-      const resultado = {
+      const resultado: ResultadoRadicacion = {
         expedienteId: expediente.expediente_id,
         cut,
         anio,
@@ -170,13 +178,80 @@ export class RadicacionVirtualService {
         totalFolios,
         cargoDigital: cargo,
       };
+
+      // Cómputo institucional de los 15 días hábiles para el pago (LPAG Art. 143)
+      const { requierePago } = await expedienteRequierePagoTupa(cliente, expediente.expediente_id);
+      if (requierePago || ordenAplicada) {
+        await registrarInicioPlazoPago(cliente, expediente.expediente_id, ordenAplicada, expediente.fecha_radicacion_legal, now);
+        await insertarEvento(cliente, {
+          agregado: 'Expediente',
+          tipo_evento: 'orden_pago_generada',
+          payload: {
+            expediente_id: expediente.expediente_id,
+            cut,
+            orden_id: ordenAplicada ?? null,
+            asunto: `Orden de Pago generada para expediente CUT: ${cut}`,
+            cuerpo: {
+              fechaRadicacionLegal: resultado.fechaRadicacionLegal,
+              plazoDiasHabiles: 15,
+            },
+            ...(publico ? {
+              correoDeclarado: publico.datos.correo,
+              telefonoDeclarado: publico.datos.telefono,
+              nombreDeclarado: publico.datos.nombreSolicitante,
+            } : {
+              usuario_id: idUsuarioAutenticado,
+            }),
+          },
+        });
+      }
+
       if (publico) {
+        // Emitir token de seguimiento criptográfico independiente (256 bits)
+        const tokenSeguimiento = await this.tokenSeguimientoService.emitirToken(cliente, expediente.expediente_id);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5178';
+        const enlaceSeguro = `${frontendUrl}/tramites/consulta-publica/${cut}#token=${tokenSeguimiento.token}`;
+        resultado.tokenSeguimiento = tokenSeguimiento.token;
+        resultado.enlaceSeguro = enlaceSeguro;
+
+        // Cifrar el secreto de seguimiento con AES-256-GCM antes de escribir al Outbox
+        let enlaceSeguroCifrado: string | undefined;
+        let tokenSeguimientoCifrado: string | undefined;
+        try {
+          enlaceSeguroCifrado = cifrarSecreto(enlaceSeguro);
+          tokenSeguimientoCifrado = cifrarSecreto(tokenSeguimiento.token);
+        } catch (e) {
+          console.error('[Transactional Outbox] Advertencia: No se pudo cifrar el secreto de seguimiento.', e);
+        }
+
         await registrarMutacion(cliente, { esquema: 'sigd_tra', tabla: 'radicacion_publica', operacion: 'INSERT',
           datos_despues: { expediente_id: expediente.expediente_id, cut, solicitante_id: idPersona,
             identidad: 'DECLARADA_PENDIENTE_VERIFICACION_INSTITUCIONAL', declaracionVeracidad: true, aceptaTerminos: true,
             ...(demoSinPago ? { modalidad: MARCA_PAGO_DEMO, estado_economico: 'NO_VERIFICADO' } : {}) } });
         await cliente.query('UPDATE sigd_tra.radicacion_publica SET expediente_id=$2::uuid, respuesta=$3::jsonb WHERE sesion_hash=$1',
           [publico.sesionHash, expediente.expediente_id, JSON.stringify(resultado)]);
+
+        await insertarEvento(cliente, {
+          agregado: 'Expediente',
+          tipo_evento: 'radicacion_exitosa',
+          payload: {
+            solicitante_id: idPersona,
+            expediente_id: expediente.expediente_id,
+            cut,
+            asunto: `Trámite radicado exitosamente — CUT: ${cut}`,
+            tipo_acto: 'RADICACION_PUBLICO',
+            cuerpo: {
+              totalFolios: resultado.totalFolios,
+              fechaRadicacionLegal: resultado.fechaRadicacionLegal,
+              diferidoPorCorte: resultado.fueraDeHorario,
+              correoDeclarado: publico.datos.correo,
+              telefonoDeclarado: publico.datos.telefono,
+              nombreDeclarado: publico.datos.nombreSolicitante,
+              enlaceConsultaPublica: `/tramites/consulta-publica/${cut}`,
+              ...(enlaceSeguroCifrado ? { enlaceSeguroCifrado, tokenSeguimientoCifrado } : {}),
+            },
+          },
+        });
       } else {
         await registrarMutacion(cliente, { esquema: 'sigd_tra', tabla: 'radicacion_virtual', operacion: 'INSERT',
           datos_despues: { expediente_id: expediente.expediente_id, cut, solicitante_id: idPersona,
@@ -189,6 +264,23 @@ export class RadicacionVirtualService {
           VALUES ($1::uuid, $2::uuid, $3::uuid, 'APROBADA', 'Radicación autenticada inicial', now())
           ON CONFLICT (expediente_id, id_usuario) DO NOTHING
         `, [expediente.expediente_id, idUsuarioAutenticado, idPersona]);
+
+        await insertarEvento(cliente, {
+          agregado: 'Expediente',
+          tipo_evento: 'radicacion_exitosa',
+          payload: {
+            usuario_id: idUsuarioAutenticado,
+            expediente_id: expediente.expediente_id,
+            cut,
+            asunto: `Trámite radicado exitosamente — CUT: ${cut}`,
+            tipo_acto: 'RADICACION_VIRTUAL',
+            cuerpo: {
+              totalFolios: resultado.totalFolios,
+              fechaRadicacionLegal: resultado.fechaRadicacionLegal,
+              diferidoPorCorte: resultado.fueraDeHorario,
+            },
+          },
+        });
       }
       await cliente.query('COMMIT');
       transaccionAbierta = false;
@@ -512,8 +604,9 @@ export class RadicacionVirtualService {
       if (procFila.rows[0]) {
         const configDoc = CATALOGO_DOCUMENTAL_POR_CODIGO.get(procFila.rows[0].codigo);
         let codigoArea = 'MP'; // Flujo seguro por defecto: Mesa de Partes (MP)
-        // Solo derivar automáticamente si la competencia institucional está verificada documentalmente
-        if (configDoc?.unidadResponsableVerificada === true) {
+        const entraPorMesaPartes = (configDoc?.unidadRecepcion ?? '').toLowerCase().includes('mesa de partes');
+        // Solo asignar automáticamente el área responsable si la recepción no exige ingreso previo por Mesa de Partes
+        if (!entraPorMesaPartes && configDoc?.unidadResponsableVerificada === true) {
           const unidadResp = (configDoc.unidadResponsable ?? '').toLowerCase();
           if (unidadResp.includes('secretar') || unidadResp.includes('académic')) {
             codigoArea = 'SEC';

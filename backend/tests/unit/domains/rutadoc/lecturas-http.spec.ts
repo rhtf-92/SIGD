@@ -11,6 +11,7 @@ function app(actor: ActorRutaDoc | null) {
   const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   const pool = { query: async (sql: string) => {
     if (sql.includes('AS inconsistente')) return { rows: [{ inconsistente: false }] };
+    if (sql.includes('to_regclass')) return { rows: [{ existe: null }] };
     if (sql.includes('fecha_radicacion AT TIME ZONE')) return { rows: [{ fecha_inicio: hoy }] };
     if (sql.includes('sigd_rut.expediente_observacion')) return { rows: [] };
     throw new Error('No se esperaba acceso a PostgreSQL');

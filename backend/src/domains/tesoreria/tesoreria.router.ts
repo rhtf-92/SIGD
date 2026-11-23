@@ -77,7 +77,7 @@ export function crearRouterTesoreria(pool:Pool):Router{
   const analisisPdf=await analizarPdfBuffer(bytes);const config=obtenerConfiguracionS3(),key=`tesoreria/${new Date().getUTCFullYear()}/${randomUUID()}.pdf`;
   const a:ActorTesoreria=res.locals.actor;
   const doc=await repo.transaccion(async c=>{
-   await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['tes-documentos:'+a.usuario]);
+   await c.query('SELECT id_usuario FROM sigd_auth.cuenta_usuario WHERE id_usuario = $1 FOR UPDATE',[a.usuario]);
    const cuota=(await c.query("SELECT count(*)::int n,COALESCE(sum(bytes),0)::text bytes FROM sigd_tes.documento WHERE propietario_id=$1 AND creado_en>now()-interval '1 hour'",[a.usuario])).rows[0];
    if(cuota.n>=30||BigInt(cuota.bytes)+BigInt(bytes.length)>50n*1024n*1024n)fallo('LIMITE_CARGAS','Máximo 30 documentos y 50 MB por hora.',429);
   const put=await fetch(generarUrlPresigned(key,config,{metodo:'PUT',contentType:'application/pdf',expiraSegundos:60}),{method:'PUT',headers:{'Content-Type':'application/pdf'},body:new Uint8Array(bytes),signal:AbortSignal.timeout(20000)});

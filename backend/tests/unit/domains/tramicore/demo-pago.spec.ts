@@ -1,12 +1,27 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PoolClient } from 'pg';
-import { omitirPagoDemo, exigirSinPagoDemoPendiente, MARCA_PAGO_DEMO } from '../../../../src/domains/tramicore/demoPago.js';
+import { omitirPagoDemo, exigirSinPagoDemoPendiente, obtenerEstadoPago, MARCA_PAGO_DEMO } from '../../../../src/domains/tramicore/demoPago.js';
 import { derivarExpediente, atenderExpediente, archivarExpediente, recepcionarExpediente } from '../../../../src/domains/rutadoc/derivaciones.service.js';
 import { crearServicioResoluciones } from '../../../../src/domains/docucore/resoluciones.service.js';
 import type { Pool } from 'pg';
 const ID = '33333333-3333-4333-8333-333333333333';
 vi.mock('../../../../src/shared/request-context/request-context.js', () => ({ getRequestContext: () => ({ usuario_id: '44444444-4444-4444-8444-444444444444' }) }));
 const connection = (db = 'sigd_jacobo_demo', pending = false) => ({ query: vi.fn(async (sql: string) => ({ rows: sql.includes('current_database') ? [{ db }] : pending ? [{ pendiente: 1 }] : [] })) }) as unknown as PoolClient;
+
+/**
+ * Helper: crea un mock de conexión con Tesorería instalada que retorna un
+ * estado específico desde la consulta principal de _consultarEstadoEnTesoreria.
+ * El argumento `tesRow` es el objeto que el mock devuelve para la consulta SQL
+ * principal (que contiene tiene_orden, verificado, importe, importe_pagado, tiene_devolucion_activa).
+ */
+const connectionTes = (tesRow: Record<string, unknown>) => ({
+  query: vi.fn(async (sql: string) => {
+    if (sql.includes('current_database')) return { rows: [{ db: 'sigd_jacobo_demo' }] };
+    if (sql.includes('to_regclass')) return { rows: [{ tabla: 'sigd_tes.aplicacion_pago' }] };
+    return { rows: [tesRow] };
+  }),
+}) as unknown as PoolClient;
+
 afterEach(() => vi.unstubAllEnvs());
 describe('excepción económica temporal, control exclusivo del servidor', () => {
  it('el pago posterior verificado permite continuar sin reescribir la evidencia inicial',async()=>{
@@ -47,5 +62,86 @@ describe('excepción económica temporal, control exclusivo del servidor', () =>
    const service = crearServicioResoluciones(c as unknown as Pool, repo as never);
    await expect(service.proyectar({ expedienteId: ID } as never)).rejects.toMatchObject({ code: 'DEMO_PAYMENT_PENDING' });
    expect(repo.guardar).not.toHaveBeenCalled(); expect(repo.asignarNumeroAnual).not.toHaveBeenCalled();
+ });
+
+ // ── Nuevos tests: cobertura de todos los estados del ciclo de pago ──────────
+
+ describe('obtenerEstadoPago — cobertura completa de estados', () => {
+   it('expediente con pago verificado → estado VERIFICADO y permite derivar', async () => {
+     const c = connectionTes({ tiene_orden: true, verificado: true, importe: '100', importe_pagado: '100', tiene_devolucion_activa: false });
+     const resultado = await obtenerEstadoPago(c, ID);
+     expect(resultado.estado).toBe('VERIFICADO');
+     expect(resultado.permiteDerivacion).toBe(true);
+     expect(resultado.mensajeBloqueo).toBeNull();
+   });
+
+   it('expediente con pago pendiente (orden sin pago verificado) → estado PENDIENTE y lanza 422', async () => {
+     const c = connectionTes({ tiene_orden: true, verificado: false, importe: '100', importe_pagado: '0', tiene_devolucion_activa: false });
+     const resultado = await obtenerEstadoPago(c, ID);
+     expect(resultado.estado).toBe('PENDIENTE');
+     expect(resultado.permiteDerivacion).toBe(false);
+     expect(resultado.mensajeBloqueo).toContain('NO ha sido verificado');
+   });
+
+   it('exigirSinPagoDemoPendiente con pago pendiente lanza AppError 422', async () => {
+     const c = connectionTes({ tiene_orden: true, verificado: false, importe: '100', importe_pagado: '0', tiene_devolucion_activa: false });
+     await expect(exigirSinPagoDemoPendiente(c, ID)).rejects.toMatchObject({ code: 'DEMO_PAYMENT_PENDING', status: 422 });
+   });
+
+   it('expediente sin orden de pago → estado SIN_ORDEN y permite derivar', async () => {
+     const c = connectionTes({ tiene_orden: false, verificado: false, importe: null, importe_pagado: '0', tiene_devolucion_activa: false });
+     const resultado = await obtenerEstadoPago(c, ID);
+     expect(resultado.estado).toBe('SIN_ORDEN');
+     expect(resultado.tieneOrden).toBe(false);
+     expect(resultado.permiteDerivacion).toBe(true);
+   });
+
+   it('exigirSinPagoDemoPendiente sin orden de pago resuelve sin lanzar', async () => {
+     const c = connectionTes({ tiene_orden: false, verificado: false, importe: null, importe_pagado: '0', tiene_devolucion_activa: false });
+     await expect(exigirSinPagoDemoPendiente(c, ID)).resolves.toBeUndefined();
+   });
+
+   it('expediente con devolución aceptada → estado ANULADO y bloquea derivación', async () => {
+     const c = connectionTes({ tiene_orden: true, verificado: false, importe: '100', importe_pagado: '100', tiene_devolucion_activa: true });
+     const resultado = await obtenerEstadoPago(c, ID);
+     expect(resultado.estado).toBe('ANULADO');
+     expect(resultado.permiteDerivacion).toBe(false);
+     expect(resultado.mensajeBloqueo).toContain('devolución');
+   });
+
+   it('exigirSinPagoDemoPendiente con devolución aceptada lanza 422', async () => {
+     const c = connectionTes({ tiene_orden: true, verificado: false, importe: '100', importe_pagado: '100', tiene_devolucion_activa: true });
+     await expect(exigirSinPagoDemoPendiente(c, ID)).rejects.toMatchObject({ code: 'DEMO_PAYMENT_PENDING', status: 422 });
+   });
+
+   it('expediente con pago parcial → estado PARCIAL y bloquea derivación', async () => {
+     const c = connectionTes({ tiene_orden: true, verificado: false, importe: '100', importe_pagado: '50', tiene_devolucion_activa: false });
+     const resultado = await obtenerEstadoPago(c, ID);
+     expect(resultado.estado).toBe('PARCIAL');
+     expect(resultado.permiteDerivacion).toBe(false);
+     expect(resultado.importe).toBe(100);
+     expect(resultado.importePagado).toBe(50);
+   });
+
+   it('expediente exonerado (importe=0) → estado EXONERADO y permite derivar', async () => {
+     const c = connectionTes({ tiene_orden: false, verificado: false, importe: '0', importe_pagado: '0', tiene_devolucion_activa: false });
+     const resultado = await obtenerEstadoPago(c, ID);
+     expect(resultado.estado).toBe('EXONERADO');
+     expect(resultado.permiteDerivacion).toBe(true);
+   });
+
+   it('obtenerEstadoPago en base no-demo retorna SIN_ORDEN sin consultar Tesorería', async () => {
+     const c = connectionTes({ tiene_orden: true, verificado: true, importe: '100', importe_pagado: '100', tiene_devolucion_activa: false });
+     // Override: simular base de producción
+     const cProd = {
+       query: vi.fn(async (sql: string) => {
+         if (sql.includes('current_database')) return { rows: [{ db: 'sigd_produccion' }] };
+         return { rows: [] };
+       }),
+     } as unknown as PoolClient;
+     const resultado = await obtenerEstadoPago(cProd, ID);
+     expect(resultado.estado).toBe('SIN_ORDEN');
+     expect(resultado.permiteDerivacion).toBe(true);
+   });
  });
 });

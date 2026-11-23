@@ -253,7 +253,8 @@ describe('Casilla: autenticación JWT y autorización por propietario', () => {
     expect(existente.status).toBe(200);
     expect(existente.body.data.timestampGeneracionIso).toBe(primero.body.data.timestampGeneracionIso);
     expect(existente.body.data.timestampGeneracionIso).toEqual(expect.any(String));
-    expect(existente.body.data.cvdAcuse).toBeNull();
+    expect(existente.body.data.cvdAcuse).toBe(primero.body.data.cvdAcuse);
+    expect(existente.body.data.cvdAcuse).toBe('CVD-PRUEBA-UNITARIA');
     expect(query.mock.calls.every(([sql]) => !sql.includes('UPDATE'))).toBe(true);
   });
 
@@ -346,14 +347,14 @@ describe('Casilla: autenticación JWT y autorización por propietario', () => {
     expect(res.body).toEqual({ downloadUrl: referencia, expiraEnSegundos: 900 });
   });
 
-  it('no genera un documento de acuse a partir de un identificador sin referencia persistida', async () => {
+  it('genera descarga tokenizada del certificado de acuse sin inventar claves S3', async () => {
     const { app, fila } = prepararCasilla();
     fila.id_acuse = 'ACU-2026-00000001';
     const res = await request(app).get(`/api/v1/casilla/notificaciones/${notificacionCasilla}/acuse/descargar`)
       .set('Authorization', `Bearer ${tokenPropio()}`);
-    expect(res.status).toBe(503);
-    expect(res.body.code).toBe('ACK_DOCUMENT_REFERENCE_UNAVAILABLE');
-    expect(res.body).not.toHaveProperty('downloadUrl');
+    expect(res.status).toBe(200);
+    expect(res.body.expiraEnSegundos).toBe(900);
+    expect(res.body.downloadUrl).toContain(`/api/v1/casilla/notificaciones/${notificacionCasilla}/acuse/archivo?token=`);
   });
 
   it.each(['javascript:alert(1)', '//otro-servidor.invalid/a', 'archivo-sin-referencia.pdf'])
@@ -481,7 +482,7 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
     expect(capturedQuery).toContain('r.rol_id = ur.rol_id');
     expect(capturedQuery).not.toContain('r.id_rol');
     expect(capturedQuery).not.toContain('ur.estado');
-    expect(capturedQuery).toContain('(c.usuario = $1 OR c.correo = $1)');
+    expect(capturedQuery).toContain('(c.usuario = $1 OR LOWER(c.correo) = LOWER($1) OR ca.id_correo_adicional IS NOT NULL)');
     expect(sessionInsertExecuted).toBe(true);
   });
 

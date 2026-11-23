@@ -29,14 +29,32 @@ describe('TupaVersionadoService — Versionado y Unidades Orgánicas (Parte 4)',
     expect(ultimoTramite.codigoInterno).toBe('SUZ26-075');
   });
 
-  it('2. Identifica transparentemente los 36 trámites validados y los 36 pendientes de validación institucional', () => {
+  it('2. Identifica transparentemente los 38 trámites validados (incluyendo SUZ26-006 y SUZ26-034/035) y los 34 pendientes de validación institucional', () => {
     const validados = CATALOGO_DOCUMENTAL_TUPA_2026.filter((p) => p.estadoValidacion === 'VALIDADO');
     const pendientes = CATALOGO_DOCUMENTAL_TUPA_2026.filter(
       (p) => p.estadoValidacion === 'PENDIENTE_VALIDACION_DOCUMENTAL'
     );
 
-    expect(validados).toHaveLength(36);
-    expect(pendientes).toHaveLength(36);
+    expect(validados).toHaveLength(38);
+    expect(pendientes).toHaveLength(34);
+
+    const suz006 = CATALOGO_DOCUMENTAL_POR_CODIGO.get('SUZ26-006');
+    expect(suz006).toBeDefined();
+    expect(suz006?.estadoValidacion).toBe('VALIDADO');
+    expect(suz006?.unidadRecepcion).toBe('Mesa de Partes (MP)');
+    expect(suz006?.unidadResponsable).toBe('Secretaría Académica (SEC)');
+    expect(suz006?.autoridadResolutiva).toBe('Dirección General (DG)');
+    expect(suz006?.plazoDias).toBe(5);
+    expect(suz006?.silencioAdministrativo).toBe('POSITIVO');
+
+    const suz034 = CATALOGO_DOCUMENTAL_POR_CODIGO.get('SUZ26-034');
+    expect(suz034).toBeDefined();
+    expect(suz034?.estadoValidacion).toBe('VALIDADO');
+    expect(suz034?.unidadRecepcion).toBe('Mesa de Partes (MP)');
+    expect(suz034?.unidadResponsable).toBe('Secretaría Académica (SEC)');
+    expect(suz034?.autoridadResolutiva).toBe('Dirección General (DG)');
+    expect(suz034?.plazoDias).toBe(30);
+    expect(suz034?.silencioAdministrativo).toBe('NEGATIVO');
 
     pendientes.forEach((p) => {
       expect(p.observacionInstitucional).toMatch(/pendiente de validación/i);

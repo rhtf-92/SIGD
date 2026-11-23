@@ -61,7 +61,7 @@ describe('OutboxWorker · Entrega at-least-once y concurrencia', () => {
     await sembrar(4);
 
     const despachador = new DespachadorMemoria();
-    const worker = new OutboxWorker(pool, despachador, { lote: 10 });
+    const worker = new OutboxWorker(pool, despachador, { lote: 10, agregado: AGREGADO_TEST });
 
     const procesados = await worker.ciclo();
 
@@ -85,7 +85,7 @@ describe('OutboxWorker · Entrega at-least-once y concurrencia', () => {
     await sembrar(3);
 
     const despachador = new DespachadorMemoria();
-    const worker = new OutboxWorker(pool, despachador, { lote: 10 });
+    const worker = new OutboxWorker(pool, despachador, { lote: 10, agregado: AGREGADO_TEST });
 
     const primero = await worker.ciclo();
     const segundo = await worker.ciclo();
@@ -99,7 +99,7 @@ describe('OutboxWorker · Entrega at-least-once y concurrencia', () => {
     await sembrar(5);
 
     const despachador = new DespachadorMemoria();
-    const worker = new OutboxWorker(pool, despachador, { lote: 2 });
+    const worker = new OutboxWorker(pool, despachador, { lote: 2, agregado: AGREGADO_TEST });
 
     const procesados = await worker.ciclo();
 
@@ -121,6 +121,7 @@ describe('OutboxWorker · Entrega at-least-once y concurrencia', () => {
       lote: 5,
       maxIntentos: 3,
       backoffBaseMs: 1,
+      agregado: AGREGADO_TEST,
     });
 
     const procesados = await worker.ciclo();
@@ -143,6 +144,7 @@ describe('OutboxWorker · Entrega at-least-once y concurrencia', () => {
       lote: 5,
       maxIntentos: 1,
       backoffBaseMs: 1,
+      agregado: AGREGADO_TEST,
     });
 
     await worker.ciclo();
@@ -161,8 +163,8 @@ describe('OutboxWorker · Entrega at-least-once y concurrencia', () => {
 
     const despachadorA = new DespachadorMemoria();
     const despachadorB = new DespachadorMemoria();
-    const workerA = new OutboxWorker(pool, despachadorA, { lote: 6 });
-    const workerB = new OutboxWorker(pool, despachadorB, { lote: 6 });
+    const workerA = new OutboxWorker(pool, despachadorA, { lote: 6, agregado: AGREGADO_TEST });
+    const workerB = new OutboxWorker(pool, despachadorB, { lote: 6, agregado: AGREGADO_TEST });
 
     const [procesadosA, procesadosB] = await Promise.all([workerA.ciclo(), workerB.ciclo()]);
 

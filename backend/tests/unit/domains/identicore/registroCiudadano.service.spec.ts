@@ -45,7 +45,7 @@ const juridica: RegistroPersonaJuridicaInput = {
 describe('RegistroCiudadanoService: compatibilidad de persistencia', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  function escenario(options: { duplicado?: boolean; conflicto?: boolean; nombre?: string; fecha?: string | null; rol?: number; nueva?: boolean; conExpedientes?: boolean; domicilio?: boolean } = {}) {
+  function escenario(options: { duplicado?: boolean; conflicto?: boolean; nombre?: string; fecha?: string | null; rol?: number; nueva?: boolean; conExpedientes?: boolean; domicilio?: boolean; falloCasilla?: boolean; casillaPrevia?: boolean } = {}) {
     const id = '11111111-1111-4111-8111-111111111111';
     const query = vi.fn(async (sql: string, _params?: unknown[]) => {
       if (sql.includes('FOR UPDATE OF pn, p')) return { rows: [{ id: '33333333-3333-4333-8333-333333333333', nombres: 'Carlos', apellidos: 'Davila Ruiz', correo: 'representante@example.com' }] };
@@ -55,6 +55,17 @@ describe('RegistroCiudadanoService: compatibilidad de persistencia', () => {
       if (sql.includes('AS existe')) return { rows: [{ existe: sql.includes('WHERE id_persona=$1::uuid') ? options.conflicto ?? false : options.duplicado ?? false }] };
       if (sql.includes('INSERT INTO sigd_auth.persona (')) return { rows: options.nueva ? [{ id }] : [] };
       if (sql.includes('INSERT INTO sigd_auth.cuenta_usuario')) return { rows: [{ id: '22222222-2222-4222-8222-222222222222' }] };
+      if (sql.includes('FROM sigd_org.institucion')) return { rows: [{ institucion_id: '018f9805-51aa-7000-8111-2b00c3f00001' }] };
+      if (sql.includes('FROM sigd_auth.usuario_institucion')) return { rows: [{ activo: true }] };
+      if (sql.includes('FROM sigd_org.rol_sistema')) return { rows: options.rol === 0 ? [] : [{ rol_id: '97069c21-17c5-4438-b0d0-293aac2c18e9' }] };
+      if (sql.includes('FROM sigd_org.usuario_rol ur')) return { rows: options.rol === 0 ? [] : [{ id_usuario_rol: 'ur-1' }] };
+      if (sql.includes('INSERT INTO sigd_audit.evento_outbox')) return { rows: [{ id_evento: 'evt-1' }] };
+      if (sql.includes('FROM sigd_auth.notificacion_casilla') && sql.includes('FOR UPDATE')) {
+        return { rows: options.casillaPrevia ? [{ id: '55555555-5555-4555-8555-555555555555', cvd: 'CVD-CASILLA-22222222', hash_sha256: 'b'.repeat(64) }] : [] };
+      }
+      if (sql.includes('INSERT INTO sigd_auth.notificacion_casilla')) {
+        return { rows: options.falloCasilla ? [] : [{ id: '44444444-4444-4444-8444-444444444444', cvd: 'CVD-CASILLA-22222222', hash_sha256: 'a'.repeat(64) }] };
+      }
       return { rows: [], rowCount: sql.includes('INSERT INTO sigd_org.usuario_rol') ? options.rol ?? 1 : 1 };
     });
     const poolQuery = vi.fn(async (sql: string) => sql.includes('information_schema')
@@ -213,21 +224,20 @@ describe('RegistroCiudadanoService: compatibilidad de persistencia', () => {
         { table_name: 'auditoria_usuarios', column_name: 'id_auditoria' },
       ] })
       .mockResolvedValueOnce({ rows: [{ id: '1' }] });
-    const clientQuery = vi.fn()
-      .mockResolvedValue({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ existe: false }] })
-      .mockResolvedValueOnce({ rows: [{ id: '11111111-1111-4111-8111-111111111111' }] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ id: '22222222-2222-4222-8222-222222222222' }] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ id_evento: '99999999-9999-4999-8999-999999999999' }] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] });
+    const clientQuery = vi.fn(async (sql: string) => {
+      if (sql.includes('AS existe')) return { rows: [{ existe: false }] };
+      if (sql.includes('INSERT INTO sigd_auth.persona (')) return { rows: [{ id: '11111111-1111-4111-8111-111111111111' }] };
+      if (sql.includes('INSERT INTO sigd_auth.cuenta_usuario')) return { rows: [{ id: '22222222-2222-4222-8222-222222222222' }] };
+      if (sql.includes('FROM sigd_org.institucion')) return { rows: [{ institucion_id: '018f9805-51aa-7000-8111-2b00c3f00001' }] };
+      if (sql.includes('FROM sigd_auth.usuario_institucion')) return { rows: [{ activo: true }] };
+      if (sql.includes('FROM sigd_org.rol_sistema')) return { rows: [{ rol_id: '97069c21-17c5-4438-b0d0-293aac2c18e9' }] };
+      if (sql.includes('FROM sigd_org.usuario_rol ur')) return { rows: [{ id_usuario_rol: 'ur-1' }] };
+      if (sql.includes('INSERT INTO sigd_audit.evento_outbox')) return { rows: [{ id_evento: '99999999-9999-4999-8999-999999999999' }] };
+      if (sql.includes('INSERT INTO sigd_auth.notificacion_casilla')) {
+        return { rows: [{ id: '44444444-4444-4444-8444-444444444444', cvd: 'CVD-CASILLA-22222222', hash_sha256: 'a'.repeat(64) }] };
+      }
+      return { rows: [] };
+    });
     const release = vi.fn();
     const connect = vi.fn().mockResolvedValue({ query: clientQuery, release });
     const service = new RegistroCiudadanoService(
@@ -237,14 +247,23 @@ describe('RegistroCiudadanoService: compatibilidad de persistencia', () => {
     const hash = vi.spyOn(Argon2Service, 'hashArgon2id').mockResolvedValue('hash-sintetico-de-unit-test');
 
     try {
-      await expect(service.registrarCiudadano(natural, null)).resolves.toMatchObject({
+      const resultado = await service.registrarCiudadano(natural, null);
+      expect(resultado).toMatchObject({
         idPersona: '11111111-1111-4111-8111-111111111111',
+        idUsuario: '22222222-2222-4222-8222-222222222222',
+        idCasilla: '44444444-4444-4444-8444-444444444444',
+        cvdCasilla: 'CVD-CASILLA-22222222',
         mensaje: 'Registro exitoso',
+        activo: true,
+        casillaHabilitada: true,
       });
+      expect(resultado).not.toHaveProperty('tokenVerificacion');
       const sentSql = clientQuery.mock.calls.map(([sql]) => String(sql));
       expect(sentSql.some((sql) => sql.includes('INSERT INTO sigd_auth.persona (tipo, id_documento)'))).toBe(true);
       expect(sentSql.some((sql) => sql.includes('id_persona, nombres, apellidos, nombre_completo, fecha_nacimiento, correo, telefono'))).toBe(true);
       expect(sentSql.some((sql) => sql.includes('id_persona, usuario, correo, password_hash'))).toBe(true);
+      expect(sentSql.some((sql) => sql.includes('sigd_auth.notificacion_casilla'))).toBe(true);
+      expect(sentSql.some((sql) => sql.includes('sigd_auth.token_verificacion_correo'))).toBe(false);
       expect(sentSql.some((sql) => sql.includes('sigd_auth.consentimiento_datos'))).toBe(true);
       expect(sentSql.some((sql) => sql.includes('sigd_auth.auditoria_usuarios'))).toBe(true);
       expect(sentSql.some((sql) => sql.includes('sigd_org.usuario_rol'))).toBe(true);
@@ -254,6 +273,27 @@ describe('RegistroCiudadanoService: compatibilidad de persistencia', () => {
       hash.mockRestore();
     }
     expect(release).toHaveBeenCalledOnce();
+  });
+
+  it('ejecuta ROLLBACK completo si falla la apertura formal de la Casilla Electrónica', async () => {
+    const { service, query } = escenario({ nueva: true, falloCasilla: true });
+    await expect(service.registrarCiudadano(natural, null)).rejects.toMatchObject({
+      status: 503,
+      code: 'CASILLA_OPENING_FAILED',
+    });
+    expect(query).toHaveBeenLastCalledWith('ROLLBACK');
+  });
+
+  it('reutiliza la apertura formal existente sin duplicar la notificación inaugural (idempotencia)', async () => {
+    const { service, query } = escenario({ nueva: true, casillaPrevia: true });
+    await expect(service.registrarCiudadano(natural, null)).resolves.toMatchObject({
+      idCasilla: '55555555-5555-4555-8555-555555555555',
+      cvdCasilla: 'CVD-CASILLA-22222222',
+      activo: true,
+      casillaHabilitada: true,
+    });
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO sigd_auth.notificacion_casilla'))).toBe(false);
+    expect(query).toHaveBeenLastCalledWith('COMMIT');
   });
 
   describe('activarCuenta', () => {
@@ -273,6 +313,9 @@ describe('RegistroCiudadanoService: compatibilidad de persistencia', () => {
               titular: 'Sergio Serruche',
             }],
           };
+        }
+        if (sql.includes('INSERT INTO sigd_auth.notificacion_casilla')) {
+          return { rows: [{ id: '44444444-4444-4444-8444-444444444444', cvd: 'CVD-CASILLA-USR-1', hash_sha256: 'a'.repeat(64) }] };
         }
         if (sql.includes('INSERT INTO sigd_audit.evento_outbox')) {
           return { rows: [{ id_evento: 'evt-1' }] };
@@ -444,7 +487,14 @@ describe('RegistroCiudadanoService: compatibilidad de persistencia', () => {
       const res = await service.reenviarVerificacion('74561238', null);
       expect(res.exito).toBe(true);
       expect(res.correo).toBe('pendiente@example.com');
-      expect(res.tokenVerificacion).toBeDefined();
+      expect(res).not.toHaveProperty('tokenVerificacion');
+      expect((res as Record<string, unknown>).tokenVerificacion).toBeUndefined();
+      const outboxCall = clientQuery.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO sigd_audit.evento_outbox'));
+      expect(outboxCall).toBeDefined();
+      const payloadOutbox = JSON.parse((outboxCall as any)[1][3]);
+      expect(payloadOutbox.tokenCifrado).toBeDefined();
+      expect(payloadOutbox.tokenCifrado.alg).toBe('aes-256-gcm');
+      expect(payloadOutbox.token).toBeUndefined();
       expect(clientQuery.mock.calls.some(([sql]) => String(sql).includes('UPDATE sigd_auth.token_verificacion_correo'))).toBe(true);
       expect(clientQuery.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO sigd_auth.token_verificacion_correo'))).toBe(true);
       expect(clientQuery).toHaveBeenLastCalledWith('COMMIT');
