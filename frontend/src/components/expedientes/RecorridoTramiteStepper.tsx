@@ -41,18 +41,20 @@ export const RecorridoTramiteStepper: React.FC<RecorridoTramiteStepperProps> = (
     estado === 'FIRMADO' ||
     estado === 'APROBADO_CON_RESOLUCION';
 
+  const estaEnIdiomas = Boolean(areaActualNombre?.toLowerCase().includes('idioma'));
+
   const esEvaluacion =
     estado === 'EVALUACION_PROGRAMADA' ||
     estado === 'EVALUADO' ||
     estado === 'INFORME_EMITIDO' ||
     estado === 'EN_EVALUACION' ||
-    (estado === 'EN_REVISION' && Boolean(especialistaAsignado || areaActualNombre?.toLowerCase().includes('idioma')));
+    ((estado === 'EN_REVISION' || estado === 'DERIVADO') && Boolean(especialistaAsignado || estaEnIdiomas));
 
   const esSubdireccion =
     estado === 'DERIVADO_SDA' ||
     estado === 'EN_TRAMITE' ||
     estado === 'ASIGNADO_ESPECIALISTA' ||
-    (estado === 'EN_REVISION' && !esEvaluacion);
+    ((estado === 'EN_REVISION' || estado === 'DERIVADO') && !esEvaluacion);
 
   const esTesoreria = estado === 'PENDIENTE_PAGO';
   const esMesaPartes = estado === 'REGISTRADO' || estado === 'EN_RECEPCION' || estado === 'OBSERVADO';
@@ -105,7 +107,7 @@ export const RecorridoTramiteStepper: React.FC<RecorridoTramiteStepperProps> = (
       numero: 3,
       titulo: 'Derivación y Control',
       area: 'Subdirección Académica',
-      descripcion: 'Revisión académica y asignación al Especialista evaluador.',
+      descripcion: 'Recepción en Subdirección Académica y envío al Área de Centro de Idiomas.',
       estadoVisual: pasoActivo > 3 ? 'COMPLETADO' : pasoActivo === 3 ? 'ACTUAL' : 'PENDIENTE',
       responsable: 'Secretario / Subdirector Académico',
     },
@@ -115,7 +117,7 @@ export const RecorridoTramiteStepper: React.FC<RecorridoTramiteStepperProps> = (
       area: 'Centro de Idiomas',
       descripcion: esInasistenciaNsp
         ? 'No se presentó a la evaluación (NSP). Memorándum de Inasistencia emitido.'
-        : 'Programación de examen, calificación y emisión de informe.',
+        : 'Recepción por Coordinador, asignación a Docente Especialista y dictamen.',
       estadoVisual: esInasistenciaNsp
         ? 'ERROR'
         : pasoActivo > 4
@@ -123,7 +125,7 @@ export const RecorridoTramiteStepper: React.FC<RecorridoTramiteStepperProps> = (
           : pasoActivo === 4
             ? 'ACTUAL'
             : 'PENDIENTE',
-      responsable: especialistaAsignado || 'Especialista / Docente Evaluador',
+      responsable: especialistaAsignado || 'Coordinador / Docente Especialista',
     },
     {
       numero: 5,

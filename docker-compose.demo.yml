@@ -1,14 +1,6 @@
-<<<<<<< HEAD
-# SIGD - Entorno de demostracion (Fase 2/3)
-# - Sin MinIO: la imagen oficial minio/minio fue retirada de Docker Hub (HTTP 404).
-#   Los endpoints que usan S3 (storage/docucore) no estaran disponibles.
-# - node:24-alpine para cumplir el engine del frontend (>=24.19.0 <25).
-# - node_modules aislado con volumen anonimo para no mezclar binarios de Windows con Linux.
-# - Puertos host alternos para no chocar con el entorno nativo (3000/5173/5432 ocupados).
-# - No reemplaza docker-compose.yml (se mantiene intacto).
+name: sigd-iestp-suiza-demo
 
 services:
-  # 1. Base de datos relacional + extensiones
   postgres:
     image: postgres:18-alpine
     container_name: sigd_demo_postgres
@@ -16,7 +8,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres_password
       POSTGRES_DB: sigd_prueba
-    # Nota: 55432 cae en el rango excluido de Windows (55384-55483); no se expone al host.
     expose:
       - "5432"
     volumes:
@@ -27,7 +18,6 @@ services:
       timeout: 5s
       retries: 10
 
-  # 2. Cache / sesiones
   redis:
     image: redis:7-alpine
     container_name: sigd_demo_redis
@@ -35,102 +25,52 @@ services:
       - "6379"
     volumes:
       - redisdata_demo:/data
-=======
-name: sigd-geric-demo
-
-services:
-  postgres:
-    image: postgres:18-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: sigd_demo_local
-      POSTGRES_DB: sigd_demo
-    ports:
-      - "55432:5432"
-    volumes:
-      - demo_pgdata:/var/lib/postgresql
-      - ./backend/migraciones:/demo-migraciones:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d sigd_demo"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "56379:6379"
-    volumes:
-      - demo_redisdata:/data
->>>>>>> origin/B_GERIC
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
-<<<<<<< HEAD
       retries: 10
-
-  # 3. API backend (ejecuta migraciones al boot: MIGRATE_ON_BOOT=true)
-  backend:
-    image: node:24-alpine
-    container_name: sigd_demo_backend
-    working_dir: /app
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
-    command: sh -c "npm ci && mkdir -p /tmp/migrademo && cp /app/migraciones/*.sql /tmp/migrademo/ && rm -f /tmp/migrademo/07_sigd_reportes.sql && npm run dev"
-    environment:
-      PORT: 3000
-      NODE_ENV: development
-      MIGRATE_ON_BOOT: "true"
-      MIGRATIONS_DIR: /tmp/migrademo
-      DATABASE_URL: postgres://postgres:postgres_password@postgres:5432/sigd_prueba
-      REDIS_URL: redis://redis:6379
-      OUTBOX_POLL_INTERVAL_MS: 5000
-    ports:
-      - "3080:3000"
-=======
-      retries: 5
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile.demo
+    container_name: sigd_demo_backend
     working_dir: /app
     volumes:
-      - ./backend:/app:ro
+      - ./backend:/app
       - demo_backend_modules:/app/node_modules
     command: >-
-      sh -ec 'if [ ! -x node_modules/.bin/tsx ]; then npm ci --no-audit --no-fund; fi;
+      sh -ec 'if [ ! -x node_modules/.bin/tsx ]; then npm install --no-audit --no-fund; fi;
       exec npm run dev'
     environment:
-      PORT: "3000"
+      PORT: 3000
       NODE_ENV: development
-      DATABASE_URL: postgres://postgres:sigd_demo_local@postgres:5432/sigd_demo
+      DISABLE_EMBEDDED_VITE: "true"
+      MIGRATE_ON_BOOT: "true"
+      DATABASE_URL: postgres://postgres:postgres_password@postgres:5432/sigd_prueba
       REDIS_URL: redis://redis:6379
-      MIGRATE_ON_BOOT: "false"
-      CORS_ORIGIN: http://localhost:5173
+      OUTBOX_POLL_INTERVAL_MS: 5000
+      FRONTEND_URL: http://localhost:5273
+      CORS_ORIGIN: http://localhost:5273,http://localhost:5173
     ports:
-      - "3000:3000"
->>>>>>> origin/B_GERIC
+      - "3080:3000"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
 
-<<<<<<< HEAD
-  # 4. Frontend SPA (Vite dev server)
   frontend:
-    image: node:24-alpine
+    image: node:24.19.0-alpine
     container_name: sigd_demo_frontend
     working_dir: /app
     volumes:
       - ./frontend:/app
-      - /app/node_modules
-    # --no-package-lock: el lock del frontend esta desincronizado; no se reescribe el del host.
-    # Si node_modules ya existe (volumen anonimo), se salta npm install para reinicios rapidos.
-    command: sh -c "[ -d node_modules/vite ] || npm install --no-package-lock; node node_modules/vite/bin/vite.js --host 0.0.0.0 --port 5173"
+      - demo_frontend_modules:/app/node_modules
+    command: >-
+      sh -ec 'if [ ! -x node_modules/.bin/vite ]; then npm install --no-package-lock --no-audit --no-fund; fi;
+      exec npm run dev -- --host 0.0.0.0 --port 5173'
     environment:
       VITE_API_BASE_URL: http://localhost:3080/api/v1
       VITE_ENABLE_MOCKS: "false"
@@ -142,27 +82,5 @@ services:
 volumes:
   pgdata_demo:
   redisdata_demo:
-=======
-  frontend:
-    image: node:24.19.0-alpine
-    working_dir: /app
-    volumes:
-      - ./frontend:/app
-      - ./frontend/package.json:/app/package.json:ro
-      - ./frontend/package-lock.json:/app/package-lock.json:ro
-      - demo_frontend_modules:/app/node_modules
-    command: >-
-      sh -ec 'if [ ! -x node_modules/.bin/vite ]; then npm ci --no-audit --no-fund; fi;
-      exec npm run dev -- --host 0.0.0.0'
-    environment:
-      VITE_API_BASE_URL: http://localhost:3000/api/v1
-      VITE_ENABLE_MOCKS: "false"
-    ports:
-      - "5173:5173"
-
-volumes:
-  demo_pgdata:
-  demo_redisdata:
   demo_backend_modules:
   demo_frontend_modules:
->>>>>>> origin/B_GERIC

@@ -1,7 +1,8 @@
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "../../api/client";
 import AccionModal from "./AccionModal";
+import { useAuthStore } from "../../stores/authStore";
 import type { ExpedienteAccionReferencia } from "../../types/expedienteActions";
 
 export interface CandidatoAsignacion {
@@ -13,6 +14,7 @@ export interface CandidatoAsignacion {
   perfilCodigo: string | null;
   alcance: any;
   esPrioritario: boolean;
+  esCoordinador?: boolean;
 }
 
 export interface AsignacionData {
@@ -25,6 +27,10 @@ export interface AsignacionData {
     nombreCompleto: string;
     motivo: string;
     asignadoEn: string;
+    rolCodigo?: string | null;
+    perfilCodigo?: string | null;
+    alcance?: any;
+    esCoordinador?: boolean;
   } | null;
   historial: Array<{
     idAsignacion: string;
@@ -50,6 +56,7 @@ export default function AsignacionModal(props: AsignacionModalProps) {
 
 function FormularioAsignacion({ expediente, onClose, onAsignado }: AsignacionModalProps) {
   const id = useId();
+  const usuario = useAuthStore((s) => s.usuario);
   const [selectedUsuarioId, setSelectedUsuarioId] = useState<string>("");
   const [motivo, setMotivo] = useState(
     "Asignación para evaluación y dictamen técnico conforme al TUPA"
@@ -68,18 +75,62 @@ function FormularioAsignacion({ expediente, onClose, onAsignado }: AsignacionMod
     staleTime: 10_000,
   });
 
-  const candidatos = data?.candidatos ?? [];
+  const esActorCoordinador = Boolean(
+    usuario &&
+      (usuario.perfiles?.includes("GESTOR_AREA_ACADEMICA") ||
+        (usuario as any).funcion === "COORDINADOR_IDIOMAS" ||
+        (usuario as any).perfilOperativoCodigo === "GESTOR_AREA_ACADEMICA" ||
+        (usuario as any).perfilCodigo === "GESTOR_AREA_ACADEMICA" ||
+        usuario.correo?.startsWith("coordinador.idiomas") ||
+        usuario.correo?.startsWith("responsable_ingles") ||
+        usuario.correo?.startsWith("ingles.demo"))
+  );
 
-  // Auto-seleccionar el candidato prioritario si no hay selección
+  const yaAsignadoACoordinador = Boolean(
+    data?.activa &&
+      (data.activa.esCoordinador ||
+        data.activa.perfilCodigo === "GESTOR_AREA_ACADEMICA" ||
+        data.activa.alcance?.funcion === "COORDINADOR_IDIOMAS" ||
+        data.activa.usuario === "responsable_ingles_demo" ||
+        data.activa.usuario === "coordinador_idiomas")
+  );
+
+  const estaEnCentroIdiomas =
+    expediente.unidadOrigenId === "a0000000-0000-0000-0000-000000000003" ||
+    expediente.unidadOrigenId === "CI";
+
+  const modoDesignarDocenteEspecialista =
+    esActorCoordinador || yaAsignadoACoordinador || estaEnCentroIdiomas;
+
+  const candidatos = useMemo(() => {
+    const raw = (data?.candidatos ?? []).filter((c) => c.rolCodigo !== "SECRETARIO");
+    if (modoDesignarDocenteEspecialista) {
+      // Si el Coordinador está asignando (o el expediente ya está en manos del Coordinador),
+      // mostrar directamente a los Docentes Especialistas Evaluadores (Inglés / Portugués)
+      const soloDocentes = raw.filter(
+        (c) =>
+          !c.esCoordinador &&
+          c.perfilCodigo !== "GESTOR_AREA_ACADEMICA" &&
+          c.alcance?.funcion !== "COORDINADOR_IDIOMAS" &&
+          c.usuario !== "responsable_ingles_demo" &&
+          c.usuario !== "coordinador_idiomas"
+      );
+      if (soloDocentes.length > 0) return soloDocentes;
+    }
+    return raw.length > 0 ? raw : (data?.candidatos ?? []);
+  }, [data?.candidatos, modoDesignarDocenteEspecialista]);
+
+  // Auto-seleccionar el candidato adecuado según la etapa
   useEffect(() => {
     if (!selectedUsuarioId && candidatos.length > 0) {
-      const prioritario =
-        candidatos.find((c) => c.esPrioritario) ??
-        candidatos.find((c) => c.rolCodigo === "ESPECIALISTA") ??
-        candidatos[0];
-      setSelectedUsuarioId(prioritario.idUsuario);
+      const preferido = modoDesignarDocenteEspecialista
+        ? (candidatos.find((c) => !c.esCoordinador) ?? candidatos[0])
+        : (candidatos.find((c) => c.esPrioritario) ??
+           candidatos.find((c) => c.rolCodigo === "ESPECIALISTA") ??
+           candidatos[0]);
+      setSelectedUsuarioId(preferido.idUsuario);
     }
-  }, [candidatos, selectedUsuarioId]);
+  }, [candidatos, selectedUsuarioId, modoDesignarDocenteEspecialista]);
 
   const candidatoSeleccionado = candidatos.find((c) => c.idUsuario === selectedUsuarioId);
 
@@ -115,25 +166,37 @@ function FormularioAsignacion({ expediente, onClose, onAsignado }: AsignacionMod
 
   return (
     <AccionModal
-      titulo="Asignar Expediente a Especialista"
-      descripcion={`Expediente ${expediente.codigo}. Despacho interno a un especialista o responsable técnico del área.`}
+      titulo={
+        modoDesignarDocenteEspecialista
+          ? "Designar Docente Especialista Evaluador"
+          : "Derivar a Coordinador de Idiomas o Asignar Especialista"
+      }
+      descripcion={
+        modoDesignarDocenteEspecialista
+          ? `Expediente ${expediente.codigo}. Seleccione al Docente Especialista del idioma (Inglés / Portugués) que evaluará al estudiante y registrará el dictamen técnico.`
+          : `Expediente ${expediente.codigo}. Puede encargarlo al Coordinador del Centro de Idiomas (quien designará al docente evaluador) o asignarlo directamente a un Docente Especialista.`
+      }
       pending={enviando}
       onClose={onClose}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {data?.activa && (
           <div className="rounded-xl border border-blue-200 bg-blue-50/80 p-3 text-xs text-blue-900">
-            <span className="font-bold">Asignación actual: </span>
-            <span>{data.activa.nombreCompleto} ({data.activa.usuario})</span>
+            <span className="font-bold">
+              {yaAsignadoACoordinador ? "En Coordinación de: " : "Especialista asignado actualmente: "}
+            </span>
+            <span>{data.activa.nombreCompleto} (@{data.activa.usuario})</span>
             <p className="text-[11px] text-blue-700 mt-0.5">
-              Motivo previo: {data.activa.motivo} (desde {new Date(data.activa.asignadoEn).toLocaleDateString("es-PE")})
+              {yaAsignadoACoordinador
+                ? "El Coordinador del Centro de Idiomas debe designar a continuación al Docente Especialista Evaluador."
+                : `Motivo previo: ${data.activa.motivo} (desde ${new Date(data.activa.asignadoEn).toLocaleDateString("es-PE")})`}
             </p>
           </div>
         )}
 
         {isLoading && (
           <div className="p-4 text-center text-xs text-slate-500">
-            Cargando especialistas elegibles del área...
+            Cargando personal académico elegible del área...
           </div>
         )}
 
@@ -158,12 +221,20 @@ function FormularioAsignacion({ expediente, onClose, onAsignado }: AsignacionMod
         {!isLoading && candidatos.length > 0 && (
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-              Especialistas Elegibles del Área ({candidatos.length})
+              {modoDesignarDocenteEspecialista
+                ? `Docentes Especialistas Evaluadores (${candidatos.length})`
+                : `Coordinador y Especialistas Elegibles (${candidatos.length})`}
             </label>
-            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
               {candidatos.map((c) => {
                 const isSelected = c.idUsuario === selectedUsuarioId;
                 const funcion = c.alcance?.funcion ? String(c.alcance.funcion) : null;
+                const esCandCoordinador = Boolean(
+                  c.esCoordinador ||
+                  c.perfilCodigo === "GESTOR_AREA_ACADEMICA" ||
+                  funcion === "COORDINADOR_IDIOMAS" ||
+                  c.usuario === "responsable_ingles_demo"
+                );
                 return (
                   <div
                     key={c.idUsuario}
@@ -181,21 +252,25 @@ function FormularioAsignacion({ expediente, onClose, onAsignado }: AsignacionMod
                       onChange={() => setSelectedUsuarioId(c.idUsuario)}
                       className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
                     />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <span className="font-bold text-slate-900">{c.nombreCompleto}</span>
                         <span className="text-[11px] text-slate-500 font-mono">(@{c.usuario})</span>
-                        {c.esPrioritario && (
+                        {esCandCoordinador ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                            ★ Prioritario TUPA
+                            🏛️ Coordinador Centro de Idiomas
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            👨‍🏫 Docente Especialista Evaluador
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-slate-600 flex flex-wrap gap-2">
-                        <span>Rol: <strong className="text-slate-800">{c.rolCodigo}</strong></span>
-                        {c.perfilCodigo && <span>Perfil: <strong className="text-slate-800">{c.perfilCodigo}</strong></span>}
-                        {funcion && <span>Función: <strong className="text-slate-800">{funcion}</strong></span>}
-                      </div>
+                      <p className="text-[11px] text-slate-600">
+                        {esCandCoordinador
+                          ? "Función: Recibe el expediente de Subdirección Académica y designa al Docente Especialista del idioma."
+                          : "Función: Evalúa al estudiante y registra el Dictamen Técnico de calificación o Memorándum NSP."}
+                      </p>
                     </div>
                   </div>
                 );

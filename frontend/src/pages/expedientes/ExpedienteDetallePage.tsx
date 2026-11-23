@@ -405,6 +405,10 @@ export default function ExpedienteDetallePage() {
           nombreCompleto: string;
           motivo: string;
           asignadoEn: string;
+          rolCodigo?: string | null;
+          perfilCodigo?: string | null;
+          alcance?: any;
+          esCoordinador?: boolean;
         } | null;
       }>(`/api/v1/expedientes/${encodeURIComponent(id!)}/asignacion`, { signal });
       return data;
@@ -827,6 +831,9 @@ export default function ExpedienteDetallePage() {
     if (areaId === "a0000000-0000-0000-0000-000000000002" || areaId === "DIR") {
       return "Dirección General";
     }
+    if (areaId === "a0000000-0000-0000-0000-000000000003" || areaId === "CI") {
+      return "Centro de Idiomas";
+    }
     if (detalleData?.areaActualId === areaId && detalleData?.areaActualNombre) {
       return detalleData.areaActualNombre;
     }
@@ -842,6 +849,10 @@ export default function ExpedienteDetallePage() {
 
   const areaExpedienteId = detalleData?.areaActualId ?? null;
   const nombreAreaCustodia = resolverNombreArea(areaExpedienteId);
+  const estaEnSubdireccionAcademica =
+    areaExpedienteId === AREA_SDA_ID || areaExpedienteId === "SDA";
+  const estaEnCentroIdiomas =
+    areaExpedienteId === AREA_CI_ID || areaExpedienteId === "CI";
   const esAreaMesaODir =
     !areaExpedienteId ||
     areaExpedienteId === "Mesa de Partes" ||
@@ -917,13 +928,23 @@ export default function ExpedienteDetallePage() {
     : Boolean(detalleData?.estadoActual === "EN_CALIFICACION" || detalleData?.estadoActual === "EN_REVISION");
   const puedeObservar = puedeOperar && tieneCustodiaObservar && estadoPermiteObservar;
 
+  const esCoordinadorIdiomas = Boolean(
+    usuario &&
+      (usuario.perfiles?.includes("GESTOR_AREA_ACADEMICA") ||
+        (usuario as any).funcion === "COORDINADOR_IDIOMAS" ||
+        (usuario as any).perfilOperativoCodigo === "GESTOR_AREA_ACADEMICA" ||
+        (usuario as any).perfilCodigo === "GESTOR_AREA_ACADEMICA" ||
+        usuario.correo?.startsWith("coordinador.idiomas") ||
+        usuario.correo?.startsWith("responsable_ingles") ||
+        usuario.correo?.startsWith("ingles.demo"))
+  );
+  const esDocenteEspecialista = Boolean(esEspecialista && !esCoordinadorIdiomas);
+
   const tieneFacultadAsignacion = Boolean(
     usuario &&
       (usuario.rol === "SECRETARIO" ||
         usuario.rol === "DIRECTOR" ||
-        (usuario as any).funcion === "COORDINADOR_IDIOMAS" ||
-        (usuario as any).perfilOperativoCodigo === "GESTOR_AREA_ACADEMICA" ||
-        (usuario as any).perfilCodigo === "GESTOR_AREA_ACADEMICA")
+        esCoordinadorIdiomas)
   );
   const puedeAsignar =
     puedeOperar &&
@@ -953,18 +974,31 @@ export default function ExpedienteDetallePage() {
   const hayAsignacionEfectiva = Boolean(
     hayAsignacionActiva || flujoAtencion?.tieneAsignacion
   );
+  const esAsignadoACoordinador = Boolean(
+    asignacionActiva &&
+      (asignacionActiva.esCoordinador ||
+        asignacionActiva.perfilCodigo === "GESTOR_AREA_ACADEMICA" ||
+        asignacionActiva.alcance?.funcion === "COORDINADOR_IDIOMAS" ||
+        asignacionActiva.usuario === "responsable_ingles_demo" ||
+        asignacionActiva.usuario === "coordinador_idiomas")
+  );
+  const hayDocenteEspecialistaAsignado = Boolean(
+    hayAsignacionEfectiva && !esAsignadoACoordinador
+  );
 
   const esEspecialistaOAreaAcademica = Boolean(
     usuario &&
-      (["ESPECIALISTA", "SECRETARIO", "ADMINISTRADOR"].includes(usuario.rol) ||
-        (usuario as any).funcion === "COORDINADOR_IDIOMAS" ||
-        (usuario as any).perfilOperativoCodigo === "GESTOR_AREA_ACADEMICA" ||
-        (usuario as any).perfilCodigo === "GESTOR_AREA_ACADEMICA") &&
+      (["ESPECIALISTA", "ADMINISTRADOR"].includes(usuario.rol) &&
+        !esCoordinadorIdiomas) &&
       (esMismaArea || sonAreasAcademicasCompatibles)
   );
 
-  const cumpleAsignacionAtender =
-    !hayAsignacionActiva
+  const cumpleAsignacionAtender = requiereAtencionTecnica
+    ? Boolean(
+        hayDocenteEspecialistaAsignado &&
+          (esUsuarioAsignado || esDocenteEspecialista || usuario?.rol === "ADMINISTRADOR")
+      )
+    : !hayAsignacionActiva
       ? esEspecialistaOAreaAcademica
       : esUsuarioAsignado || esEspecialistaOAreaAcademica;
   const bloqueadoPorAreaTecnicaParaAtender = Boolean(
@@ -982,8 +1016,8 @@ export default function ExpedienteDetallePage() {
   const requiereAtencionPendienteFirma = evaluacionAcademicaPendiente;
   const puedeEnviarAFirma =
     puedeOperar &&
-    tieneFacultadDespacho &&
-    !esEspecialista &&
+    (tieneFacultadDespacho || esCoordinadorIdiomas) &&
+    !esDocenteEspecialista &&
     esMismaArea &&
     detalleData?.estadoActual === "EN_REVISION" &&
     !requiereAtencionPendienteFirma;
@@ -1007,9 +1041,20 @@ export default function ExpedienteDetallePage() {
     tieneCustodiaAcumular &&
     detalleData?.estadoActual !== "ARCHIVADO";
 
+  // Recepción estricta por área de destino:
+  // Si fue derivado a Centro de Idiomas, lo recepciona el Coordinador / personal de Centro de Idiomas.
+  // Si fue derivado a Subdirección Académica, lo recepciona Subdirección Académica.
+  const perteneceAlAreaExactaDestino = Boolean(
+    usuario &&
+      (estaEnCentroIdiomas
+        ? usuario.areaId === AREA_CI_ID || esCoordinadorIdiomas || esDocenteEspecialista
+        : estaEnSubdireccionAcademica
+          ? usuario.areaId === AREA_SDA_ID || usuario.rol === "SECRETARIO"
+          : esMismaArea)
+  );
   const puedeRecepcionar =
     puedeOperar &&
-    esMismaArea &&
+    perteneceAlAreaExactaDestino &&
     detalleData?.estadoActual === "DERIVADO";
 
   const puedeIniciarRevision =
@@ -1225,8 +1270,11 @@ export default function ExpedienteDetallePage() {
       return "Director General (Titular con DNIe)";
     }
     if (detalleData?.estadoActual === "EN_REVISION") {
+      if (esAsignadoACoordinador) {
+        return `${asignacionActiva?.nombreCompleto || "Coordinador Centro de Idiomas"} (Coordinador)`;
+      }
       if (asignacionActiva?.nombreCompleto) {
-        return `${asignacionActiva.nombreCompleto} (Asignado)`;
+        return `${asignacionActiva.nombreCompleto} (Docente Especialista)`;
       }
       return hayAsignacionActiva ? "Especialista asignado" : "Pendiente de asignación en área";
     }
@@ -1234,7 +1282,7 @@ export default function ExpedienteDetallePage() {
       return "Mesa de entrada / Despacho de área receptora";
     }
     return "Operador de Mesa de Partes";
-  }, [detalleData, asignacionActiva, hayAsignacionActiva]);
+  }, [detalleData, asignacionActiva, hayAsignacionActiva, esAsignadoACoordinador]);
 
   const esInasistenciaNsp = detalleData?.ultimoMovimiento?.evento === "INASISTENCIA_NSP";
 
@@ -1290,10 +1338,13 @@ export default function ExpedienteDetallePage() {
           if (!estaEnAreaTecnica) {
             return `Derivar a ${resolverNombreArea(areaResponsableTecnicaId)} (SDA) para evaluación académica`;
           }
-          if (!hayAsignacionEfectiva) {
-            return "Asignar especialista en Subdirección Académica";
+          if (estaEnSubdireccionAcademica && !hayDocenteEspecialistaAsignado) {
+            return "Enviar / Derivar expediente al Área de Centro de Idiomas";
           }
-          return "Registrar dictamen técnico (Especialista asignado)";
+          if (!hayAsignacionEfectiva || esAsignadoACoordinador) {
+            return "Coordinador Centro de Idiomas: Derivar / Asignar a Docente Especialista";
+          }
+          return "Registrar dictamen técnico o NSP (Docente Especialista asignado)";
         }
         return estaEnAreaTecnica
           ? "Elevar a Dirección (Enviar a Firma)"
@@ -1339,11 +1390,17 @@ export default function ExpedienteDetallePage() {
     esInasistenciaNsp,
   ]);
 
-  // Regla PM-5H-23 / PM-5H-24: Solo sugerir destino si proviene de configuración explícita verificable
-  const destinoSugeridoId = tupaResumen?.unidadResponsableId ?? undefined;
+  // Regla PM-5H-23 / PM-5H-24: Si el expediente ya está en Subdirección Académica (SDA) pendiente de evaluación,
+  // el destino sugerido es el Área de Centro de Idiomas (CI) para que su Coordinador lo recepcione.
+  const destinoSugeridoId =
+    estaEnSubdireccionAcademica && evaluacionAcademicaPendiente
+      ? AREA_CI_ID
+      : (tupaResumen?.unidadResponsableId ?? undefined);
   const destinoSugeridoNombre =
-    tupaResumen?.unidadResponsableNombre ??
-    (destinoSugeridoId ? resolverNombreArea(destinoSugeridoId) : undefined);
+    estaEnSubdireccionAcademica && evaluacionAcademicaPendiente
+      ? "Centro de Idiomas"
+      : (tupaResumen?.unidadResponsableNombre ??
+         (destinoSugeridoId ? resolverNombreArea(destinoSugeridoId) : undefined));
 
   const estadoInfo = esInasistenciaNsp
     ? {
@@ -1677,33 +1734,46 @@ export default function ExpedienteDetallePage() {
                   </div>
                 )}
 
-                {/* BANNER OPERACIONAL SDA / ATENCIÓN SEGÚN ESTADO FSM */}
+                {/* BANNER OPERACIONAL SDA / CENTRO DE IDIOMAS / ATENCIÓN SEGÚN ESTADO FSM */}
                 {detalleData.estadoActual === "DERIVADO" && (
-                  <div className="rounded-2xl border border-indigo-200 bg-indigo-50/90 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-xs">
-                    <div className="space-y-1">
+                  <div className="rounded-2xl border border-indigo-200 bg-indigo-50/90 p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 shadow-xs">
+                    <div className="flex-1 min-w-0 space-y-1.5">
                       <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse"></span>
-                        <h3 className="text-sm font-bold text-indigo-950 uppercase tracking-wide">
-                          Atención del Expediente — Pendiente de Recepción (Subdirección Académica)
+                        <span className="w-2.5 h-2.5 shrink-0 rounded-full bg-indigo-600 animate-pulse"></span>
+                        <h3 className="text-sm font-bold text-indigo-950 uppercase tracking-wide leading-snug">
+                          {estaEnCentroIdiomas
+                            ? "Área Centro de Idiomas — Pendiente de Recepción por Coordinador"
+                            : `Atención del Expediente — Pendiente de Recepción (${nombreAreaCustodia})`}
                         </h3>
                       </div>
-                      <p className="text-xs text-indigo-900">
-                        Este expediente fue derivado a su área. Debe confirmar la recepción formal para iniciar la evaluación técnica y sustantiva.
+                      <p className="text-xs text-indigo-900 leading-relaxed">
+                        {estaEnCentroIdiomas
+                          ? "Este expediente fue enviado por Subdirección Académica al Área de Centro de Idiomas. El Coordinador del Centro de Idiomas debe confirmar la recepción formal del trámite para derivarlo/asignarlo al Docente Especialista."
+                          : "Este expediente fue derivado a su área. Debe confirmar la recepción formal para continuar con el flujo institucional."}
                       </p>
                     </div>
                     {puedeOperar && (
-                      <div className="shrink-0 flex flex-col items-end gap-1">
+                      <div className="shrink-0 flex flex-col items-start lg:items-end gap-1.5 pt-3 lg:pt-0 border-t lg:border-t-0 border-indigo-200/70">
                         <button
                           type="button"
                           disabled={acciones.recepcion.pending || !puedeRecepcionar}
                           onClick={puedeRecepcionar ? () => void acciones.recepcion.ejecutar({ expediente: refExpediente }) : undefined}
-                          className="shrink-0 rounded-xl bg-indigo-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-900 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
+                          className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-indigo-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-900 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
                         >
-                          {acciones.recepcion.pending ? "Recepcionando..." : "📥 Recepcionar Expediente"}
+                          <span>📥</span>
+                          <span>
+                            {acciones.recepcion.pending
+                              ? "Recepcionando..."
+                              : estaEnCentroIdiomas
+                                ? "Recepcionar en Centro de Idiomas"
+                                : "Recepcionar Expediente"}
+                          </span>
                         </button>
                         {!puedeRecepcionar && (
-                          <span className="text-[11px] text-indigo-900">
-                            Solo personal de {nombreAreaCustodia} puede recepcionar
+                          <span className="text-[11px] font-medium text-indigo-900">
+                            {estaEnCentroIdiomas
+                              ? "Pendiente de recepción por el Coordinador del Centro de Idiomas"
+                              : `Solo personal de ${nombreAreaCustodia} puede recepcionar`}
                           </span>
                         )}
                       </div>
@@ -1712,59 +1782,84 @@ export default function ExpedienteDetallePage() {
                 )}
 
                 {detalleData.estadoActual === "EN_REVISION" && (
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50/90 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-xs">
-                    <div className="space-y-1">
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50/90 p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 shadow-xs">
+                    <div className="flex-1 min-w-0 space-y-1.5">
                       <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-600 animate-pulse"></span>
-                        <h3 className="text-sm font-bold text-amber-950 uppercase tracking-wide">
+                        <span className="w-2.5 h-2.5 shrink-0 rounded-full bg-amber-600 animate-pulse"></span>
+                        <h3 className="text-sm font-bold text-amber-950 uppercase tracking-wide leading-snug">
                           {requiereAtencionTecnica
                             ? atencionTecnicaYaCompletada
-                              ? "Revisión Académica: Dictamen Técnico Registrado"
+                              ? "Centro de Idiomas / Subdirección Académica: Dictamen Técnico Registrado"
                               : !estaEnAreaTecnica
-                                ? "Evaluación Académica Pendiente — Remitir a SDA"
-                                : !hayAsignacionEfectiva
-                                  ? "Calificación Académica (SDA) — Pendiente de Asignación"
-                                  : "Calificación Académica (SDA) — Evaluación por Especialista"
+                                ? "Evaluación Académica Pendiente — Remitir a Subdirección Académica"
+                                : estaEnSubdireccionAcademica && !hayDocenteEspecialistaAsignado
+                                  ? "Subdirección Académica (SDA) — Enviar al Área de Centro de Idiomas"
+                                  : !hayDocenteEspecialistaAsignado
+                                    ? "Área Centro de Idiomas — Coordinador: Derivar / Asignar a Docente Especialista"
+                                    : "Área Centro de Idiomas — Evaluación Técnica por Docente Especialista"
                             : "Expediente en Calificación y Revisión"}
                         </h3>
                       </div>
-                      <p className="text-xs text-amber-900">
+                      <p className="text-xs text-amber-900 leading-relaxed">
                         {requiereAtencionTecnica
                           ? atencionTecnicaYaCompletada
-                            ? esEspecialista
-                              ? "✓ El dictamen de atención técnica fue registrado. El expediente se encuentra a disposición de la Secretaría del área para elevar a Despacho de Dirección."
-                              : "✓ El dictamen de atención técnica fue registrado por el especialista. Proceda a elevar el expediente a Despacho de Dirección mediante 'Enviar a Firma'."
+                            ? esDocenteEspecialista
+                              ? "✓ El dictamen de atención técnica fue registrado. El expediente queda a disposición del Coordinador del Centro de Idiomas o Subdirección Académica para elevarlo a Dirección General."
+                              : "✓ El dictamen de atención técnica fue registrado por el Docente Especialista. Proceda a elevar el expediente a Despacho de Dirección mediante 'Enviar a Firma'."
                             : !estaEnAreaTecnica
-                              ? `El procedimiento requiere asignación y dictamen técnico obligatorio en ${resolverNombreArea(areaResponsableTecnicaId)} antes de poder elevarse a firma o resolverse. Derive el expediente a dicha unidad.`
-                              : !hayAsignacionEfectiva
-                                ? "La Secretaría del área debe asignar formalmente un especialista antes de registrar el dictamen técnico."
-                                : esEspecialista
-                                  ? `Especialista asignado (${asignacionActiva?.nombreCompleto || "asignado"}). Registre el dictamen técnico para habilitar el envío a firma.`
-                                  : `Expediente asignado a ${asignacionActiva?.nombreCompleto || "un especialista del área"} para su evaluación técnica. Puede reasignarlo o registrar el dictamen correspondiente.`
+                              ? `El procedimiento requiere evaluación técnica obligatoria. Derive el expediente a ${resolverNombreArea(areaResponsableTecnicaId)}.`
+                              : estaEnSubdireccionAcademica && !hayDocenteEspecialistaAsignado
+                                ? "El expediente fue recepcionado en Subdirección Académica. Envíe el documento al Área de Centro de Idiomas para que el Coordinador del Centro de Idiomas lo recepcione y lo derive al Docente Especialista Evaluador."
+                                : !hayDocenteEspecialistaAsignado
+                                  ? esCoordinadorIdiomas
+                                    ? "Expediente recepcionado en el Área de Centro de Idiomas. Como Coordinador del Centro de Idiomas, atienda y derive/asigne el trámite al Docente Especialista del idioma (Inglés / Portugués) para la evaluación."
+                                    : "Expediente en el Área de Centro de Idiomas. Pendiente de que el Coordinador del Centro de Idiomas lo derive/asigne al Docente Especialista Evaluador."
+                                  : esDocenteEspecialista
+                                    ? `Docente Especialista asignado (${asignacionActiva?.nombreCompleto || "asignado"}). Evalúe al estudiante y registre el Dictamen Técnico o emita el Memorándum de Inasistencia (NSP).`
+                                    : `Expediente asignado al Docente Especialista ${asignacionActiva?.nombreCompleto || "del Centro de Idiomas"} para la evaluación del estudiante y emisión del Dictamen Técnico o Memorándum NSP.`
                           : "El expediente se encuentra en revisión. Una vez evaluado, remítalo a despacho mediante 'Enviar a Firma' para su resolución."}
                       </p>
                     </div>
                     {puedeOperar && (
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="shrink-0 flex flex-wrap items-center justify-start lg:justify-end gap-2.5 pt-3 lg:pt-0 border-t lg:border-t-0 border-amber-200/70">
                         {evaluacionAcademicaPendiente && !estaEnAreaTecnica && (
                           <button
                             type="button"
                             disabled={!puedeDerivar}
                             onClick={puedeDerivar ? () => setModal("derivacion") : undefined}
-                            className="shrink-0 rounded-xl bg-blue-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-900 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
+                            className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-blue-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-900 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
                           >
-                            🚀 Derivar a SDA
+                            <span>🚀</span>
+                            <span>Derivar a Subdirección Académica</span>
                           </button>
                         )}
-                        {tieneFacultadAsignacion && (!requiereAtencionTecnica || estaEnAreaTecnica) && (
+                        {evaluacionAcademicaPendiente && estaEnSubdireccionAcademica && !hayDocenteEspecialistaAsignado && (
+                          <button
+                            type="button"
+                            disabled={!puedeDerivar}
+                            onClick={puedeDerivar ? () => setModal("derivacion") : undefined}
+                            className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-blue-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-900 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
+                          >
+                            <span>🚀</span>
+                            <span>Enviar al Área de Centro de Idiomas</span>
+                          </button>
+                        )}
+                        {tieneFacultadAsignacion &&
+                          (!requiereAtencionTecnica ||
+                            (!atencionTecnicaYaCompletada && (estaEnCentroIdiomas || hayDocenteEspecialistaAsignado))) && (
                           <button
                             type="button"
                             disabled={!puedeAsignar}
                             onClick={puedeAsignar ? () => setModal("asignacion") : undefined}
                             title={!puedeAsignar ? `Custodia actual en ${nombreAreaCustodia}` : undefined}
-                            className="shrink-0 rounded-xl bg-indigo-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-800 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
+                            className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-indigo-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-800 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
                           >
-                            👤 Asignar Especialista
+                            <span>👤</span>
+                            <span>
+                              {!hayDocenteEspecialistaAsignado
+                                ? "Derivar / Asignar a Docente Especialista"
+                                : "Reasignar Docente Especialista"}
+                            </span>
                           </button>
                         )}
                         {!atencionTecnicaYaCompletada && !evaluacionAcademicaPendiente && tieneRolAtencion && !bloqueadoPorAreaTecnicaParaAtender && (
@@ -1772,13 +1867,18 @@ export default function ExpedienteDetallePage() {
                             type="button"
                             disabled={!puedeAtender}
                             onClick={puedeAtender ? () => setModal("atender") : undefined}
-                            className="shrink-0 rounded-xl bg-emerald-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-900 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
+                            className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-emerald-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-900 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
                           >
-                            📝 Registrar Evaluación Interna
+                            <span>📝</span>
+                            <span>Registrar Evaluación Interna</span>
                           </button>
                         )}
-                        {requiereAtencionTecnica && !atencionTecnicaYaCompletada && estaEnAreaTecnica && tieneRolAtencion && (
-                          <div className="flex items-center gap-2">
+                        {requiereAtencionTecnica &&
+                          !atencionTecnicaYaCompletada &&
+                          estaEnAreaTecnica &&
+                          hayDocenteEspecialistaAsignado &&
+                          (esDocenteEspecialista || esUsuarioAsignado) && (
+                          <div className="flex flex-wrap items-center gap-2.5">
                             <button
                               type="button"
                               disabled={!puedeAtender}
@@ -1792,31 +1892,34 @@ export default function ExpedienteDetallePage() {
                                     : "Sin permiso para atender en este estado"
                                   : undefined
                               }
-                              className="shrink-0 rounded-xl bg-emerald-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-900 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
+                              className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-emerald-800 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-900 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
                             >
-                              📝 Registrar Dictamen Técnico
+                              <span>📝</span>
+                              <span>Registrar Dictamen Técnico</span>
                             </button>
                             <button
                               type="button"
                               disabled={!puedeAtender}
                               onClick={puedeAtender ? () => { setModoAtencionModal("nsp"); setModal("atender"); } : undefined}
                               title="Emitir Memorándum de Inasistencia si el alumno no se presentó a la evaluación programada"
-                              className="shrink-0 rounded-xl bg-rose-700 px-3.5 py-2.5 text-xs font-bold text-white hover:bg-rose-800 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
+                              className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-rose-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-rose-800 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
                             >
-                              ⚠️ No se presentó (NSP)
+                              <span>⚠️</span>
+                              <span>No se presentó (NSP)</span>
                             </button>
                           </div>
                         )}
                         {(!requiereAtencionTecnica || atencionTecnicaYaCompletada) &&
-                          tieneFacultadDespacho &&
-                          !esEspecialista && (
+                          (tieneFacultadDespacho || esCoordinadorIdiomas) &&
+                          !esDocenteEspecialista && (
                           <button
                             type="button"
                             disabled={!puedeEnviarAFirma}
                             onClick={puedeEnviarAFirma ? () => setModal("enviar-a-firma") : undefined}
-                            className="shrink-0 rounded-xl bg-violet-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-violet-800 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
+                            className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-violet-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-violet-800 transition shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:cursor-not-allowed"
                           >
-                            🚀 Enviar a Firma (Dirección)
+                            <span>🚀</span>
+                            <span>Enviar a Firma (Dirección)</span>
                           </button>
                         )}
                       </div>

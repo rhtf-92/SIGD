@@ -48,9 +48,55 @@ function hashRefreshToken(token: string): string {
 export function crearRouterAuth(pool: Pool): Router {
   const router = Router();
 
+  // Mapa bidireccional de compatibilidad entre alias anteriores y nuevos usuarios reconocibles por módulo/área
+  const ALIAS_USUARIOS_MODULO: Record<string, string> = {
+    mesa_partes_demo: 'mesa_partes',
+    'mesapartes.demo@iestp-suiza.edu.pe': 'mesa_partes',
+    mesa_partes: 'mesa_partes_demo',
+    'mesapartes@iestp-suiza.edu.pe': 'mesa_partes_demo',
+    tesoreria_demo: 'tesoreria_caja',
+    'tesoreria.demo@iestp-suiza.edu.pe': 'tesoreria_caja',
+    tesoreria_caja: 'tesoreria_demo',
+    'tesoreria@iestp-suiza.edu.pe': 'tesoreria_demo',
+    secretario_demo: 'subdireccion_academica',
+    'secretario.demo@iestp-suiza.edu.pe': 'subdireccion_academica',
+    subdireccion_academica: 'secretario_demo',
+    'subdireccion@iestp-suiza.edu.pe': 'secretario_demo',
+    responsable_ingles_demo: 'coordinador_idiomas',
+    'ingles.demo@iestp-suiza.edu.pe': 'coordinador_idiomas',
+    coordinador_idiomas: 'responsable_ingles_demo',
+    'coordinador.idiomas@iestp-suiza.edu.pe': 'responsable_ingles_demo',
+    especialista_demo: 'especialista_ingles',
+    'especialista.demo@iestp-suiza.edu.pe': 'especialista_ingles',
+    especialista_ingles: 'especialista_demo',
+    'especialista.ingles@iestp-suiza.edu.pe': 'especialista_demo',
+    especialista_portugues_demo: 'especialista_portugues',
+    'portugues.demo@iestp-suiza.edu.pe': 'especialista_portugues',
+    especialista_portugues: 'especialista_portugues_demo',
+    'especialista.portugues@iestp-suiza.edu.pe': 'especialista_portugues_demo',
+    director_demo: 'direccion_general',
+    'director.demo@iestp-suiza.edu.pe': 'direccion_general',
+    direccion_general: 'director_demo',
+    'direccion@iestp-suiza.edu.pe': 'director_demo',
+    administrador_demo: 'admin_suiza',
+    'administrador.demo@iestp-suiza.edu.pe': 'admin_suiza',
+    admin_suiza: 'administrador_demo',
+    'admin@iestp-suiza.edu.pe': 'administrador_demo',
+    superadmin_demo: 'superadmin_suiza',
+    'superadmin.demo@iestp-suiza.edu.pe': 'superadmin_suiza',
+    superadmin_suiza: 'superadmin_demo',
+    'superadmin@iestp-suiza.edu.pe': 'superadmin_demo',
+    ciudadano_demo: 'ciudadano_suiza',
+    'ciudadano.demo@iestp-suiza.edu.pe': 'ciudadano_suiza',
+    ciudadano_suiza: 'ciudadano_demo',
+    'ciudadano@iestp-suiza.edu.pe': 'ciudadano_demo',
+  };
+
   // #1 — POST /auth/login (con rate limiting contra ataques de fuerza bruta SEC-10)
   router.post('/auth/login', loginRateLimiter, async (req: Request, res: Response) => {
     const datos = loginSchema.parse(req.body);
+    const idRaw = datos.identificador.trim();
+    const idNormalizado = ALIAS_USUARIOS_MODULO[idRaw.toLowerCase()] ?? idRaw;
 
     const query = `
       SELECT c.id_usuario, c.id_persona, c.usuario, c.correo,
@@ -64,7 +110,7 @@ export function crearRouterAuth(pool: Pool): Router {
         LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = c.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
         LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
         LEFT JOIN sigd_auth.perfil_usuario p ON p.id_usuario = c.id_usuario
-       WHERE (c.usuario = $1 OR c.correo = $1)
+       WHERE (c.usuario = $1 OR c.correo = $1 OR c.usuario = $2 OR c.correo = $2)
        ORDER BY CASE r.codigo
          WHEN 'ADMINISTRADOR' THEN 1 WHEN 'DIRECTOR' THEN 2
          WHEN 'SECRETARIO' THEN 3 WHEN 'ESPECIALISTA' THEN 4
@@ -72,7 +118,7 @@ export function crearRouterAuth(pool: Pool): Router {
        LIMIT 1;
     `;
 
-    const resultado = await pool.query(query, [datos.identificador.trim()]);
+    const resultado = await pool.query(query, [idNormalizado, idRaw]);
     const usuario = resultado.rows[0];
 
     if (!usuario) {

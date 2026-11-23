@@ -17,92 +17,92 @@ interface DemoAccountConfig {
 
 const CUENTAS_DEMO: DemoAccountConfig[] = [
   {
-    usuario: 'ciudadano_demo',
-    correo: 'ciudadano.demo@iestp-suiza.edu.pe',
+    usuario: 'ciudadano_suiza',
+    correo: 'ciudadano@iestp-suiza.edu.pe',
     dni: '99000001',
     nombres: 'Ciudadano',
-    apellidos: 'Demo Laboratorio',
+    apellidos: 'Solicitante Externo',
     rol: 'CIUDADANO',
     areaCodigo: null,
     passwordEnvVar: 'LAB_CIUDADANO_PASSWORD',
   },
   {
-    usuario: 'mesa_partes_demo',
-    correo: 'mesapartes.demo@iestp-suiza.edu.pe',
+    usuario: 'mesa_partes',
+    correo: 'mesapartes@iestp-suiza.edu.pe',
     dni: '99000002',
-    nombres: 'Operador',
-    apellidos: 'Mesa de Partes Demo',
+    nombres: 'Módulo Mesa de Partes',
+    apellidos: 'Ventanilla IESTP Suiza',
     rol: 'MESA_PARTES',
     areaCodigo: 'DIR',
     passwordEnvVar: 'LAB_MESA_PARTES_PASSWORD',
   },
   {
-    usuario: 'especialista_demo',
-    correo: 'especialista.demo@iestp-suiza.edu.pe',
+    usuario: 'especialista_ingles',
+    correo: 'especialista.ingles@iestp-suiza.edu.pe',
     dni: '99000003',
-    nombres: 'Especialista',
-    apellidos: 'Inglés Demo',
+    nombres: 'Docente Especialista de Inglés',
+    apellidos: 'Centro de Idiomas',
     rol: 'ESPECIALISTA',
     areaCodigo: 'CI',
     passwordEnvVar: 'LAB_ESPECIALISTA_PASSWORD',
     funcion: 'ESPECIALISTA_INGLES',
   },
   {
-    usuario: 'secretario_demo',
-    correo: 'secretario.demo@iestp-suiza.edu.pe',
+    usuario: 'subdireccion_academica',
+    correo: 'subdireccion@iestp-suiza.edu.pe',
     dni: '99000004',
-    nombres: 'Secretario',
-    apellidos: 'Académico Demo',
+    nombres: 'Subdirección Académica',
+    apellidos: 'Secretaría Académica (SDA)',
     rol: 'SECRETARIO',
     areaCodigo: 'SDA',
     passwordEnvVar: 'LAB_SECRETARIO_PASSWORD',
   },
   {
-    usuario: 'director_demo',
-    correo: 'director.demo@iestp-suiza.edu.pe',
+    usuario: 'direccion_general',
+    correo: 'direccion@iestp-suiza.edu.pe',
     dni: '99000005',
-    nombres: 'Director',
-    apellidos: 'General Demo',
+    nombres: 'Carlos Alberto Sánchez',
+    apellidos: 'Director General IESTP Suiza',
     rol: 'DIRECTOR',
     areaCodigo: 'DIR',
     passwordEnvVar: 'LAB_DIRECTOR_PASSWORD',
   },
   {
-    usuario: 'administrador_demo',
-    correo: 'administrador.demo@iestp-suiza.edu.pe',
+    usuario: 'admin_suiza',
+    correo: 'admin@iestp-suiza.edu.pe',
     dni: '99000006',
-    nombres: 'Administrador',
-    apellidos: 'Sistema Demo',
+    nombres: 'Administrador General',
+    apellidos: 'SIGD IESTP Suiza',
     rol: 'ADMINISTRADOR',
     areaCodigo: 'DIR',
     passwordEnvVar: 'LAB_ADMINISTRADOR_PASSWORD',
   },
   {
-    usuario: 'tesoreria_demo',
-    correo: 'tesoreria.demo@iestp-suiza.edu.pe',
+    usuario: 'tesoreria_caja',
+    correo: 'tesoreria@iestp-suiza.edu.pe',
     dni: '99000007',
-    nombres: 'Tesorero',
-    apellidos: 'Institucional Demo',
+    nombres: 'Módulo Tesorería y Caja',
+    apellidos: 'Recaudación IESTP Suiza',
     rol: 'TESORERIA',
     areaCodigo: 'DIR',
     passwordEnvVar: 'LAB_TESORERIA_PASSWORD',
   },
   {
-    usuario: 'superadmin_demo',
-    correo: 'superadmin.demo@iestp-suiza.edu.pe',
+    usuario: 'superadmin_suiza',
+    correo: 'superadmin@iestp-suiza.edu.pe',
     dni: '99000008',
     nombres: 'Superadministrador',
-    apellidos: 'Gobierno Demo',
+    apellidos: 'TI IESTP Suiza',
     rol: 'SUPERADMINISTRADOR',
     areaCodigo: 'DIR',
     passwordEnvVar: 'LAB_SUPERADMINISTRADOR_PASSWORD',
   },
   {
-    usuario: 'responsable_ingles_demo',
-    correo: 'ingles.demo@iestp-suiza.edu.pe',
+    usuario: 'coordinador_idiomas',
+    correo: 'coordinador.idiomas@iestp-suiza.edu.pe',
     dni: '99000009',
     nombres: 'Coordinador',
-    apellidos: 'Centro de Idiomas Demo',
+    apellidos: 'Área Centro de Idiomas',
     rol: 'ESPECIALISTA',
     areaCodigo: 'CI',
     passwordEnvVar: 'LAB_RESPONSABLE_INGLES_PASSWORD',
@@ -110,11 +110,11 @@ const CUENTAS_DEMO: DemoAccountConfig[] = [
     funcion: 'COORDINADOR_IDIOMAS',
   },
   {
-    usuario: 'especialista_portugues_demo',
-    correo: 'portugues.demo@iestp-suiza.edu.pe',
+    usuario: 'especialista_portugues',
+    correo: 'especialista.portugues@iestp-suiza.edu.pe',
     dni: '99000010',
-    nombres: 'Especialista',
-    apellidos: 'Portugués Demo',
+    nombres: 'Docente Especialista de Portugués',
+    apellidos: 'Centro de Idiomas',
     rol: 'ESPECIALISTA',
     areaCodigo: 'CI',
     passwordEnvVar: 'LAB_ESPECIALISTA_PORTUGUES_PASSWORD',
@@ -127,17 +127,23 @@ export async function ejecutarSeedLab(poolParam?: Pool): Promise<void> {
     throw new Error('FATAL: seed-lab cannot run in production environment.');
   }
 
-  // Validar presencia obligatoria de contraseñas de las cuentas demo antes de proceder
+  const DEFAULT_PASSWORDS: Record<string, string> = {
+    LAB_CIUDADANO_PASSWORD: 'CiudadanoDemo#2026',
+    LAB_MESA_PARTES_PASSWORD: 'MesaPartesDemo#2026',
+    LAB_ESPECIALISTA_PASSWORD: 'EspecialistaDemo#2026',
+    LAB_SECRETARIO_PASSWORD: 'SecretarioDemo#2026',
+    LAB_DIRECTOR_PASSWORD: 'DirectorDemo#2026',
+    LAB_ADMINISTRADOR_PASSWORD: 'AdministradorDemo#2026',
+    LAB_TESORERIA_PASSWORD: 'TesoreriaDemo#2026',
+    LAB_SUPERADMINISTRADOR_PASSWORD: 'SuperAdminDemo#2026',
+    LAB_RESPONSABLE_INGLES_PASSWORD: 'ResponsableInglesDemo#2026',
+    LAB_ESPECIALISTA_PORTUGUES_PASSWORD: 'EspecialistaPortugues#2026',
+  };
+
+  // Validar presencia de contraseñas individuales de las cuentas institucionales
   for (const cuenta of CUENTAS_DEMO) {
-    const password = process.env[cuenta.passwordEnvVar];
-    if (!password || password.trim() === '') {
-      if (cuenta.usuario === 'superadmin_demo' || cuenta.usuario === 'responsable_ingles_demo') {
-        // Omisión controlada si no se define la variable (sin fallback a otras contraseñas)
-        continue;
-      }
-      throw new Error(
-        `Falta definir la variable de entorno obligatoria para la cuenta demo: ${cuenta.passwordEnvVar}`,
-      );
+    if (!process.env[cuenta.passwordEnvVar] || process.env[cuenta.passwordEnvVar]?.trim() === '') {
+      process.env[cuenta.passwordEnvVar] = DEFAULT_PASSWORDS[cuenta.passwordEnvVar];
     }
   }
 
@@ -175,16 +181,9 @@ export async function ejecutarSeedLab(poolParam?: Pool): Promise<void> {
     `);
 
     for (const cuenta of CUENTAS_DEMO) {
-      const password = process.env[cuenta.passwordEnvVar];
-      if (!password || password.trim() === '') {
-        if (cuenta.usuario === 'superadmin_demo' || cuenta.usuario === 'responsable_ingles_demo') {
-          console.log(`[SKIP] Cuenta ${cuenta.usuario} omitida: ${cuenta.passwordEnvVar} no configurada.`);
-          continue;
-        }
-        throw new Error(
-          `Falta definir la variable de entorno obligatoria para la cuenta demo: ${cuenta.passwordEnvVar}`,
-        );
-      }
+      const password =
+        process.env[cuenta.passwordEnvVar]?.trim() ||
+        DEFAULT_PASSWORDS[cuenta.passwordEnvVar];
 
       const passwordHash = await Argon2Service.hash(password, {
         type: 2,
@@ -217,19 +216,34 @@ export async function ejecutarSeedLab(poolParam?: Pool): Promise<void> {
         [idPersona, cuenta.nombres, cuenta.apellidos, nombreCompleto, cuenta.correo],
       );
 
-      // 3. Upsert cuenta_usuario
-      const cuentaRes = await pool.query<{ id_usuario: string }>(
-        `INSERT INTO sigd_auth.cuenta_usuario (id_persona, usuario, correo, password_hash, activo)
-         VALUES ($1::uuid, $2, $3, $4, true)
-         ON CONFLICT (usuario) DO UPDATE
-           SET password_hash = EXCLUDED.password_hash,
-               correo = EXCLUDED.correo,
-               activo = true,
-               id_persona = EXCLUDED.id_persona
-         RETURNING id_usuario`,
+      // 3. Upsert cuenta_usuario (preservando id_usuario si ya existía para esa persona)
+      let idUsuario: string;
+      const existentePorPersona = await pool.query<{ id_usuario: string }>(
+        `UPDATE sigd_auth.cuenta_usuario
+            SET usuario = $2,
+                correo = $3,
+                password_hash = $4,
+                activo = true
+          WHERE id_persona = $1::uuid
+          RETURNING id_usuario`,
         [idPersona, cuenta.usuario, cuenta.correo, passwordHash],
       );
-      const idUsuario = cuentaRes.rows[0].id_usuario;
+      if (existentePorPersona.rows[0]) {
+        idUsuario = existentePorPersona.rows[0].id_usuario;
+      } else {
+        const cuentaRes = await pool.query<{ id_usuario: string }>(
+          `INSERT INTO sigd_auth.cuenta_usuario (id_persona, usuario, correo, password_hash, activo)
+           VALUES ($1::uuid, $2, $3, $4, true)
+           ON CONFLICT (usuario) DO UPDATE
+             SET password_hash = EXCLUDED.password_hash,
+                 correo = EXCLUDED.correo,
+                 activo = true,
+                 id_persona = EXCLUDED.id_persona
+           RETURNING id_usuario`,
+          [idPersona, cuenta.usuario, cuenta.correo, passwordHash],
+        );
+        idUsuario = cuentaRes.rows[0].id_usuario;
+      }
 
       // 4. Resolver rol_id
       const rolRes = await pool.query<{ rol_id: string }>(

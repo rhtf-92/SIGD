@@ -19,6 +19,10 @@ export interface DtoExpedienteAsignacion {
   areaNombre?: string;
   usuario?: string;
   nombreCompleto?: string;
+  rolCodigo?: string | null;
+  perfilCodigo?: string | null;
+  alcance?: any;
+  esCoordinador?: boolean;
 }
 
 export interface AsignarExpedienteInput {
@@ -38,6 +42,7 @@ export interface CandidatoAsignacionDTO {
   perfilCodigo: string | null;
   alcance: any;
   esPrioritario: boolean;
+  esCoordinador?: boolean;
 }
 
 export class ExpedienteAsignacionService {
@@ -329,15 +334,25 @@ export class ExpedienteAsignacionService {
       area_nombre: string;
       usuario: string;
       nombre_completo: string;
+      rol_codigo: string | null;
+      perfil_codigo: string | null;
+      alcance: any;
     }>(
       `SELECT a.*,
               ar.nombre AS area_nombre,
               cu.usuario,
-              pn.nombre_completo
+              pn.nombre_completo,
+              rs.codigo AS rol_codigo,
+              po.codigo AS perfil_codigo,
+              apo.alcance
          FROM sigd_rut.expediente_asignacion a
          JOIN sigd_org.area ar ON ar.area_id = a.id_area
          LEFT JOIN sigd_auth.cuenta_usuario cu ON cu.id_usuario = a.id_usuario
          LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = a.id_persona
+         LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = a.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+         LEFT JOIN sigd_org.rol_sistema rs ON rs.rol_id = ur.rol_id
+         LEFT JOIN sigd_org.asignacion_perfil_operativo apo ON apo.id_usuario = a.id_usuario AND apo.estado = 'ACTIVO'
+         LEFT JOIN sigd_org.perfil_operativo po ON po.perfil_id = apo.perfil_id
         WHERE a.expediente_id = $1::uuid
           AND a.activo = true
         LIMIT 1`,
@@ -346,6 +361,12 @@ export class ExpedienteAsignacionService {
 
     if (rows.length === 0) return null;
     const r = rows[0];
+    const esCoordinador = Boolean(
+      r.perfil_codigo === 'GESTOR_AREA_ACADEMICA' ||
+      r.alcance?.funcion === 'COORDINADOR_IDIOMAS' ||
+      r.usuario === 'responsable_ingles_demo' ||
+      r.usuario === 'coordinador_idiomas',
+    );
     return {
       idAsignacion: r.id_asignacion,
       expedienteId: r.expediente_id,
@@ -362,6 +383,10 @@ export class ExpedienteAsignacionService {
       areaNombre: r.area_nombre,
       usuario: r.usuario,
       nombreCompleto: r.nombre_completo,
+      rolCodigo: r.rol_codigo,
+      perfilCodigo: r.perfil_codigo,
+      alcance: r.alcance,
+      esCoordinador,
     };
   }
 
@@ -504,8 +529,19 @@ export class ExpedienteAsignacionService {
       [areaId],
     );
 
-    return rows.map((r) => {
+    const hayEspecialistas = rows.some((r) => r.rol_codigo === 'ESPECIALISTA');
+    const filasFiltradas = hayEspecialistas
+      ? rows.filter((r) => r.rol_codigo === 'ESPECIALISTA')
+      : rows;
+
+    return filasFiltradas.map((r) => {
       const coincidePerfil = Boolean(perfilRequeridoCodigo && r.perfil_codigo === perfilRequeridoCodigo);
+      const esCoordinador = Boolean(
+        r.perfil_codigo === 'GESTOR_AREA_ACADEMICA' ||
+        r.alcance?.funcion === 'COORDINADOR_IDIOMAS' ||
+        r.usuario === 'responsable_ingles_demo' ||
+        r.usuario === 'coordinador_idiomas',
+      );
       return {
         idUsuario: r.id_usuario,
         idPersona: r.id_persona,
@@ -515,6 +551,7 @@ export class ExpedienteAsignacionService {
         perfilCodigo: r.perfil_codigo,
         alcance: r.alcance,
         esPrioritario: coincidePerfil,
+        esCoordinador,
       };
     }).sort((a, b) => {
       if (a.esPrioritario && !b.esPrioritario) return -1;

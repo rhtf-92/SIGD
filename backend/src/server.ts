@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,6 +12,7 @@ import { construirApp } from './app.js';
 import { API_PREFIX } from './config/rutas.js';
 import { BusSse, HEARTBEAT_SEGUNDOS } from './modules/corelink/sseStream.service.js';
 import { ejecutarMigraciones } from './db/migrate.js';
+import { ejecutarSeedLab } from './tools/seed-lab.js';
 import { OutboxWorker } from './audit/outbox-worker.js';
 import { crearDespachadorPorDefecto } from './audit/despachador-notificaciones.js';
 import { BridgeNotificacion } from './core/realtime/bridge-notificacion.js';
@@ -27,9 +29,62 @@ if (process.env.MIGRATE_ON_BOOT !== 'false') {
   await ejecutarMigraciones(pool);
 }
 
-// Sincronización de seguridad: alinear estado_actual_expediente para expedientes resueltos
+// Sincronizar cuentas institucionales por módulo/área con contraseña uniforme Suiza#2026
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    await ejecutarSeedLab(pool);
+  } catch (err) {
+    console.warn('[SEED-LAB] Aviso al sincronizar cuentas institucionales:', err);
+  }
+}
+
+// Sincronización de seguridad: alinear estado_actual_expediente para expedientes resueltos y asegurar Área Centro de Idiomas (CI)
 try {
   await pool.query(`
+    INSERT INTO sigd_org.area (area_id, codigo, nombre, area_padre_id, tipo_unidad, vigente)
+    VALUES (
+      'a0000000-0000-0000-0000-000000000003'::uuid,
+      'CI',
+      'Centro de Idiomas',
+      'a0000000-0000-0000-0000-000000000001'::uuid,
+      'AREA',
+      true
+    )
+    ON CONFLICT (codigo) DO UPDATE
+    SET nombre = 'Centro de Idiomas',
+        area_padre_id = 'a0000000-0000-0000-0000-000000000001'::uuid,
+        tipo_unidad = 'AREA',
+        vigente = true;
+
+    UPDATE sigd_org.usuario_rol ur
+       SET area_id = 'a0000000-0000-0000-0000-000000000003'::uuid
+      FROM sigd_auth.cuenta_usuario cu
+     WHERE ur.id_usuario = cu.id_usuario
+       AND cu.usuario IN (
+         'coordinador_idiomas', 'especialista_ingles', 'especialista_portugues',
+         'responsable_ingles_demo', 'especialista_demo', 'especialista_portugues_demo'
+       );
+
+    UPDATE sigd_auth.perfil_usuario pu
+       SET area_id = 'a0000000-0000-0000-0000-000000000003'::uuid
+      FROM sigd_auth.cuenta_usuario cu
+     WHERE pu.id_usuario = cu.id_usuario
+       AND cu.usuario IN (
+         'coordinador_idiomas', 'especialista_ingles', 'especialista_portugues',
+         'responsable_ingles_demo', 'especialista_demo', 'especialista_portugues_demo'
+       );
+
+    UPDATE sigd_org.asignacion_perfil_operativo apo
+       SET area_id = 'a0000000-0000-0000-0000-000000000003'::uuid,
+           estado = 'ACTIVO',
+           vigente_hasta = NULL
+      FROM sigd_auth.cuenta_usuario cu
+     WHERE apo.id_usuario = cu.id_usuario
+       AND cu.usuario IN (
+         'coordinador_idiomas', 'especialista_ingles', 'especialista_portugues',
+         'responsable_ingles_demo', 'especialista_demo', 'especialista_portugues_demo'
+       );
+
     UPDATE sigd_rut.estado_actual_expediente u
        SET estado_nuevo = e.estado,
            area_actual_id = CASE
@@ -38,7 +93,7 @@ try {
              ELSE u.area_actual_id
            END,
            evento = CASE
-             WHEN e.estado = 'RESUELTO' THEN 'RESOLUCION_FIRMA_DIGITAL'
+             WHEN e.estado = 'RESUELTO' AND COALESCE(u.evento, '') <> 'INASISTENCIA_NSP' THEN 'RESOLUCION_FIRMA_DIGITAL'
              ELSE u.evento
            END,
            fecha_hora = now()
@@ -112,34 +167,36 @@ const frontendDir = path.resolve(__dirname, '../../frontend');
 const viteBin = path.resolve(frontendDir, 'node_modules/vite/bin/vite.js');
 
 let viteProc: ReturnType<typeof spawn> | null = null;
-try {
-  viteProc = spawn(process.execPath, [viteBin, '--port', '5173', '--host', '0.0.0.0'], {
-    cwd: frontendDir,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: {
-      ...process.env,
-      VITE_API_BASE_URL: `http://localhost:${port}${API_PREFIX}`,
-      VITE_ENABLE_MOCKS: process.env.VITE_ENABLE_MOCKS ?? 'false',
-    },
-  });
+if (process.env.DISABLE_EMBEDDED_VITE !== 'true' && fs.existsSync(viteBin)) {
+  try {
+    viteProc = spawn(process.execPath, [viteBin, '--port', '5173', '--host', '0.0.0.0'], {
+      cwd: frontendDir,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        VITE_API_BASE_URL: `http://localhost:${port}${API_PREFIX}`,
+        VITE_ENABLE_MOCKS: process.env.VITE_ENABLE_MOCKS ?? 'false',
+      },
+    });
 
-  viteProc.stdout?.on('data', (data) => {
-    console.log(`[Vite stdout] ${data}`);
-  });
+    viteProc.stdout?.on('data', (data) => {
+      console.log(`[Vite stdout] ${data}`);
+    });
 
-  viteProc.stderr?.on('data', (data) => {
-    console.error(`[Vite stderr] ${data}`);
-  });
+    viteProc.stderr?.on('data', (data) => {
+      console.error(`[Vite stderr] ${data}`);
+    });
 
-  viteProc.on('error', (err) => {
-    console.error('[Frontend Vite] Error al iniciar:', err);
-  });
+    viteProc.on('error', (err) => {
+      console.error('[Frontend Vite] Error al iniciar:', err);
+    });
 
-  viteProc.on('close', (code) => {
-    console.log(`[Frontend Vite] Proceso cerrado con código ${code}`);
-  });
-} catch (e) {
-  console.error('[Frontend Vite] Excepción al lanzar proceso:', e);
+    viteProc.on('close', (code) => {
+      console.log(`[Frontend Vite] Proceso cerrado con código ${code}`);
+    });
+  } catch (e) {
+    console.error('[Frontend Vite] Excepción al lanzar proceso:', e);
+  }
 }
 
 process.on('SIGINT', () => {

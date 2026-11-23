@@ -268,8 +268,16 @@ export function crearRouterDerivaciones(
 
         // Verificación de tenencia de custodia en el área
         let tieneCustodia = false;
+        const sdaAreaId = 'a0000000-0000-0000-0000-000000000001';
+        const ciAreaId = 'a0000000-0000-0000-0000-000000000003';
 
         if (actor.unidadOrganicaId && actor.unidadOrganicaId === contextoExp.areaActualId) {
+          tieneCustodia = true;
+        } else if (
+          actor.unidadOrganicaId &&
+          [sdaAreaId, ciAreaId].includes(actor.unidadOrganicaId) &&
+          [sdaAreaId, ciAreaId].includes(contextoExp.areaActualId)
+        ) {
           tieneCustodia = true;
         } else if (
           actor.roles.includes('MESA_PARTES') &&
@@ -318,7 +326,8 @@ export function crearRouterDerivaciones(
           destinoTupa.unidadResponsableId &&
           primerDestinoId &&
           primerDestinoId !== destinoTupa.unidadResponsableId &&
-          primerDestinoId !== destinoTupa.unidadResolutivaId
+          primerDestinoId !== destinoTupa.unidadResolutivaId &&
+          primerDestinoId !== ciAreaId
         ) {
           const justificacion = datos.justificacion_desviacion?.trim();
           if (!justificacion || justificacion.length < 10) {
@@ -577,7 +586,15 @@ export function crearRouterDerivaciones(
 
       // BOLA: Verificar pertenencia al área de destino
       let tieneCustodia = false;
+      const sdaAreaId = 'a0000000-0000-0000-0000-000000000001';
+      const ciAreaId = 'a0000000-0000-0000-0000-000000000003';
       if (actor.unidadOrganicaId && actor.unidadOrganicaId === contextoExp.areaActualId) {
+        tieneCustodia = true;
+      } else if (
+        actor.unidadOrganicaId &&
+        [sdaAreaId, ciAreaId].includes(actor.unidadOrganicaId) &&
+        [sdaAreaId, ciAreaId].includes(contextoExp.areaActualId)
+      ) {
         tieneCustodia = true;
       }
       if (!tieneCustodia) {
@@ -873,20 +890,38 @@ export function crearRouterDerivaciones(
         throw new ForbiddenError({ detail: 'Los administrados no tienen autorización para remitir a firma.' });
       }
 
-      const tieneFacultadDespacho = actor.roles.some((r) =>
-        ['SECRETARIO', 'DIRECTOR'].includes(r),
-      );
-      const esEspecialista = actor.roles.includes('ESPECIALISTA');
+      let esGestorAreaAcademica = false;
+      try {
+        const resGestor = await pool.query(
+          `SELECT 1
+             FROM sigd_org.asignacion_perfil_operativo apo
+             JOIN sigd_org.perfil_operativo po ON po.perfil_id = apo.perfil_id
+            WHERE apo.id_usuario = $1::uuid
+              AND apo.estado = 'ACTIVO'
+              AND (apo.vigente_hasta IS NULL OR apo.vigente_hasta > now())
+              AND po.codigo = 'GESTOR_AREA_ACADEMICA'
+            LIMIT 1`,
+          [actor.id],
+        );
+        esGestorAreaAcademica = (resGestor.rowCount ?? 0) > 0;
+      } catch {
+        esGestorAreaAcademica = false;
+      }
+
+      const tieneFacultadDespacho =
+        actor.roles.some((r) => ['SECRETARIO', 'DIRECTOR'].includes(r)) ||
+        esGestorAreaAcademica;
+      const esEspecialista = actor.roles.includes('ESPECIALISTA') && !esGestorAreaAcademica;
       if (esEspecialista && !tieneFacultadDespacho) {
         throw new ForbiddenError({
           code: 'ESPECIALISTA_NO_PUEDE_ELEVAR_A_FIRMA',
-          detail: 'El especialista técnico emite dictamen o informe, pero no posee facultad de despacho para elevar directamente a firma. La elevación corresponde a la Secretaría o Jefatura de Despacho.',
+          detail: 'El especialista técnico emite dictamen o informe, pero no posee facultad de despacho para elevar directamente a firma. La elevación corresponde a la Secretaría o Coordinación del área.',
         });
       }
       if (!tieneFacultadDespacho) {
         throw new ForbiddenError({
           code: 'SIN_FACULTAD_DESPACHO_FIRMA',
-          detail: 'El usuario no posee facultades de secretaría o despacho para remitir expedientes a firma resolutiva.',
+          detail: 'El usuario no posee facultades de secretaría, coordinación o despacho para remitir expedientes a firma resolutiva.',
         });
       }
 

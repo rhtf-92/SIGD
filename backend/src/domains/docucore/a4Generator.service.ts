@@ -82,8 +82,8 @@ const REPARTO_INTERLINEADO = 0.75;
 
 const PADDING_CELDA_X = 4;
 const PADDING_CELDA_Y = 5;
-const ALTO_PIE = 34;
-const ALTO_ENCABEZADO_CONTINUACION = 26;
+const ALTO_PIE = 92;
+const ALTO_ENCABEZADO_CONTINUACION = 30;
 
 /** Lineas minimas del bloque siguiente que deben accompanyar a un titulo. */
 const MIN_LINEAS_COMPANERAS = 2;
@@ -116,10 +116,10 @@ const ESTILO_ENCABEZADO: Record<1 | 2 | 3, { cuerpo: number; estilo: EstiloFuent
  * los de la institucion antes de generar documentos oficiales.
  */
 export const MEMBRETE_POR_DEFECTO: MembreteInstitucional = {
-  institucion: 'INSTITUTO DE EDUCACION SUPERIOR TECNICO PUBLICO "SUIZA" [EJEMPLO]',
-  unidad: "DIRECCION DE ADMINISTRACION Y UNIDADES ACADEMICAS [EJEMPLO]",
-  direccion: "Pucallpa, Ucayali - Peru [EJEMPLO]",
-  sigla: 'IESTP "Suiza" [EJEMPLO]',
+  institucion: 'INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO "SUIZA"',
+  unidad: "DIRECCIÓN GENERAL · SUBDIRECCIÓN ACADÉMICA",
+  direccion: "Av. Túpac Amaru Km. 4.200, Callería - Pucallpa, Región Ucayali (R.D. N° 0507-2006-ED)",
+  sigla: 'IESTP "Suiza" - Pucallpa',
 };
 
 // ---------------------------------------------------------------------------
@@ -1196,11 +1196,180 @@ export class A4GeneratorService {
   // -------------------------------------------------------------------------
 
   private altoMembrete(membrete: MembreteInstitucional): number {
-    let alto = 3 * 12 + 16;
+    let alto = 74;
     if (membrete.tipoDocumento !== undefined) {
-      alto += 2 * 16;
+      alto += 42;
     }
     return alto;
+  }
+
+  private pintarLogoSuizaVectorial(
+    hoja: PDFPage,
+    fuentes: Record<EstiloFuente, PDFFont>,
+    cx: number,
+    cy: number,
+  ): void {
+    const colorAzulSuiza = rgb(0.05, 0.18, 0.38);
+    const colorVerdeSuiza = rgb(0.06, 0.42, 0.25);
+    const colorDoradoSuiza = rgb(0.82, 0.62, 0.12);
+    const colorRojoSuiza = rgb(0.75, 0.12, 0.16);
+    const colorBlanco = rgb(1, 1, 1);
+
+    // 1. Dientes de engranaje tecnológico exterior (12 dientes)
+    const numDientes = 12;
+    for (let i = 0; i < numDientes; i++) {
+      const ang = (i * 2 * Math.PI) / numDientes;
+      const dx = cx + Math.cos(ang) * 21.5;
+      const dy = cy + Math.sin(ang) * 21.5;
+      hoja.drawCircle({
+        x: dx,
+        y: dy,
+        size: 2.6,
+        color: colorAzulSuiza,
+      });
+    }
+
+    // 2. Anillo exterior azul marino institucional con borde dorado
+    hoja.drawCircle({
+      x: cx,
+      y: cy,
+      size: 21,
+      color: colorAzulSuiza,
+      borderColor: colorDoradoSuiza,
+      borderWidth: 1.4,
+    });
+
+    // 3. Anillo medio blanco para leyenda circular
+    hoja.drawCircle({
+      x: cx,
+      y: cy,
+      size: 16,
+      color: colorBlanco,
+      borderColor: colorVerdeSuiza,
+      borderWidth: 1.1,
+    });
+
+    // 4. Escudo interior amazónico (verde esmeralda / azul)
+    hoja.drawCircle({
+      x: cx,
+      y: cy,
+      size: 11.5,
+      color: colorVerdeSuiza,
+    });
+
+    // 5. Emblema central: Escudo rojo con Cruz Suiza blanca y libro abierto en la base
+    hoja.drawRectangle({
+      x: cx - 5.5,
+      y: cy - 3.5,
+      width: 11,
+      height: 10,
+      color: colorRojoSuiza,
+      borderColor: colorDoradoSuiza,
+      borderWidth: 0.7,
+    });
+    // Cruz Suiza blanca
+    hoja.drawRectangle({
+      x: cx - 1.1,
+      y: cy - 1.8,
+      width: 2.2,
+      height: 6.6,
+      color: colorBlanco,
+    });
+    hoja.drawRectangle({
+      x: cx - 3.3,
+      y: cy + 0.4,
+      width: 6.6,
+      height: 2.2,
+      color: colorBlanco,
+    });
+
+    // 6. Cinta / estandarte inferior con siglas "IESTP SUIZA" y "PUCALLPA"
+    const txtTop = "IESTP";
+    const wTop = fuentes["negrita"].widthOfTextAtSize(txtTop, 4.8);
+    hoja.drawText(txtTop, {
+      x: cx - wTop / 2,
+      y: cy + 16.6,
+      size: 4.8,
+      font: fuentes["negrita"],
+      color: colorBlanco,
+    });
+
+    const txtMid = "SUIZA";
+    const wMid = fuentes["negrita"].widthOfTextAtSize(txtMid, 5.2);
+    hoja.drawRectangle({
+      x: cx - 13,
+      y: cy - 10.5,
+      width: 26,
+      height: 6.2,
+      color: colorAzulSuiza,
+      borderColor: colorDoradoSuiza,
+      borderWidth: 0.6,
+    });
+    hoja.drawText(txtMid, {
+      x: cx - wMid / 2,
+      y: cy - 9.2,
+      size: 5.2,
+      font: fuentes["negrita"],
+      color: colorBlanco,
+    });
+
+    const txtBot = "PUCALLPA";
+    const wBot = fuentes["negrita"].widthOfTextAtSize(txtBot, 4.1);
+    hoja.drawText(txtBot, {
+      x: cx - wBot / 2,
+      y: cy - 19.3,
+      size: 4.1,
+      font: fuentes["negrita"],
+      color: colorBlanco,
+    });
+  }
+
+  private pintarMarcaAguaSuiza(
+    hoja: PDFPage,
+    fuentes: Record<EstiloFuente, PDFFont>,
+  ): void {
+    const cx = A4_PUNTOS.ancho / 2;
+    const cy = A4_PUNTOS.alto / 2 - 10;
+    const colorMarca = rgb(0.05, 0.18, 0.38);
+
+    hoja.drawCircle({
+      x: cx,
+      y: cy,
+      size: 115,
+      borderColor: colorMarca,
+      borderWidth: 2,
+      opacity: 0.04,
+    });
+    hoja.drawCircle({
+      x: cx,
+      y: cy,
+      size: 98,
+      borderColor: colorMarca,
+      borderWidth: 1,
+      opacity: 0.04,
+    });
+
+    const t1 = 'IESTP "SUIZA"';
+    const w1 = fuentes["negrita"].widthOfTextAtSize(t1, 22);
+    hoja.drawText(t1, {
+      x: cx - w1 / 2,
+      y: cy + 4,
+      size: 22,
+      font: fuentes["negrita"],
+      color: colorMarca,
+      opacity: 0.045,
+    });
+
+    const t2 = "PUCALLPA - UCAYALI";
+    const w2 = fuentes["negrita"].widthOfTextAtSize(t2, 12);
+    hoja.drawText(t2, {
+      x: cx - w2 / 2,
+      y: cy - 14,
+      size: 12,
+      font: fuentes["negrita"],
+      color: colorMarca,
+      opacity: 0.045,
+    });
   }
 
   private pintarMembrete(
@@ -1208,38 +1377,121 @@ export class A4GeneratorService {
     fuentes: Record<EstiloFuente, PDFFont>,
     membrete: MembreteInstitucional,
   ): void {
-    let y = A4_PUNTOS.alto - MARGEN_PUNTOS;
+    const colorAzulSuiza = rgb(0.05, 0.18, 0.38);
+    const colorVerdeSuiza = rgb(0.06, 0.38, 0.24);
+    const colorDoradoSuiza = rgb(0.82, 0.62, 0.12);
 
-    const centrar = (texto: string, estilo: EstiloFuente, cuerpo: number, color: RGB): void => {
+    // Marca de agua institucional de fondo
+    this.pintarMarcaAguaSuiza(hoja, fuentes);
+
+    const topY = A4_PUNTOS.alto - MARGEN_PUNTOS;
+
+    // Franja tricolor superior institucional (Azul Marino, Dorado y Verde Amazónico)
+    hoja.drawRectangle({
+      x: MARGEN_PUNTOS,
+      y: topY + 6,
+      width: ANCHO_UTIL * 0.62,
+      height: 4,
+      color: colorAzulSuiza,
+    });
+    hoja.drawRectangle({
+      x: MARGEN_PUNTOS + ANCHO_UTIL * 0.62,
+      y: topY + 6,
+      width: ANCHO_UTIL * 0.08,
+      height: 4,
+      color: colorDoradoSuiza,
+    });
+    hoja.drawRectangle({
+      x: MARGEN_PUNTOS + ANCHO_UTIL * 0.70,
+      y: topY + 6,
+      width: ANCHO_UTIL * 0.30,
+      height: 4,
+      color: colorVerdeSuiza,
+    });
+
+    // Logo / Escudo Vectorial del IESTP "Suiza" de Pucallpa a la izquierda
+    const logoCx = MARGEN_PUNTOS + 25;
+    const logoCy = topY - 22;
+    this.pintarLogoSuizaVectorial(hoja, fuentes, logoCx, logoCy);
+
+    // Bloque central de identidad institucional (desplazado ligeramente a la derecha del logo)
+    const areaTextoX = MARGEN_PUNTOS + 54;
+    const areaTextoAncho = ANCHO_UTIL - 54;
+    let y = topY - 4;
+
+    const centrarEnCabecera = (texto: string, estilo: EstiloFuente, cuerpo: number, color: RGB): void => {
       const ancho = fuentes[estilo].widthOfTextAtSize(texto, cuerpo);
       hoja.drawText(texto, {
-        x: (A4_PUNTOS.ancho - ancho) / 2,
+        x: areaTextoX + (areaTextoAncho - ancho) / 2,
         y,
         size: cuerpo,
         font: fuentes[estilo],
         color,
       });
-      y -= cuerpo * 1.35;
+      y -= cuerpo * 1.32;
     };
 
-    centrar(membrete.institucion, "negrita", 11, COLOR_TEXTO);
+    centrarEnCabecera(
+      "MINISTERIO DE EDUCACIÓN · DIRECCIÓN REGIONAL DE EDUCACIÓN DE UCAYALI",
+      "negrita",
+      7.8,
+      COLOR_SECUNDARIO,
+    );
+    centrarEnCabecera(membrete.institucion, "negrita", 10.5, colorAzulSuiza);
     if (membrete.unidad !== undefined) {
-      centrar(membrete.unidad, "normal", 9.5, COLOR_TEXTO);
+      centrarEnCabecera(membrete.unidad, "negrita", 9.2, colorVerdeSuiza);
     }
-    if (membrete.direccion !== undefined) {
-      centrar(membrete.direccion, "normal", 8.5, COLOR_SECUNDARIO);
-    }
+    const direccionOficial =
+      membrete.direccion ??
+      "Av. Túpac Amaru Km. 4.200, Callería - Pucallpa, Región Ucayali · Revalidado R.D. N° 0507-2006-ED";
+    centrarEnCabecera(direccionOficial, "normal", 7.6, COLOR_SECUNDARIO);
 
-    y -= 6;
-    this.regla(hoja, MARGEN_PUNTOS, A4_PUNTOS.ancho - MARGEN_PUNTOS, y, 1.4, COLOR_REGLA);
-    this.regla(hoja, MARGEN_PUNTOS, A4_PUNTOS.ancho - MARGEN_PUNTOS, y - 3, 0.5, COLOR_REGLA);
+    const reglaY = Math.min(y - 3, logoCy - 27);
+    this.regla(hoja, MARGEN_PUNTOS, A4_PUNTOS.ancho - MARGEN_PUNTOS, reglaY, 1.5, colorAzulSuiza);
+    this.regla(hoja, MARGEN_PUNTOS, A4_PUNTOS.ancho - MARGEN_PUNTOS, reglaY - 2.5, 0.7, colorDoradoSuiza);
 
-    y -= 18;
     if (membrete.tipoDocumento !== undefined) {
-      centrar(membrete.tipoDocumento, "negrita", 12, COLOR_TEXTO);
-    }
-    if (membrete.numeroDocumento !== undefined) {
-      centrar(membrete.numeroDocumento, "negrita", 12, COLOR_TEXTO);
+      const boxTop = reglaY - 8;
+      const boxHeight = 32;
+      hoja.drawRectangle({
+        x: MARGEN_PUNTOS,
+        y: boxTop - boxHeight,
+        width: ANCHO_UTIL,
+        height: boxHeight,
+        color: rgb(0.96, 0.97, 0.99),
+        borderColor: colorAzulSuiza,
+        borderWidth: 0.7,
+      });
+      hoja.drawRectangle({
+        x: MARGEN_PUNTOS,
+        y: boxTop - boxHeight,
+        width: 4,
+        height: boxHeight,
+        color: colorAzulSuiza,
+      });
+
+      const wTipo = fuentes["negrita"].widthOfTextAtSize(membrete.tipoDocumento, 11);
+      hoja.drawText(membrete.tipoDocumento, {
+        x: (A4_PUNTOS.ancho - wTipo) / 2,
+        y: boxTop - 13,
+        size: 11,
+        font: fuentes["negrita"],
+        color: colorAzulSuiza,
+      });
+
+      if (membrete.numeroDocumento !== undefined) {
+        const numTexto = `N° ${membrete.numeroDocumento.replace(/^N°\s*/i, "")}${
+          membrete.correlativo ? `   |   ${membrete.correlativo}` : ""
+        }`;
+        const wNum = fuentes["negrita"].widthOfTextAtSize(numTexto, 9.5);
+        hoja.drawText(numTexto, {
+          x: (A4_PUNTOS.ancho - wNum) / 2,
+          y: boxTop - 26,
+          size: 9.5,
+          font: fuentes["negrita"],
+          color: colorVerdeSuiza,
+        });
+      }
     }
   }
 

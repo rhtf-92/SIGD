@@ -490,8 +490,13 @@ export async function enviarAFirmaExpediente(
   const operadorId = resolverOperadorBigInt(usuarioActorId);
   const areaResolutiva = areaResolutivaRaw || 'a0000000-0000-0000-0000-000000000002';
 
+  const sdaAreaId = 'a0000000-0000-0000-0000-000000000001';
+  const ciAreaId = 'a0000000-0000-0000-0000-000000000003';
   if (datos.actor_unidad_organica_id) {
-    if (areaActual && datos.actor_unidad_organica_id !== areaActual) {
+    const sonAreasAcademicasCompatibles =
+      [sdaAreaId, ciAreaId].includes(datos.actor_unidad_organica_id) &&
+      [sdaAreaId, ciAreaId].includes(areaActual);
+    if (areaActual && datos.actor_unidad_organica_id !== areaActual && !sonAreasAcademicasCompatibles) {
       throw new ForbiddenError({
         code: 'BOLA_VIOLATION_CUSTODIA_AJENA',
         detail: 'No pertenece al área de custodia del expediente para remitirlo a despacho de firma.',

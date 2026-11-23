@@ -316,8 +316,10 @@ export function renderizarResolucionHTML(proyecto: {
   </head>
   <body>
     <header class="membrete">
-      <p class="institucion">${ANSI_NOMBRE_INSTITUCION}</p>
-      <p class="anio">GESTION ${new Date().getFullYear()}</p>
+      <p style="font-size:9pt;font-weight:bold;color:#334155;letter-spacing:0.5px;">MINISTERIO DE EDUCACIÓN · DIRECCIÓN REGIONAL DE EDUCACIÓN DE UCAYALI</p>
+      <p class="institucion" style="font-weight:bold;color:#0d2e61;margin-top:2px;">${ANSI_NOMBRE_INSTITUCION}</p>
+      <p style="font-size:9.5pt;color:#475569;margin-top:2px;">Revalidado con R.D. N° 0507-2006-ED · Av. Túpac Amaru Km. 4.200, Callería - Pucallpa, Ucayali</p>
+      <p class="anio" style="font-weight:bold;margin-top:3px;">DIRECCIÓN GENERAL · GESTIÓN ${new Date().getFullYear()}</p>
     </header>
 
     <section class="nomenclatura">
@@ -325,7 +327,7 @@ export function renderizarResolucionHTML(proyecto: {
       <p class="numero">N° ${escaparHtml(proyecto.numero)}</p>
     </section>
 
-    <p class="ciudad-fecha">Arequipa, ${fecha}</p>
+    <p class="ciudad-fecha">Pucallpa, ${fecha}</p>
 
     <h2 class="seccion">VISTO:</h2>
     <p class="texto jd">${escaparHtml(proyecto.visto)}</p>
@@ -612,100 +614,131 @@ export async function generarActoResolutivoInstitucional(
   const fechaTexto = `${hoy.getDate()} de ${meses[hoy.getMonth()]} de ${hoy.getFullYear()}`;
 
   const contenido: ContenidoResolucion = {
-    titulo: 'RESOLUCIÓN DIRECTORAL INSTITUCIONAL',
-    subtitulo: `N° ${numeroResolucion}`,
+    titulo: '',
+    subtitulo: '',
     bloques: [
       {
         tipo: 'parrafo',
         texto: `Pucallpa, ${fechaTexto}`,
         alineacion: 'derecha',
-        espacioAntes: 4,
-        espacioDespues: 12,
+        estilo: 'negrita',
+        espacioAntes: 2,
+        espacioDespues: 8,
+      },
+      {
+        tipo: 'tabla',
+        columnas: ['DATOS OFICIALES DEL EXPEDIENTE Y CERTIFICACIÓN', 'DETALLE REGISTRADO EN EL SIGD - IESTP "SUIZA"'],
+        anchosRelativos: [1.15, 2.1],
+        cuerpo: 9.5,
+        espacioAntes: 2,
+        espacioDespues: 10,
+        filas: [
+          ['Código Único de Trámite (CUT):', exp.codigo_expediente],
+          ['Solicitante / Estudiante:', ciudadano.nombre_completo],
+          ['Documento de Identidad:', `${ciudadano.tipo_documento ?? 'DNI'} N° ${ciudadano.numero_documento ?? '--------'}`],
+          ['Procedimiento TUPA:', nombreProcedimiento],
+          ['Sede Institucional:', 'IESTP "Suiza" de Pucallpa · Av. Túpac Amaru Km. 4.200, Callería - Ucayali'],
+        ],
       },
       {
         tipo: 'encabezado',
         texto: 'VISTO:',
-        nivel: 2,
-        espacioAntes: 10,
-        espacioDespues: 4,
+        nivel: 3,
+        espacioAntes: 6,
+        espacioDespues: 3,
       },
       {
         tipo: 'parrafo',
-        texto: `El Expediente Administrativo N° ${exp.codigo_expediente}, formulado por don/doña ${ciudadano.nombre_completo}, identificado(a) con ${ciudadano.tipo_documento ?? 'DNI'} N° ${ciudadano.numero_documento ?? ''}, sobre atención del procedimiento institucional "${nombreProcedimiento}"; y el dictamen técnico emitido en sede técnica (${dictamenTexto}); y,`,
+        cuerpo: 10,
+        interlineado: 1.3,
+        texto: `El Expediente Administrativo CUT N° ${exp.codigo_expediente}, promovido por don/doña ${ciudadano.nombre_completo}, identificado(a) con ${ciudadano.tipo_documento ?? 'DNI'} N° ${ciudadano.numero_documento ?? ''}, solicitando la atención del procedimiento institucional "${nombreProcedimiento}" ante el Instituto de Educación Superior Tecnológico Público "Suiza" de Pucallpa; el Informe y Dictamen Técnico favorable emitido por el Centro de Idiomas y la Subdirección Académica (${dictamenTexto}); y,`,
         alineacion: 'justificado',
-        interlineado: 1.35,
-        espacioDespues: 10,
+        espacioDespues: 7,
       },
       {
         tipo: 'encabezado',
         texto: 'CONSIDERANDO:',
-        nivel: 2,
-        espacioAntes: 10,
-        espacioDespues: 4,
+        nivel: 3,
+        espacioAntes: 6,
+        espacioDespues: 3,
       },
       {
         tipo: 'parrafo',
-        texto: `Que, de conformidad con el Texto Único de Procedimientos Administrativos (TUPA) institucional vigente, don/doña ${ciudadano.nombre_completo} presentó formalmente su solicitud en el Sistema Integral de Gestión Documentaria (SIGD), cumpliendo con presentar los requisitos reglamentarios exigidos;`,
+        cuerpo: 10,
+        interlineado: 1.3,
+        texto: `Que, el Instituto de Educación Superior Tecnológico Público "Suiza" de Pucallpa, institución pública de educación superior adscrita a la Dirección Regional de Educación de Ucayali (DREU) y revalidada mediante R.D. N° 0507-2006-ED, garantiza la formación tecnológica, evaluación académica y certificación oficial conforme a la Ley N° 30512, Ley de Institutos y Escuelas de Educación Superior y de la Carrera Pública de sus Docentes, y su Reglamento aprobado por D.S. N° 010-2017-MINEDU;`,
         alineacion: 'justificado',
-        interlineado: 1.35,
-        espacioDespues: 8,
+        espacioDespues: 6,
       },
       {
         tipo: 'parrafo',
-        texto: `Que, habiéndose efectuado la revisión y verificación técnica correspondiente, la unidad técnica y académica competente determinó la procedencia de lo solicitado conforme al mérito de los actuados;`,
+        cuerpo: 10,
+        interlineado: 1.3,
+        texto: `Que, don/doña ${ciudadano.nombre_completo} cumplió con presentar los requisitos documentales y el derecho de tramitación establecidos en el Texto Único de Procedimientos Administrativos (TUPA) del IESTP "Suiza" de Pucallpa; habiendo sido evaluado(a) satisfactoriamente por el Docente Especialista del Centro de Idiomas y contando con la conformidad de la Subdirección Académica;`,
         alineacion: 'justificado',
-        interlineado: 1.35,
-        espacioDespues: 8,
+        espacioDespues: 6,
       },
       {
         tipo: 'parrafo',
-        texto: `Que, de conformidad con la Ley General de Educación N° 28044, la Ley de Institutos y Escuelas de Educación Superior N° 30512, su Reglamento aprobado mediante D.S. N° 010-2017-MINEDU, y el Reglamento Institucional del IESTP "Suiza";`,
+        cuerpo: 10,
+        interlineado: 1.3,
+        texto: `Estando a lo informado por la Subdirección Académica y en uso de las atribuciones conferidas a la Dirección General del Instituto de Educación Superior Tecnológico Público "Suiza" de Pucallpa;`,
         alineacion: 'justificado',
-        interlineado: 1.35,
-        espacioDespues: 8,
-      },
-      {
-        tipo: 'parrafo',
-        texto: `Estando a las atribuciones conferidas al Despacho de la Dirección General del Instituto de Educación Superior Tecnológico Público "Suiza";`,
-        alineacion: 'justificado',
-        interlineado: 1.35,
-        espacioDespues: 10,
+        espacioDespues: 7,
       },
       {
         tipo: 'encabezado',
         texto: 'SE RESUELVE:',
-        nivel: 2,
-        espacioAntes: 10,
+        nivel: 3,
+        espacioAntes: 6,
+        espacioDespues: 4,
+      },
+      {
+        tipo: 'articulo',
+        cuerpo: 10,
+        interlineado: 1.3,
+        numero: 'Artículo Primero.-',
+        texto: `DECLARAR PROCEDENTE Y OTORGAR LA CERTIFICACIÓN OFICIAL solicitada por don/doña ${ciudadano.nombre_completo} (${ciudadano.tipo_documento ?? 'DNI'} N° ${ciudadano.numero_documento ?? ''}), recaída en el Expediente Administrativo N° ${exp.codigo_expediente}, correspondiente al procedimiento "${nombreProcedimiento}" en el Instituto de Educación Superior Tecnológico Público "Suiza" de Pucallpa.`,
+        alineacion: 'justificado',
+        espacioAntes: 4,
         espacioDespues: 6,
       },
       {
         tipo: 'articulo',
-        numero: 'Artículo 1.-',
-        texto: `DECLARAR PROCEDENTE la solicitud formulada por don/doña ${ciudadano.nombre_completo}, recaída en el Expediente Administrativo N° ${exp.codigo_expediente}, respecto al procedimiento "${nombreProcedimiento}".`,
+        cuerpo: 10,
+        interlineado: 1.3,
+        numero: 'Artículo Segundo.-',
+        texto: `ENCARGAR a la Subdirección Académica, al Centro de Idiomas y a Secretaría Académica del IESTP "Suiza" de Pucallpa el registro del presente acto resolutivo y de la certificación otorgada en los libros y actas oficiales de la institución.`,
         alineacion: 'justificado',
-        espacioDespues: 8,
+        espacioAntes: 2,
+        espacioDespues: 6,
       },
       {
         tipo: 'articulo',
-        numero: 'Artículo 2.-',
-        texto: `NOTIFICAR la presente Resolución Directoral a la Casilla Electrónica institucional del administrado, conforme a lo establecido en el Texto Único Ordenado de la Ley N° 27444, Ley del Procedimiento Administrativo General.`,
+        cuerpo: 10,
+        interlineado: 1.3,
+        numero: 'Artículo Tercero.-',
+        texto: `NOTIFICAR la presente Resolución Directoral y Certificación Oficial al correo electrónico y Casilla Electrónica del administrado, conforme al TUO de la Ley N° 27444, Ley del Procedimiento Administrativo General.`,
         alineacion: 'justificado',
+        espacioAntes: 2,
         espacioDespues: 8,
       },
       {
-        tipo: 'articulo',
-        numero: 'Artículo 3.-',
-        texto: `DISPONER el cumplimiento de las acciones administrativas y académicas derivadas del presente acto resolutivo a las unidades orgánicas competentes del IESTP "Suiza".`,
-        alineacion: 'justificado',
-        espacioDespues: 16,
+        tipo: 'parrafo',
+        cuerpo: 10,
+        estilo: 'negrita',
+        texto: 'REGÍSTRESE, COMUNÍQUESE Y ARCHÍVESE.',
+        alineacion: 'centro',
+        espacioAntes: 4,
+        espacioDespues: 6,
       },
       {
         tipo: 'firma',
-        cargo: 'DIRECTOR GENERAL',
+        cargo: 'DIRECTOR GENERAL · IESTP "SUIZA" DE PUCALLPA',
         nombre: autoridad.nombre_completo,
-        documento: autoridad.numero_documento ? `DNI: ${autoridad.numero_documento}` : undefined,
+        documento: autoridad.numero_documento ? `DNI N° ${autoridad.numero_documento}` : undefined,
         alineacion: 'centro',
-        espacioAntes: 20,
+        espacioAntes: 18,
       },
     ],
   };
@@ -713,11 +746,12 @@ export async function generarActoResolutivoInstitucional(
   const opciones: OpcionesGeneracion = {
     membrete: {
       institucion: 'INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO "SUIZA"',
-      unidad: 'DIRECCIÓN GENERAL',
-      tipoDocumento: 'RESOLUCIÓN DIRECTORAL',
+      unidad: 'DIRECCIÓN GENERAL · PUCALLPA, REGIÓN UCAYALI',
+      direccion: 'Av. Túpac Amaru Km. 4.200, Callería - Pucallpa, Ucayali · Revalidado R.D. N° 0507-2006-ED',
+      tipoDocumento: 'RESOLUCIÓN DIRECTORAL INSTITUCIONAL',
       numeroDocumento: numeroResolucion,
       correlativo: `EXP: ${exp.codigo_expediente}`,
-      sigla: 'IESTP SUIZA - DG',
+      sigla: 'IESTP "Suiza" Pucallpa - Dirección General',
     },
   };
 
@@ -924,72 +958,88 @@ export async function generarMemorandumInasistenciaInstitucional(
   const fechaTexto = `${hoy.getDate()} de ${meses[hoy.getMonth()]} de ${hoy.getFullYear()}`;
 
   const contenido: ContenidoResolucion = {
-    titulo: 'MEMORÁNDUM DE INASISTENCIA A EVALUACIÓN (NSP)',
-    subtitulo: `N° ${correlativoNsp}`,
+    titulo: '',
+    subtitulo: '',
     bloques: [
       {
-        tipo: 'parrafo',
-        texto: `Pucallpa, ${fechaTexto}`,
-        alineacion: 'derecha',
+        tipo: 'tabla',
+        columnas: ['CAMPOS DEL MEMORÁNDUM OFICIAL', 'INFORMACIÓN DEL EXPEDIENTE - IESTP "SUIZA" PUCALLPA'],
+        anchosRelativos: [1.0, 2.25],
+        cuerpo: 9.5,
         espacioAntes: 4,
-        espacioDespues: 12,
+        espacioDespues: 10,
+        filas: [
+          ['A (SOLICITANTE):', `${ciudadano.nombre_completo} (${ciudadano.tipo_documento ?? 'DNI'} N° ${ciudadano.numero_documento ?? '--------'})`],
+          ['DE (ÓRGANO EVALUADOR):', `${autoridad.nombre_completo} · Centro de Idiomas / Subdirección Académica IESTP "Suiza"`],
+          ['ASUNTO:', 'Declaración de Improcedencia y Cierre de Trámite por Inasistencia a Evaluación Técnica (NSP)'],
+          ['REFERENCIA:', `Expediente Administrativo CUT N° ${exp.codigo_expediente} — "${nombreProcedimiento}"`],
+          ['SEDE Y FECHA:', `Pucallpa, Región Ucayali, ${fechaTexto}`],
+        ],
       },
       {
         tipo: 'encabezado',
-        texto: '1. DATOS DEL EXPEDIENTE Y SOLICITANTE:',
-        nivel: 2,
-        espacioAntes: 8,
-        espacioDespues: 4,
+        texto: '1. ANTECEDENTES DEL PROCEDIMIENTO:',
+        nivel: 3,
+        espacioAntes: 6,
+        espacioDespues: 3,
       },
       {
         tipo: 'parrafo',
-        texto: `Expediente CUT N° ${exp.codigo_expediente}, presentado por ${ciudadano.nombre_completo}, identificado(a) con ${ciudadano.tipo_documento ?? 'DNI'} N° ${ciudadano.numero_documento ?? ''}, correspondiente al procedimiento "${nombreProcedimiento}".`,
+        cuerpo: 10,
+        interlineado: 1.3,
+        texto: `Mediante el Expediente Administrativo CUT N° ${exp.codigo_expediente}, don/doña ${ciudadano.nombre_completo}, identificado(a) con ${ciudadano.tipo_documento ?? 'DNI'} N° ${ciudadano.numero_documento ?? ''}, solicitó ante el Instituto de Educación Superior Tecnológico Público "Suiza" de Pucallpa la atención del procedimiento "${nombreProcedimiento}", siendo derivado a la Subdirección Académica y al Centro de Idiomas para la evaluación técnica presencial/sincrónica obligatoria.`,
         alineacion: 'justificado',
-        interlineado: 1.35,
-        espacioDespues: 10,
+        espacioDespues: 7,
       },
       {
         tipo: 'encabezado',
         texto: '2. CONSTANCIA TÉCNICA DE INASISTENCIA (NO SE PRESENTÓ - NSP):',
-        nivel: 2,
-        espacioAntes: 8,
-        espacioDespues: 4,
+        nivel: 3,
+        espacioAntes: 6,
+        espacioDespues: 3,
       },
       {
         tipo: 'parrafo',
-        texto: motivoNsp || 'Se deja constancia oficial de que el(la) solicitante NO SE PRESENTÓ (NSP) a la evaluación técnica programada por el Centro de Idiomas / Subdirección Académica del IESTP "Suiza".',
+        cuerpo: 10,
+        interlineado: 1.3,
+        texto: motivoNsp || 'Habiéndose cumplido la fecha y hora programadas por el Centro de Idiomas del IESTP "Suiza" de Pucallpa para la evaluación de suficiencia del idioma, se deja constancia oficial en actas de que el(la) solicitante NO SE PRESENTÓ (NSP) a rendir el examen técnico correspondiente.',
         alineacion: 'justificado',
-        interlineado: 1.35,
-        espacioDespues: 10,
+        espacioDespues: 7,
       },
       {
         tipo: 'encabezado',
-        texto: '3. DETERMINACIÓN Y CIERRE DEL TRÁMITE:',
-        nivel: 2,
-        espacioAntes: 8,
+        texto: '3. DETERMINACIÓN ACADÉMICA Y CIERRE DEL EXPEDIENTE:',
+        nivel: 3,
+        espacioAntes: 6,
+        espacioDespues: 4,
+      },
+      {
+        tipo: 'articulo',
+        cuerpo: 10,
+        interlineado: 1.3,
+        numero: 'PRIMERO.-',
+        texto: `DECLARAR IMPROCEDENTE Y DESESTIMADO POR INASISTENCIA (NSP) el trámite recaído en el Expediente N° ${exp.codigo_expediente} presentado por don/doña ${ciudadano.nombre_completo}, al no haberse presentado a rendir la evaluación técnica obligatoria en el Centro de Idiomas del IESTP "Suiza" de Pucallpa.`,
+        alineacion: 'justificado',
+        espacioAntes: 3,
         espacioDespues: 6,
       },
       {
         tipo: 'articulo',
-        numero: 'PRIMERO.-',
-        texto: `DECLARAR IMPROCEDENTE Y DESESTIMADO POR INASISTENCIA (NSP) el trámite recaído en el Expediente N° ${exp.codigo_expediente} formulado por ${ciudadano.nombre_completo}, al no haberse presentado a rendir la evaluación técnica obligatoria.`,
-        alineacion: 'justificado',
-        espacioDespues: 8,
-      },
-      {
-        tipo: 'articulo',
+        cuerpo: 10,
+        interlineado: 1.3,
         numero: 'SEGUNDO.-',
-        texto: `NOTIFICAR el presente Memorándum de Inasistencia al correo electrónico y Casilla Electrónica del administrado, dando por concluido el presente expediente sin emisión de certificado. En caso requiera una nueva evaluación, deberá iniciar una nueva solicitud conforme al TUPA vigente.`,
+        texto: `NOTIFICAR el presente Memorándum Oficial de Inasistencia al correo electrónico y Casilla Electrónica del administrado, disponiendo el archivo definitivo del expediente sin emisión de certificado. En caso requiera una nueva programación de examen, deberá tramitar una nueva solicitud conforme al TUPA vigente del IESTP "Suiza" de Pucallpa.`,
         alineacion: 'justificado',
-        espacioDespues: 18,
+        espacioAntes: 2,
+        espacioDespues: 12,
       },
       {
         tipo: 'firma',
-        cargo: 'CENTRO DE IDIOMAS / SUBDIRECCIÓN ACADÉMICA',
+        cargo: 'CENTRO DE IDIOMAS · SUBDIRECCIÓN ACADÉMICA - IESTP "SUIZA" PUCALLPA',
         nombre: autoridad.nombre_completo,
-        documento: autoridad.numero_documento ? `DNI: ${autoridad.numero_documento}` : undefined,
+        documento: autoridad.numero_documento ? `DNI N° ${autoridad.numero_documento}` : undefined,
         alineacion: 'centro',
-        espacioAntes: 20,
+        espacioAntes: 18,
       },
     ],
   };
@@ -997,11 +1047,12 @@ export async function generarMemorandumInasistenciaInstitucional(
   const opciones: OpcionesGeneracion = {
     membrete: {
       institucion: 'INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO "SUIZA"',
-      unidad: 'CENTRO DE IDIOMAS · SUBDIRECCIÓN ACADÉMICA',
-      tipoDocumento: 'MEMORÁNDUM DE INASISTENCIA (NSP)',
+      unidad: 'SUBDIRECCIÓN ACADÉMICA · CENTRO DE IDIOMAS - PUCALLPA',
+      direccion: 'Av. Túpac Amaru Km. 4.200, Callería - Pucallpa, Ucayali · Revalidado R.D. N° 0507-2006-ED',
+      tipoDocumento: 'MEMORÁNDUM OFICIAL DE INASISTENCIA A EVALUACIÓN (NSP)',
       numeroDocumento: correlativoNsp,
       correlativo: `EXP: ${exp.codigo_expediente}`,
-      sigla: 'IESTP SUIZA - CI/SDA',
+      sigla: 'IESTP "Suiza" Pucallpa - Centro de Idiomas / SDA',
     },
   };
 

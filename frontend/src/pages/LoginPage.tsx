@@ -17,6 +17,73 @@ const ROLES_INSTITUCIONALES: RolCanonica[] = [
   'ESPECIALISTA',
 ];
 
+const ACCESOS_POR_MODULO_AREA = [
+  {
+    paso: "Paso 1",
+    modulo: "Módulo Mesa de Partes",
+    usuario: "mesa_partes",
+    correo: "mesapartes@iestp-suiza.edu.pe",
+    password: "MesaPartesDemo#2026",
+    funcion: "Recepciona solicitudes y deriva a Subdirección Académica",
+  },
+  {
+    paso: "Paso 2",
+    modulo: "Módulo Tesorería y Caja",
+    usuario: "tesoreria_caja",
+    correo: "tesoreria@iestp-suiza.edu.pe",
+    password: "TesoreriaDemo#2026",
+    funcion: "Confirma pagos TUPA y emite recibos oficiales",
+  },
+  {
+    paso: "Paso 3",
+    modulo: "Área Subdirección Académica",
+    usuario: "subdireccion_academica",
+    correo: "subdireccion@iestp-suiza.edu.pe",
+    password: "SecretarioDemo#2026",
+    funcion: "Recepciona trámite y envía al Área de Centro de Idiomas",
+  },
+  {
+    paso: "Paso 4A",
+    modulo: "Área Centro de Idiomas (Coordinador)",
+    usuario: "coordinador_idiomas",
+    correo: "coordinador.idiomas@iestp-suiza.edu.pe",
+    password: "ResponsableInglesDemo#2026",
+    funcion: "Recibe el trámite en Centro de Idiomas y deriva al Especialista",
+  },
+  {
+    paso: "Paso 4B",
+    modulo: "Centro de Idiomas (Especialista Inglés)",
+    usuario: "especialista_ingles",
+    correo: "especialista.ingles@iestp-suiza.edu.pe",
+    password: "EspecialistaDemo#2026",
+    funcion: "Evalúa al estudiante y emite Dictamen Técnico o NSP",
+  },
+  {
+    paso: "Paso 4C",
+    modulo: "Centro de Idiomas (Especialista Portugués)",
+    usuario: "especialista_portugues",
+    correo: "especialista.portugues@iestp-suiza.edu.pe",
+    password: "EspecialistaPortugues#2026",
+    funcion: "Evalúa idioma Portugués y emite Dictamen Técnico o NSP",
+  },
+  {
+    paso: "Paso 5",
+    modulo: "Área Dirección General",
+    usuario: "direccion_general",
+    correo: "direccion@iestp-suiza.edu.pe",
+    password: "DirectorDemo#2026",
+    funcion: "Firma Digital DNIe y emite Resolución Directoral / Certificado PDF",
+  },
+  {
+    paso: "Admin",
+    modulo: "Administración General SIGD",
+    usuario: "admin_suiza",
+    correo: "admin@iestp-suiza.edu.pe",
+    password: "AdministradorDemo#2026",
+    funcion: "Gestión de usuarios, organigrama y catálogo TUPA",
+  },
+] as const;
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -226,6 +293,45 @@ export default function LoginPage() {
             Iniciar sesión
           </Button>
         </form>
+
+        {/* Directorio rápido de credenciales reconocibles por Módulo / Área */}
+        <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 overflow-hidden text-left">
+          <summary className="cursor-pointer px-3.5 py-2.5 text-xs font-bold text-slate-800 hover:bg-slate-100 transition flex items-center justify-between">
+            <span>🔑 Cuentas por Módulo y Área (IESTP &quot;Suiza&quot;)</span>
+            <span className="rounded-md bg-blue-100 text-blue-800 border border-blue-300 px-2 py-0.5 text-[10px] font-semibold">
+              Ver usuarios y claves
+            </span>
+          </summary>
+          <div className="p-2.5 border-t border-slate-200 space-y-1.5 max-h-64 overflow-y-auto">
+            <p className="text-[11px] text-slate-600 px-1 pb-1">
+              Haz clic en cualquier área o módulo para autocompletar su usuario y su contraseña correspondiente:
+            </p>
+            {ACCESOS_POR_MODULO_AREA.map((item) => (
+              <button
+                key={item.usuario}
+                type="button"
+                onClick={() => {
+                  setIdentificador(item.usuario);
+                  setPassword(item.password);
+                  setError(null);
+                }}
+                className="w-full text-left rounded-lg border border-slate-200 bg-white hover:border-blue-500 hover:bg-blue-50/60 p-2 transition flex flex-col gap-0.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-slate-900">{item.modulo}</span>
+                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-800">
+                    {item.paso}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] font-mono text-blue-900">
+                  <span>Usuario: <strong>{item.usuario}</strong></span>
+                  <span className="text-slate-600">Clave: <strong>{item.password}</strong></span>
+                </div>
+                <span className="text-[10px] text-slate-500">{item.funcion}</span>
+              </button>
+            ))}
+          </div>
+        </details>
 
         {/* Separación conceptual visual para administrados */}
         <div className="mt-4 pt-3.5 border-t border-slate-200 text-center space-y-1.5">
