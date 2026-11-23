@@ -29,9 +29,11 @@ import {
   StandardFonts,
   rgb,
   type PDFFont,
+  type PDFImage,
   type PDFPage,
   type RGB,
 } from "pdf-lib";
+import { obtenerLogoSuizaPngBuffer } from "../../shared/logoInstitucional.js";
 
 import type {
   Alineacion,
@@ -564,11 +566,19 @@ export class A4GeneratorService {
     const unidades = this.compilar(contenido, opciones, medir);
     const compositor = this.componer(unidades, membrete);
 
+    let logoImagen: PDFImage | undefined;
+    try {
+      logoImagen = await documento.embedPng(obtenerLogoSuizaPngBuffer());
+    } catch {
+      // Si la imagen no está disponible continúa sin fallar
+    }
+
     const paginas = compositor.finalizar();
     for (const [indice, paginaCompuesta] of paginas.entries()) {
       const hoja = documento.addPage([A4_PUNTOS.ancho, A4_PUNTOS.alto]);
+      this.pintarMarcaAguaSuiza(hoja, fuentes, logoImagen);
       if (indice === 0) {
-        this.pintarMembrete(hoja, fuentes, membrete);
+        this.pintarMembrete(hoja, fuentes, membrete, logoImagen);
       } else {
         this.pintarEncabezadoContinuacion(hoja, fuentes, membrete);
       }
@@ -1326,8 +1336,23 @@ export class A4GeneratorService {
 
   private pintarMarcaAguaSuiza(
     hoja: PDFPage,
-    fuentes: Record<EstiloFuente, PDFFont>,
+    _fuentes: Record<EstiloFuente, PDFFont>,
+    logoImagen?: PDFImage,
   ): void {
+    if (logoImagen) {
+      const size = 210;
+      const cx = (A4_PUNTOS.ancho - size) / 2;
+      const cy = (A4_PUNTOS.alto - size) / 2 - 20;
+      hoja.drawImage(logoImagen, {
+        x: cx,
+        y: cy,
+        width: size,
+        height: size,
+        opacity: 0.035,
+      });
+      return;
+    }
+
     const cx = A4_PUNTOS.ancho / 2;
     const cy = A4_PUNTOS.alto / 2 - 10;
     const colorMarca = rgb(0.05, 0.18, 0.38);
@@ -1337,38 +1362,9 @@ export class A4GeneratorService {
       y: cy,
       size: 115,
       borderColor: colorMarca,
-      borderWidth: 2,
-      opacity: 0.04,
-    });
-    hoja.drawCircle({
-      x: cx,
-      y: cy,
-      size: 98,
-      borderColor: colorMarca,
       borderWidth: 1,
-      opacity: 0.04,
-    });
-
-    const t1 = 'IESTP "SUIZA"';
-    const w1 = fuentes["negrita"].widthOfTextAtSize(t1, 22);
-    hoja.drawText(t1, {
-      x: cx - w1 / 2,
-      y: cy + 4,
-      size: 22,
-      font: fuentes["negrita"],
-      color: colorMarca,
-      opacity: 0.045,
-    });
-
-    const t2 = "PUCALLPA - UCAYALI";
-    const w2 = fuentes["negrita"].widthOfTextAtSize(t2, 12);
-    hoja.drawText(t2, {
-      x: cx - w2 / 2,
-      y: cy - 14,
-      size: 12,
-      font: fuentes["negrita"],
-      color: colorMarca,
-      opacity: 0.045,
+      opacity: 0.02,
+      borderOpacity: 0.035,
     });
   }
 
@@ -1376,13 +1372,11 @@ export class A4GeneratorService {
     hoja: PDFPage,
     fuentes: Record<EstiloFuente, PDFFont>,
     membrete: MembreteInstitucional,
+    logoImagen?: PDFImage,
   ): void {
     const colorAzulSuiza = rgb(0.05, 0.18, 0.38);
     const colorVerdeSuiza = rgb(0.06, 0.38, 0.24);
     const colorDoradoSuiza = rgb(0.82, 0.62, 0.12);
-
-    // Marca de agua institucional de fondo
-    this.pintarMarcaAguaSuiza(hoja, fuentes);
 
     const topY = A4_PUNTOS.alto - MARGEN_PUNTOS;
 
@@ -1409,10 +1403,19 @@ export class A4GeneratorService {
       color: colorVerdeSuiza,
     });
 
-    // Logo / Escudo Vectorial del IESTP "Suiza" de Pucallpa a la izquierda
-    const logoCx = MARGEN_PUNTOS + 25;
+    // Logo Oficial del IESTP "Suiza" de Pucallpa (Emblema institucional de la boleta de pago)
     const logoCy = topY - 22;
-    this.pintarLogoSuizaVectorial(hoja, fuentes, logoCx, logoCy);
+    if (logoImagen) {
+      hoja.drawImage(logoImagen, {
+        x: MARGEN_PUNTOS + 2,
+        y: topY - 50,
+        width: 48,
+        height: 48,
+      });
+    } else {
+      const logoCx = MARGEN_PUNTOS + 25;
+      this.pintarLogoSuizaVectorial(hoja, fuentes, logoCx, logoCy);
+    }
 
     // Bloque central de identidad institucional (desplazado ligeramente a la derecha del logo)
     const areaTextoX = MARGEN_PUNTOS + 54;
@@ -1549,9 +1552,9 @@ export class A4GeneratorService {
     const x = MARGEN_PUNTOS + linea.sangriaX;
 
     if (linea.justificada && linea.palabras.length > 1 && holgura >= 0) {
-      const hueco = holgura / (linea.palabras.length - 1);
+      const extraPorEspacio = holgura / (linea.palabras.length - 1);
       let cursor = x;
-      for (const palabra of linea.palabras) {
+      for (const [indice, palabra] of linea.palabras.entries()) {
         const fuente = fuentes[palabra.estilo];
         hoja.drawText(palabra.texto, {
           x: cursor,
@@ -1560,7 +1563,11 @@ export class A4GeneratorService {
           font: fuente,
           color: linea.color,
         });
-        cursor += fuente.widthOfTextAtSize(palabra.texto, linea.cuerpo) + hueco;
+        cursor += fuente.widthOfTextAtSize(palabra.texto, linea.cuerpo);
+        if (indice < linea.palabras.length - 1) {
+          const anchoEspacioBase = fuente.widthOfTextAtSize(" ", linea.cuerpo);
+          cursor += anchoEspacioBase + extraPorEspacio;
+        }
       }
       return;
     }

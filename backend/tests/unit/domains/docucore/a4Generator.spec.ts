@@ -312,8 +312,8 @@ describe("A4GeneratorService — bloques y tipografia", () => {
 });
 
 describe("A4GeneratorService — membrete institucional", () => {
-  it("expone un membrete por omision marcado como ejemplo", () => {
-    assert.match(MEMBRETE_POR_DEFECTO.institucion, /\[EJEMPLO\]/u);
+  it("expone el membrete oficial institucional del IESTP Suiza", () => {
+    assert.match(MEMBRETE_POR_DEFECTO.institucion, /IESTP|SUIZA/iu);
   });
 
   it("acepta un membrete institucional propio", async () => {

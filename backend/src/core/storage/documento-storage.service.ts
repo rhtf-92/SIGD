@@ -9,6 +9,8 @@ import {
   HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import * as QRCode from 'qrcode';
+import { obtenerLogoSuizaPngBuffer } from '../../shared/logoInstitucional.js';
 import { obtenerConfiguracionS3, type ConfiguracionS3 } from '../../config/s3.config.js';
 import { ValidationError, NotFoundError } from '../../shared/domain/errors/index.js';
 
@@ -194,44 +196,545 @@ export class DocumentoStorageService {
    */
   public async generarCargoPdf(datos: DatosCargoPdf): Promise<Buffer> {
     const pdfDoc = await PDFDocument.create();
+    pdfDoc.setTitle(`Cargo Oficial de Recepción - ${datos.cut}`);
+    pdfDoc.setAuthor('IESTP "Suiza" de Pucallpa');
+    pdfDoc.setProducer('SIGD - IESTP Suiza');
+
     const page = pdfDoc.addPage([595.28, 841.89]); // A4 estándar
+    const { width, height } = page.getSize();
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    const { width, height } = page.getSize();
+    const colorAzulSuiza = rgb(0.05, 0.18, 0.38);
+    const colorVerdeSuiza = rgb(0.06, 0.38, 0.24);
+    const colorDoradoSuiza = rgb(0.82, 0.62, 0.12);
+    const colorTextoPrincipal = rgb(0.09, 0.13, 0.20);
+    const colorTextoSecundario = rgb(0.38, 0.44, 0.52);
+    const colorFondoEncabezado = rgb(0.96, 0.97, 0.99);
+    const colorBorde = rgb(0.78, 0.82, 0.88);
+    const colorFilaPar = rgb(0.97, 0.98, 1);
+    const colorBlanco = rgb(1, 1, 1);
 
-    // Encabezado institucional
-    page.drawText('INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO "SUIZA"', {
-      x: 50,
-      y: height - 50,
-      size: 11,
-      font: fontBold,
-      color: rgb(0.1, 0.2, 0.4),
+    const margenX = 45;
+    const anchoUtil = width - margenX * 2;
+
+    // 1. Franja Tricolor Superior Institucional
+    const yTop = height - 32;
+    page.drawRectangle({
+      x: margenX,
+      y: yTop,
+      width: anchoUtil * 0.62,
+      height: 4,
+      color: colorAzulSuiza,
     });
-    page.drawText('SISTEMA INTEGRAL DE GESTIÓN DOCUMENTARIA (SIGD 2026) — MESA DE PARTES', {
-      x: 50,
-      y: height - 66,
-      size: 8.5,
+    page.drawRectangle({
+      x: margenX + anchoUtil * 0.62,
+      y: yTop,
+      width: anchoUtil * 0.08,
+      height: 4,
+      color: colorDoradoSuiza,
+    });
+    page.drawRectangle({
+      x: margenX + anchoUtil * 0.70,
+      y: yTop,
+      width: anchoUtil * 0.30,
+      height: 4,
+      color: colorVerdeSuiza,
+    });
+
+    // 2. Logo Oficial del IESTP "Suiza" de Pucallpa (el mismo de la boleta de pago)
+    try {
+      const logoImg = await pdfDoc.embedPng(obtenerLogoSuizaPngBuffer());
+      page.drawImage(logoImg, {
+        x: margenX,
+        y: height - 88,
+        width: 50,
+        height: 50,
+      });
+    } catch {
+      // Continuar si no estuviera disponible
+    }
+
+    // 3. Membrete Institucional Oficial
+    const textoX = margenX + 58;
+    page.drawText('GOBIERNO REGIONAL DE UCAYALI · DIRECCIÓN REGIONAL DE EDUCACIÓN DE UCAYALI', {
+      x: textoX,
+      y: height - 48,
+      size: 7.2,
+      font: fontBold,
+      color: colorTextoSecundario,
+    });
+    page.drawText('INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO "SUIZA"', {
+      x: textoX,
+      y: height - 61,
+      size: 10.5,
+      font: fontBold,
+      color: colorAzulSuiza,
+    });
+    page.drawText('SISTEMA INTEGRAL DE GESTIÓN DOCUMENTARIA (SIGD 2026) · MESA DE PARTES', {
+      x: textoX,
+      y: height - 73,
+      size: 8,
+      font: fontBold,
+      color: colorVerdeSuiza,
+    });
+    page.drawText('R.D. N° 0778-2006-ED · Revalidado R.D. N° 0507-2006-ED · Av. Túpac Amaru Km. 4.200, Pucallpa', {
+      x: textoX,
+      y: height - 84,
+      size: 7.2,
       font,
-      color: rgb(0.3, 0.3, 0.3),
+      color: colorTextoSecundario,
+    });
+
+    // Separador institucional
+    page.drawLine({
+      start: { x: margenX, y: height - 94 },
+      end: { x: width - margenX, y: height - 94 },
+      thickness: 1.2,
+      color: colorAzulSuiza,
+    });
+    page.drawLine({
+      start: { x: margenX, y: height - 96.5 },
+      end: { x: width - margenX, y: height - 96.5 },
+      thickness: 0.6,
+      color: colorDoradoSuiza,
+    });
+
+    // 4. Banner del Título del Documento y Recuadro CUT
+    const bannerY = height - 146;
+    const bannerH = 42;
+    page.drawRectangle({
+      x: margenX,
+      y: bannerY,
+      width: anchoUtil,
+      height: bannerH,
+      color: colorFondoEncabezado,
+      borderColor: colorBorde,
+      borderWidth: 0.8,
+    });
+    page.drawRectangle({
+      x: margenX,
+      y: bannerY,
+      width: 4.5,
+      height: bannerH,
+      color: colorAzulSuiza,
+    });
+
+    page.drawText('CARGO OFICIAL DE RECEPCIÓN DOCUMENTARIA', {
+      x: margenX + 14,
+      y: bannerY + 23,
+      size: 12,
+      font: fontBold,
+      color: colorAzulSuiza,
+    });
+    page.drawText('CONSTANCIA FORMAL DE PRESENTACIÓN · CONFORME AL ART. 136 DEL TUO DE LA LEY N° 27444 (LPAG)', {
+      x: margenX + 14,
+      y: bannerY + 10,
+      size: 6.8,
+      font,
+      color: colorTextoSecundario,
+    });
+
+    // Insignia CUT a la derecha
+    const cutBoxW = 165;
+    const cutBoxX = width - margenX - cutBoxW - 6;
+    page.drawRectangle({
+      x: cutBoxX,
+      y: bannerY + 5,
+      width: cutBoxW,
+      height: 32,
+      color: colorBlanco,
+      borderColor: colorAzulSuiza,
+      borderWidth: 0.8,
+    });
+    page.drawText('CÓDIGO ÚNICO DE TRÁMITE', {
+      x: cutBoxX + 10,
+      y: bannerY + 24,
+      size: 6.5,
+      font: fontBold,
+      color: colorTextoSecundario,
+    });
+    page.drawText(datos.cut, {
+      x: cutBoxX + 10,
+      y: bannerY + 11,
+      size: 10.5,
+      font: fontBold,
+      color: colorAzulSuiza,
+    });
+
+    // 5. Tabla de Metadatos Oficiales
+    const fechaFormateada = datos.fechaHora.toLocaleString('es-PE', {
+      timeZone: 'America/Lima',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+
+    const costoStr = datos.costoTupa !== undefined && datos.costoTupa !== null && Number(datos.costoTupa) > 0
+      ? ` · Tasa TUPA: S/ ${Number(datos.costoTupa).toFixed(2)}`
+      : ' · Gratuito';
+
+    const tupaDetalle = datos.codigoTupa
+      ? `${datos.codigoTupa}${datos.denominacionTupa ? ` - ${datos.denominacionTupa}` : ''}${costoStr}`
+      : 'Procedimiento Administrativo General (TUPA)';
+
+    const campos: Array<[string, string]> = [
+      ['CÓDIGO ÚNICO DE TRÁMITE (CUT):', datos.cut],
+      ['FECHA Y HORA OFICIAL DE INGRESO:', fechaFormateada],
+      ['CANAL DE RECEPCIÓN:', 'Ventanilla Presencial — Mesa de Partes Digital'],
+      ['ADMINISTRADO / SOLICITANTE:', datos.nombreSolicitante],
+      ['DOCUMENTO DE IDENTIDAD:', datos.documentoEnmascarado],
+      ['ASUNTO DEL TRÁMITE:', datos.asunto],
+      ['TOTAL DE FOLIOS PRESENTADOS:', `${datos.folios} folio(s)`],
+      ['PROCEDIMIENTO TUPA:', tupaDetalle],
+      ['OPERADOR DE MESA DE PARTES:', datos.operadorMesa || 'Mesa de Partes Central'],
+    ];
+
+    if (datos.urlConsulta) {
+      campos.push(['CONSULTA EN LÍNEA DE ESTADO:', datos.urlConsulta]);
+    }
+
+    let cursorY = bannerY - 14;
+    const colEtiquetaW = 185;
+    const colValorW = anchoUtil - colEtiquetaW;
+
+    for (let i = 0; i < campos.length; i++) {
+      const [etiqueta, valor] = campos[i];
+      const esPar = i % 2 === 0;
+
+      const palabras = valor.split(' ');
+      const lineasValor: string[] = [];
+      let lineaActual = '';
+      for (const p of palabras) {
+        const testLinea = lineaActual ? `${lineaActual} ${p}` : p;
+        if (font.widthOfTextAtSize(testLinea, 8.2) > colValorW - 14) {
+          if (lineaActual) lineasValor.push(lineaActual);
+          lineaActual = p;
+        } else {
+          lineaActual = testLinea;
+        }
+      }
+      if (lineaActual) lineasValor.push(lineaActual);
+
+      const altoFila = Math.max(22, lineasValor.length * 11 + 9);
+
+      page.drawRectangle({
+        x: margenX,
+        y: cursorY - altoFila,
+        width: anchoUtil,
+        height: altoFila,
+        color: esPar ? colorFilaPar : colorBlanco,
+        borderColor: colorBorde,
+        borderWidth: 0.5,
+      });
+
+      page.drawLine({
+        start: { x: margenX + colEtiquetaW, y: cursorY },
+        end: { x: margenX + colEtiquetaW, y: cursorY - altoFila },
+        thickness: 0.5,
+        color: colorBorde,
+      });
+
+      page.drawText(etiqueta, {
+        x: margenX + 8,
+        y: cursorY - 14,
+        size: 8,
+        font: fontBold,
+        color: colorAzulSuiza,
+      });
+
+      let valorY = cursorY - 14;
+      for (const lv of lineasValor) {
+        page.drawText(lv, {
+          x: margenX + colEtiquetaW + 8,
+          y: valorY,
+          size: 8.2,
+          font: (i === 0 || i === 3) ? fontBold : font,
+          color: colorTextoPrincipal,
+        });
+        valorY -= 11;
+      }
+
+      cursorY -= altoFila;
+    }
+
+    // 6. Recuadro Inferior de Verificación Digital y Código QR
+    const qrBoxH = 74;
+    const qrBoxY = 76;
+    page.drawRectangle({
+      x: margenX,
+      y: qrBoxY,
+      width: anchoUtil,
+      height: qrBoxH,
+      color: colorFondoEncabezado,
+      borderColor: colorAzulSuiza,
+      borderWidth: 0.8,
+    });
+    page.drawRectangle({
+      x: margenX,
+      y: qrBoxY,
+      width: 4,
+      height: qrBoxH,
+      color: colorVerdeSuiza,
+    });
+
+    const urlConsultaFinal = datos.urlConsulta || `https://sigd.iestp-suiza.edu.pe/consulta/${encodeURIComponent(datos.cut)}`;
+
+    try {
+      const qrPngBuffer = await QRCode.toBuffer(urlConsultaFinal, {
+        errorCorrectionLevel: 'M',
+        width: 300,
+        margin: 1,
+      });
+      const qrImg = await pdfDoc.embedPng(qrPngBuffer);
+      page.drawImage(qrImg, {
+        x: margenX + 10,
+        y: qrBoxY + 7,
+        width: 60,
+        height: 60,
+      });
+    } catch {
+      // Continuar si no se pudo generar QR
+    }
+
+    const qrTextoX = margenX + 80;
+    page.drawText('IESTP "SUIZA" DE PUCALLPA · SELLO DE RECEPCIÓN Y VERIFICACIÓN DIGITAL (SIGD)', {
+      x: qrTextoX,
+      y: qrBoxY + 56,
+      size: 7.8,
+      font: fontBold,
+      color: colorAzulSuiza,
+    });
+    page.drawText('Escanee el código QR o ingrese al portal de seguimiento para verificar el estado en tiempo real:', {
+      x: qrTextoX,
+      y: qrBoxY + 44,
+      size: 7,
+      font,
+      color: colorTextoPrincipal,
+    });
+    page.drawText(urlConsultaFinal.length > 70 ? `${urlConsultaFinal.slice(0, 68)}...` : urlConsultaFinal, {
+      x: qrTextoX,
+      y: qrBoxY + 32,
+      size: 7.2,
+      font: fontBold,
+      color: colorVerdeSuiza,
+    });
+    page.drawText('Constancia formal de recepción expedida de conformidad con el Art. 136 del TUO de la Ley N° 27444 (LPAG).', {
+      x: qrTextoX,
+      y: qrBoxY + 20,
+      size: 6.6,
+      font,
+      color: colorTextoSecundario,
+    });
+    page.drawText('La información registrada en este cargo goza de fe pública y acredita el inicio del procedimiento administrativo.', {
+      x: qrTextoX,
+      y: qrBoxY + 9,
+      size: 6.4,
+      font,
+      color: colorTextoSecundario,
+    });
+
+    // 7. Pie de Página Formal
+    page.drawLine({
+      start: { x: margenX, y: 64 },
+      end: { x: width - margenX, y: 64 },
+      thickness: 0.5,
+      color: colorBorde,
+    });
+    page.drawText('IESTP «Suiza» de Pucallpa — Sede Digital Central · Mesa de Partes Digital (SIGD 2026)', {
+      x: margenX,
+      y: 50,
+      size: 7.2,
+      font,
+      color: colorTextoSecundario,
+    });
+    const pagTxt = 'Página 1 de 1';
+    const pagW = fontBold.widthOfTextAtSize(pagTxt, 7.2);
+    page.drawText(pagTxt, {
+      x: width - margenX - pagW,
+      y: 50,
+      size: 7.2,
+      font: fontBold,
+      color: colorTextoSecundario,
+    });
+
+    const pdfBytes = await pdfDoc.save();
+    return Buffer.from(pdfBytes);
+  }
+
+  /**
+   * Genera el PDF físico oficial de Resolución / Atención Administrativa.
+   */
+  public async generarResolucionPdf(datos: DatosResolucionPdf): Promise<Buffer> {
+    const pdfDoc = await PDFDocument.create();
+    pdfDoc.setTitle(`Resolución de Atención - ${datos.cut}`);
+    pdfDoc.setAuthor('IESTP "Suiza" de Pucallpa');
+    pdfDoc.setProducer('SIGD - IESTP Suiza');
+
+    const page = pdfDoc.addPage([595.28, 841.89]);
+    const { width, height } = page.getSize();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    const colorAzulSuiza = rgb(0.05, 0.18, 0.38);
+    const colorVerdeSuiza = rgb(0.06, 0.38, 0.24);
+    const colorDoradoSuiza = rgb(0.82, 0.62, 0.12);
+    const colorTextoPrincipal = rgb(0.09, 0.13, 0.20);
+    const colorTextoSecundario = rgb(0.38, 0.44, 0.52);
+    const colorFondoEncabezado = rgb(0.96, 0.97, 0.99);
+    const colorBorde = rgb(0.78, 0.82, 0.88);
+    const colorFilaPar = rgb(0.97, 0.98, 1);
+    const colorBlanco = rgb(1, 1, 1);
+
+    const margenX = 45;
+    const anchoUtil = width - margenX * 2;
+
+    // 1. Franja Tricolor Superior
+    const yTop = height - 32;
+    page.drawRectangle({
+      x: margenX,
+      y: yTop,
+      width: anchoUtil * 0.62,
+      height: 4,
+      color: colorAzulSuiza,
+    });
+    page.drawRectangle({
+      x: margenX + anchoUtil * 0.62,
+      y: yTop,
+      width: anchoUtil * 0.08,
+      height: 4,
+      color: colorDoradoSuiza,
+    });
+    page.drawRectangle({
+      x: margenX + anchoUtil * 0.70,
+      y: yTop,
+      width: anchoUtil * 0.30,
+      height: 4,
+      color: colorVerdeSuiza,
+    });
+
+    // 2. Logo Oficial
+    try {
+      const logoImg = await pdfDoc.embedPng(obtenerLogoSuizaPngBuffer());
+      page.drawImage(logoImg, {
+        x: margenX,
+        y: height - 88,
+        width: 50,
+        height: 50,
+      });
+    } catch {
+      // Continuar si no estuviera disponible
+    }
+
+    // 3. Membrete
+    const textoX = margenX + 58;
+    page.drawText('GOBIERNO REGIONAL DE UCAYALI · DIRECCIÓN REGIONAL DE EDUCACIÓN DE UCAYALI', {
+      x: textoX,
+      y: height - 48,
+      size: 7.2,
+      font: fontBold,
+      color: colorTextoSecundario,
+    });
+    page.drawText('INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO "SUIZA"', {
+      x: textoX,
+      y: height - 61,
+      size: 10.5,
+      font: fontBold,
+      color: colorAzulSuiza,
+    });
+    page.drawText(`SISTEMA INTEGRAL DE GESTIÓN DOCUMENTARIA — ${datos.area.toUpperCase()}`, {
+      x: textoX,
+      y: height - 73,
+      size: 8,
+      font: fontBold,
+      color: colorVerdeSuiza,
+    });
+    page.drawText('R.D. N° 0778-2006-ED · Revalidado R.D. N° 0507-2006-ED · Av. Túpac Amaru Km. 4.200, Pucallpa', {
+      x: textoX,
+      y: height - 84,
+      size: 7.2,
+      font,
+      color: colorTextoSecundario,
     });
 
     page.drawLine({
-      start: { x: 50, y: height - 76 },
-      end: { x: width - 50, y: height - 76 },
-      thickness: 1,
-      color: rgb(0.7, 0.7, 0.7),
+      start: { x: margenX, y: height - 94 },
+      end: { x: width - margenX, y: height - 94 },
+      thickness: 1.2,
+      color: colorAzulSuiza,
+    });
+    page.drawLine({
+      start: { x: margenX, y: height - 96.5 },
+      end: { x: width - margenX, y: height - 96.5 },
+      thickness: 0.6,
+      color: colorDoradoSuiza,
     });
 
-    // Título del documento
-    page.drawText('CARGO OFICIAL DE RECEPCIÓN DOCUMENTARIA', {
-      x: 50,
-      y: height - 105,
-      size: 13,
+    // 4. Banner
+    const bannerY = height - 146;
+    const bannerH = 42;
+    page.drawRectangle({
+      x: margenX,
+      y: bannerY,
+      width: anchoUtil,
+      height: bannerH,
+      color: colorFondoEncabezado,
+      borderColor: colorBorde,
+      borderWidth: 0.8,
+    });
+    page.drawRectangle({
+      x: margenX,
+      y: bannerY,
+      width: 4.5,
+      height: bannerH,
+      color: colorAzulSuiza,
+    });
+
+    page.drawText('RESOLUCIÓN ADMINISTRATIVA DE ATENCIÓN DE EXPEDIENTE', {
+      x: margenX + 14,
+      y: bannerY + 23,
+      size: 11.5,
       font: fontBold,
-      color: rgb(0.05, 0.15, 0.35),
+      color: colorAzulSuiza,
+    });
+    page.drawText('ACTO ADMINISTRATIVO EMITIDO EN EL MARCO DEL TUO DE LA LEY N° 27444', {
+      x: margenX + 14,
+      y: bannerY + 10,
+      size: 6.8,
+      font,
+      color: colorTextoSecundario,
     });
 
+    const cutBoxW = 165;
+    const cutBoxX = width - margenX - cutBoxW - 6;
+    page.drawRectangle({
+      x: cutBoxX,
+      y: bannerY + 5,
+      width: cutBoxW,
+      height: 32,
+      color: colorBlanco,
+      borderColor: colorAzulSuiza,
+      borderWidth: 0.8,
+    });
+    page.drawText('EXPEDIENTE ATENDIDO', {
+      x: cutBoxX + 10,
+      y: bannerY + 24,
+      size: 6.5,
+      font: fontBold,
+      color: colorTextoSecundario,
+    });
+    page.drawText(datos.cut, {
+      x: cutBoxX + 10,
+      y: bannerY + 11,
+      size: 10.5,
+      font: fontBold,
+      color: colorAzulSuiza,
+    });
+
+    // 5. Tabla de Metadatos
     const fechaFormateada = datos.fechaHora.toLocaleString('es-PE', {
       timeZone: 'America/Lima',
       year: 'numeric',
@@ -243,171 +746,173 @@ export class DocumentoStorageService {
     });
 
     const campos: Array<[string, string]> = [
-      ['CÓDIGO ÚNICO DE TRÁMITE (CUT):', datos.cut],
-      ['FECHA Y HORA DE INGRESO:', fechaFormateada],
-      ['CANAL DE RECEPCIÓN:', 'Ventanilla Presencial — Mesa de Partes'],
-      ['ADMINISTRADO / SOLICITANTE:', datos.nombreSolicitante],
-      ['DOCUMENTO DE IDENTIDAD:', datos.documentoEnmascarado],
-      ['ASUNTO DEL TRÁMITE:', datos.asunto.slice(0, 120)],
-      ['TOTAL DE FOLIOS PRESENTADOS:', `${datos.folios} folio(s)`],
-      ['OPERADOR DE RECEPCIÓN:', datos.operadorMesa || 'Mesa de Partes Presencial'],
-    ];
-
-    if (datos.codigoTupa) {
-      const costoStr = datos.costoTupa !== undefined && datos.costoTupa !== null
-        ? ` · S/ ${Number(datos.costoTupa).toFixed(2)}`
-        : '';
-      campos.push([
-        'PROCEDIMIENTO TUPA:',
-        `${datos.codigoTupa}${datos.denominacionTupa ? ` - ${datos.denominacionTupa}` : ''}${costoStr}`,
-      ]);
-    }
-
-    if (datos.urlConsulta) {
-      campos.push(['CONSULTA DE ESTADO:', datos.urlConsulta]);
-    }
-
-    let y = height - 135;
-    for (const [etiqueta, valor] of campos) {
-      page.drawText(etiqueta, {
-        x: 50,
-        y,
-        size: 8.5,
-        font: fontBold,
-        color: rgb(0.2, 0.2, 0.2),
-      });
-      page.drawText(valor, {
-        x: 230,
-        y,
-        size: 8.5,
-        font,
-        color: rgb(0, 0, 0),
-      });
-      y -= 22;
-    }
-
-    // Pie de página legal
-    page.drawLine({
-      start: { x: 50, y: 75 },
-      end: { x: width - 50, y: 75 },
-      thickness: 0.5,
-      color: rgb(0.8, 0.8, 0.8),
-    });
-
-    page.drawText(
-      'Constancia formal de recepción documentaria expedida conforme al Art. 136 del TUO de la Ley N° 27444 (LPAG).',
-      {
-        x: 50,
-        y: 60,
-        size: 7.5,
-        font,
-        color: rgb(0.4, 0.4, 0.4),
-      },
-    );
-
-    const pdfBytes = await pdfDoc.save();
-    return Buffer.from(pdfBytes);
-  }
-
-  /**
-   * Genera el PDF físico oficial de Resolución / Atención Administrativa.
-   */
-  public async generarResolucionPdf(datos: DatosResolucionPdf): Promise<Buffer> {
-    const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595.28, 841.89]);
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-    const { width, height } = page.getSize();
-
-    page.drawText('INSTITUTO DE EDUCACIÓN SUPERIOR TECNOLÓGICO PÚBLICO "SUIZA"', {
-      x: 50,
-      y: height - 50,
-      size: 11,
-      font: fontBold,
-      color: rgb(0.1, 0.2, 0.4),
-    });
-    page.drawText(`SISTEMA INTEGRAL DE GESTIÓN DOCUMENTARIA — ${datos.area.toUpperCase()}`, {
-      x: 50,
-      y: height - 66,
-      size: 8.5,
-      font,
-      color: rgb(0.3, 0.3, 0.3),
-    });
-
-    page.drawLine({
-      start: { x: 50, y: height - 76 },
-      end: { x: width - 50, y: height - 76 },
-      thickness: 1,
-      color: rgb(0.7, 0.7, 0.7),
-    });
-
-    page.drawText(`RESOLUCIÓN DE ATENCIÓN DE EXPEDIENTE: ${datos.cut}`, {
-      x: 50,
-      y: height - 105,
-      size: 13,
-      font: fontBold,
-      color: rgb(0.05, 0.15, 0.35),
-    });
-
-    const fechaFormateada = datos.fechaHora.toLocaleString('es-PE', {
-      timeZone: 'America/Lima',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-
-    const campos: Array<[string, string]> = [
-      ['EXPEDIENTE ADMINISTRATIVO:', datos.cut],
-      ['FECHA DE EMISIÓN:', fechaFormateada],
-      ['ÓRGANO RESOLUTOR:', datos.area],
-      ['ADMINISTRADO:', datos.administrado],
-      ['DICTAMEN / RESOLUCIÓN:', datos.resultadoResumen.slice(0, 180)],
+      ['EXPEDIENTE ADMINISTRATIVO (CUT):', datos.cut],
+      ['FECHA Y HORA DE RESOLUCIÓN:', fechaFormateada],
+      ['ÓRGANO RESOLUTOR INSTITUCIONAL:', datos.area],
+      ['ADMINISTRADO / SOLICITANTE:', datos.administrado],
+      ['DICTAMEN Y RESULTADO TÉCNICO:', datos.resultadoResumen],
       ['RESPONSABLE DE EMISIÓN:', datos.operador || 'Especialista Académico'],
     ];
 
     if (datos.observacionInterna) {
-      campos.push(['OBSERVACIONES TÉCNICAS:', datos.observacionInterna.slice(0, 180)]);
+      campos.push(['OBSERVACIONES TÉCNICAS:', datos.observacionInterna]);
     }
 
-    let y = height - 135;
-    for (const [etiqueta, valor] of campos) {
+    let cursorY = bannerY - 14;
+    const colEtiquetaW = 185;
+    const colValorW = anchoUtil - colEtiquetaW;
+
+    for (let i = 0; i < campos.length; i++) {
+      const [etiqueta, valor] = campos[i];
+      const esPar = i % 2 === 0;
+
+      const palabras = valor.split(' ');
+      const lineasValor: string[] = [];
+      let lineaActual = '';
+      for (const p of palabras) {
+        const testLinea = lineaActual ? `${lineaActual} ${p}` : p;
+        if (font.widthOfTextAtSize(testLinea, 8.2) > colValorW - 14) {
+          if (lineaActual) lineasValor.push(lineaActual);
+          lineaActual = p;
+        } else {
+          lineaActual = testLinea;
+        }
+      }
+      if (lineaActual) lineasValor.push(lineaActual);
+
+      const altoFila = Math.max(22, lineasValor.length * 11 + 9);
+
+      page.drawRectangle({
+        x: margenX,
+        y: cursorY - altoFila,
+        width: anchoUtil,
+        height: altoFila,
+        color: esPar ? colorFilaPar : colorBlanco,
+        borderColor: colorBorde,
+        borderWidth: 0.5,
+      });
+
+      page.drawLine({
+        start: { x: margenX + colEtiquetaW, y: cursorY },
+        end: { x: margenX + colEtiquetaW, y: cursorY - altoFila },
+        thickness: 0.5,
+        color: colorBorde,
+      });
+
       page.drawText(etiqueta, {
-        x: 50,
-        y,
-        size: 8.5,
+        x: margenX + 8,
+        y: cursorY - 14,
+        size: 8,
         font: fontBold,
-        color: rgb(0.2, 0.2, 0.2),
+        color: colorAzulSuiza,
       });
-      page.drawText(valor, {
-        x: 230,
-        y,
-        size: 8.5,
-        font,
-        color: rgb(0, 0, 0),
-      });
-      y -= 24;
+
+      let valorY = cursorY - 14;
+      for (const lv of lineasValor) {
+        page.drawText(lv, {
+          x: margenX + colEtiquetaW + 8,
+          y: valorY,
+          size: 8.2,
+          font: (i === 0 || i === 3) ? fontBold : font,
+          color: colorTextoPrincipal,
+        });
+        valorY -= 11;
+      }
+
+      cursorY -= altoFila;
     }
 
-    page.drawLine({
-      start: { x: 50, y: 75 },
-      end: { x: width - 50, y: 75 },
-      thickness: 0.5,
-      color: rgb(0.8, 0.8, 0.8),
+    // 6. Recuadro de Validez
+    const qrBoxH = 68;
+    const qrBoxY = 76;
+    page.drawRectangle({
+      x: margenX,
+      y: qrBoxY,
+      width: anchoUtil,
+      height: qrBoxH,
+      color: colorFondoEncabezado,
+      borderColor: colorAzulSuiza,
+      borderWidth: 0.8,
+    });
+    page.drawRectangle({
+      x: margenX,
+      y: qrBoxY,
+      width: 4,
+      height: qrBoxH,
+      color: colorAzulSuiza,
     });
 
-    page.drawText(
-      'Acto resolutivo formal emitido por la autoridad competente de conformidad con el TUO de la Ley N° 27444.',
-      {
-        x: 50,
-        y: 60,
-        size: 7.5,
-        font,
-        color: rgb(0.4, 0.4, 0.4),
-      },
-    );
+    const urlVerif = `https://sigd.iestp-suiza.edu.pe/consulta/${encodeURIComponent(datos.cut)}`;
+    try {
+      const qrPngBuffer = await QRCode.toBuffer(urlVerif, {
+        errorCorrectionLevel: 'M',
+        width: 300,
+        margin: 1,
+      });
+      const qrImg = await pdfDoc.embedPng(qrPngBuffer);
+      page.drawImage(qrImg, {
+        x: margenX + 10,
+        y: qrBoxY + 6,
+        width: 56,
+        height: 56,
+      });
+    } catch {
+      // Continuar si no se pudo generar QR
+    }
+
+    const qrTextoX = margenX + 76;
+    page.drawText('IESTP "SUIZA" DE PUCALLPA · CERTIFICACIÓN Y FIRMA DIGITAL INSTITUCIONAL', {
+      x: qrTextoX,
+      y: qrBoxY + 50,
+      size: 7.8,
+      font: fontBold,
+      color: colorAzulSuiza,
+    });
+    page.drawText('Acto resolutivo oficial emitido conforme al TUO de la Ley N° 27444 y Ley N° 27269.', {
+      x: qrTextoX,
+      y: qrBoxY + 38,
+      size: 7,
+      font,
+      color: colorTextoPrincipal,
+    });
+    page.drawText(`Enlace oficial de verificación: ${urlVerif}`, {
+      x: qrTextoX,
+      y: qrBoxY + 26,
+      size: 7.2,
+      font: fontBold,
+      color: colorVerdeSuiza,
+    });
+    page.drawText('Documento electrónico con valor probatorio legal e inalterabilidad garantizada por el SIGD.', {
+      x: qrTextoX,
+      y: qrBoxY + 14,
+      size: 6.6,
+      font,
+      color: colorTextoSecundario,
+    });
+
+    // 7. Pie
+    page.drawLine({
+      start: { x: margenX, y: 64 },
+      end: { x: width - margenX, y: 64 },
+      thickness: 0.5,
+      color: colorBorde,
+    });
+    page.drawText('IESTP «Suiza» de Pucallpa — Sistema Integral de Gestión Documentaria (SIGD 2026)', {
+      x: margenX,
+      y: 50,
+      size: 7.2,
+      font,
+      color: colorTextoSecundario,
+    });
+    const pagTxt = 'Página 1 de 1';
+    const pagW = fontBold.widthOfTextAtSize(pagTxt, 7.2);
+    page.drawText(pagTxt, {
+      x: width - margenX - pagW,
+      y: 50,
+      size: 7.2,
+      font: fontBold,
+      color: colorTextoSecundario,
+    });
 
     const pdfBytes = await pdfDoc.save();
     return Buffer.from(pdfBytes);
