@@ -6,9 +6,11 @@ import ExpedienteTable from "../../components/expedientes/ExpedienteTable";
 import { useBandejaExpedientes } from "../../hooks/useBandejaExpedientes";
 import { useAuthStore } from "../../stores/authStore";
 import { AREA_ID_DIR, AREA_ID_SDA } from "../../utils/areaPresentacion";
-import type { Filtros } from "./rutadoc/rutadoc.dto";
+import type { Filtros, Sla } from "./rutadoc/rutadoc.dto";
 import RutaDocEstado from "./rutadoc/RutaDocEstado";
 import { tesoreriaService, type DtoSolicitudDevolucion } from "../../services/tesoreria.service";
+import { rutaDoc } from "./rutadoc/rutadoc.service";
+import { calcularConteosSla, generarCsvExpedientes, type FiltroSlaLocal } from "./rutadoc/rutadoc.summary";
 
 export interface SolicitudVinculacionPendiente {
   solicitudId: string;
@@ -54,6 +56,49 @@ export default function BandejaExpedientesPage() {
 
   const [anteriores, setAnteriores] = useState<(string | undefined)[]>([]);
   const consulta = useBandejaExpedientes(filtros);
+  const expedientes = consulta.data?.elementos ?? [];
+  const [estadosSla, setEstadosSla] = useState<Map<string, Sla["estado"]>>(() => new Map());
+  const [slaPendiente, setSlaPendiente] = useState(false);
+  const [slaConError, setSlaConError] = useState(false);
+  const idsExpedientes = expedientes.map((expediente) => expediente.idExpediente).join("|");
+  useEffect(() => {
+    if (!idsExpedientes) {
+      setEstadosSla(new Map());
+      setSlaPendiente(false);
+      setSlaConError(false);
+      return;
+    }
+    const controller = new AbortController();
+    const ids = idsExpedientes.split("|");
+    setEstadosSla(new Map());
+    setSlaPendiente(true);
+    setSlaConError(false);
+    void Promise.allSettled(ids.map((id) => rutaDoc.sla(id, controller.signal))).then((resultados) => {
+      if (controller.signal.aborted) return;
+      const estados = new Map<string, Sla["estado"]>();
+      resultados.forEach((resultado, indice) => {
+        if (resultado.status === "fulfilled") estados.set(ids[indice], resultado.value.estado);
+      });
+      setEstadosSla(estados);
+      setSlaConError(resultados.some((resultado) => resultado.status === "rejected"));
+      setSlaPendiente(false);
+    });
+    return () => controller.abort();
+  }, [idsExpedientes]);
+  const conteosSla = calcularConteosSla(expedientes, estadosSla);
+  const [filtroSlaLocal, setFiltroSlaLocal] = useState<FiltroSlaLocal>("TOTAL");
+  const expedientesVisibles = filtroSlaLocal === "TOTAL"
+    ? expedientes
+    : expedientes.filter((expediente) => estadosSla.get(expediente.idExpediente) === filtroSlaLocal);
+  const exportarCsv = () => {
+    const blob = new Blob([generarCsvExpedientes(expedientesVisibles)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement("a");
+    enlace.href = url;
+    enlace.download = "expedientes-rutadoc.csv";
+    enlace.click();
+    URL.revokeObjectURL(url);
+  };
 
   const [solicitudesPendientes, setSolicitudesPendientes] = useState<SolicitudVinculacionPendiente[]>([]);
   const [modalVinculacionesOpen, setModalVinculacionesOpen] = useState(false);
@@ -410,8 +455,48 @@ export default function BandejaExpedientesPage() {
       >
         {consulta.data && (
           <>
+            <section aria-label="Indicadores SLA de la página" className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-sm font-semibold text-slate-800">Estado SLA · expedientes cargados</h2>
+                <button type="button" onClick={exportarCsv} disabled={!expedientesVisibles.length}
+                  className="rounded-lg border border-blue-800 bg-blue-800 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-900 disabled:cursor-not-allowed disabled:opacity-50">
+                  Exportar CSV
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {([ ["TOTAL", "Total"], ["VERDE", "En plazo"], ["AMARILLO", "Por vencer"], ["ROJO", "Vencidos"] ] as const).map(([estado, etiqueta]) => (
+                  (() => {
+                    const conteo = conteosSla[estado];
+                    const seleccionado = filtroSlaLocal === estado;
+                    const tono = conteo > 0 ? {
+                      TOTAL: "border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100",
+                      VERDE: "border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
+                      AMARILLO: "border-amber-200 bg-amber-50 text-amber-950 hover:bg-amber-100",
+                      ROJO: "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100",
+                    }[estado] : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50";
+                    const anillo = seleccionado ? {
+                      TOTAL: "ring-blue-600",
+                      VERDE: "ring-emerald-600",
+                      AMARILLO: "ring-amber-600",
+                      ROJO: "ring-rose-600",
+                    }[estado] : "";
+                    return (
+                      <button key={estado} type="button" aria-pressed={seleccionado}
+                        onClick={() => setFiltroSlaLocal(estado === "TOTAL" || seleccionado ? "TOTAL" : estado)}
+                        className={`rounded-xl border p-3 text-left shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 ${tono} ${seleccionado ? `ring-2 ring-offset-1 ${anillo}` : ""}`}>
+                    <span className="block text-xs font-semibold text-slate-600">{etiqueta}</span>
+                    <span className="mt-1 block text-2xl font-bold">{slaPendiente ? "…" : conteo}</span>
+                      </button>
+                    );
+                  })()
+                ))}
+              </div>
+              {!slaPendiente && slaConError && <p className="text-xs text-amber-800">Algunos estados SLA no están disponibles; los conteos incluyen solo respuestas recibidas correctamente.</p>}
+            </section>
             <ExpedienteTable
-              expedientes={consulta.data.elementos}
+              expedientes={expedientesVisibles}
+              estadosSla={estadosSla}
+              slaPendiente={slaPendiente}
               onVerExpediente={(e) => navigate(`/expedientes/${encodeURIComponent(e.idExpediente)}`)}
             />
             <nav

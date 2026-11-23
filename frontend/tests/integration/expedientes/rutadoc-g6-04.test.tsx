@@ -17,9 +17,10 @@ const C = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const fecha = "2026-10-01T10:00:00.000Z";
 const contadores = { PENDIENTES: 7, EN_TRAMITE: 6, DERIVADOS: 5, POR_FIRMAR: 4, ATENDIDOS: 3, ARCHIVADOS: 2 };
 const cursor = "v2-opaco_+/=no-decodificar";
-function resumen(id: string) {
-  return { idExpediente: id, cut: id === A ? "CUT-A" : "CUT-B", asunto: id === A ? "Asunto A" : "Asunto B",
-    fechaRadicacion: fecha, estadoActual: "REGISTRADO", areaActualId: null };
+function resumen(id: string, estadoActual: "REGISTRADO" | "EN_REVISION" = "REGISTRADO") {
+  return { idExpediente: id, cut: id === A ? "CUT-A" : id === B ? "CUT-B" : "CUT-C",
+    asunto: id === A ? "Asunto A" : id === B ? "Asunto B" : "Asunto C",
+    fechaRadicacion: fecha, estadoActual, areaActualId: null };
 }
 function detalle(id: string) {
   return { ...resumen(id), solicitanteId: null, resumenDocumentos: null, ultimoMovimiento: null, sla: null };
@@ -60,7 +61,9 @@ function instalar(handler: Handler) {
       : handler(url, config)) as typeof apiClient.get);
 }
 function parametrosUltimaLlamada(get: ReturnType<typeof instalar>) {
-  const params = get.mock.calls.at(-1)?.[1]?.params;
+  const llamadaBandeja = [...get.mock.calls].reverse().find(([url, config]) =>
+    new URL(url).pathname === "/api/v1/expedientes" && config?.params !== undefined);
+  const params = llamadaBandeja?.[1]?.params;
   expect(params).toBeTypeOf("object");
   expect(params).not.toBeNull();
   return params as Record<string, unknown>;
@@ -674,6 +677,51 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
     expect(within(seccion).getByText("Constancia de matrícula")).toBeInTheDocument();
     expect(within(seccion).getByText("Código").nextElementSibling).toHaveTextContent("No disponible");
     expect(within(seccion).queryByText("TUPA-2026-001")).not.toBeInTheDocument();
+  });
+
+  it("aplica tonos SLA semánticos, badges por fila y mantiene el filtro de tarjeta", async () => {
+    const idRojo = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const estadoPorId: Record<string, "VERDE" | "AMARILLO" | "ROJO"> = {
+      [A]: "VERDE", [B]: "AMARILLO", [idRojo]: "ROJO",
+    };
+    instalar(async url => {
+      const pathname = new URL(url).pathname;
+      if (pathname === "/api/v1/expedientes") {
+        return respuesta({ elementos: [resumen(A), resumen(B, "EN_REVISION"), resumen(idRojo, "EN_REVISION")],
+          contadores, siguienteCursor: null, tieneMas: false });
+      }
+      const idSla = /\/api\/v1\/expedientes\/([^/]+)\/sla-status$/.exec(pathname)?.[1];
+      if (idSla) return respuesta({ ...sla(idSla), estado: estadoPorId[idSla] });
+      return normal(url);
+    });
+    montar("/expedientes");
+
+    const tarjetaTotal = await screen.findByRole("button", { name: /Total/ });
+    const tarjetaVerde = screen.getByRole("button", { name: /En plazo/ });
+    const tarjetaAmbar = screen.getByRole("button", { name: /Por vencer/ });
+    const tarjetaRoja = screen.getByRole("button", { name: /Vencidos/ });
+    await screen.findByText("En plazo", { selector: "tbody span" });
+    expect(tarjetaTotal).toHaveAttribute("aria-pressed", "true");
+    expect(tarjetaTotal).toHaveClass("bg-blue-50", "ring-2", "ring-blue-600");
+    expect(tarjetaVerde).toHaveClass("bg-emerald-50");
+    expect(tarjetaAmbar).toHaveClass("bg-amber-50");
+    expect(tarjetaRoja).toHaveClass("bg-rose-50");
+
+    const filaVerde = screen.getByText("CUT-A").closest("tr")!;
+    const filaAmbar = screen.getByText("CUT-B").closest("tr")!;
+    const filaRoja = screen.getByText("CUT-C").closest("tr")!;
+    expect(within(filaVerde).getByText("En plazo")).toHaveClass("bg-emerald-50");
+    expect(within(filaVerde).getByText("REGISTRADO")).toHaveClass("bg-slate-50");
+    expect(within(filaAmbar).getByText("Por vencer")).toHaveClass("bg-amber-50");
+    expect(within(filaAmbar).getByText("EN_REVISION")).toHaveClass("bg-blue-50");
+    expect(within(filaRoja).getByText("Vencido")).toHaveClass("bg-rose-50");
+
+    fireEvent.click(tarjetaAmbar);
+    expect(tarjetaAmbar).toHaveAttribute("aria-pressed", "true");
+    expect(tarjetaAmbar).toHaveClass("ring-2", "ring-amber-600");
+    expect(screen.getByText("CUT-B")).toBeInTheDocument();
+    expect(screen.queryByText("CUT-A")).not.toBeInTheDocument();
+    expect(screen.queryByText("CUT-C")).not.toBeInTheDocument();
   });
 
   it("muestra estado neutral cuando el expediente no tiene procedimiento TUPA vinculado", async () => {
