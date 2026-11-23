@@ -90,7 +90,7 @@ beforeEach(() => {
   useAuthStore.setState({ accessToken: "token-operador", refreshToken: null,
     usuario: { id: C, nombreCompleto: "Operador", correo: "operador@example.test", rol: "ESPECIALISTA" }, isAuthenticated: true });
 });
-afterEach(() => { clientes.forEach(c => c.clear()); clientes = []; });
+afterEach(() => { clientes.forEach(c => c.clear()); clientes = []; vi.unstubAllGlobals(); });
 function normal(url: string) {
   const { id, sufijo } = endpoint(url);
   return Promise.resolve(respuesta(recurso(id, sufijo)));
@@ -722,6 +722,89 @@ describe("G6-04 frontend contra respuestas de contrato (sin API integrada)", () 
     expect(screen.getByText("CUT-B")).toBeInTheDocument();
     expect(screen.queryByText("CUT-A")).not.toBeInTheDocument();
     expect(screen.queryByText("CUT-C")).not.toBeInTheDocument();
+  });
+
+  it("limpia el filtro rápido SLA al cambiar pestaña y al aplicar filtros", async () => {
+    const idRojo = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const estadoPorId: Record<string, "VERDE" | "AMARILLO" | "ROJO"> = {
+      [A]: "VERDE", [B]: "AMARILLO", [idRojo]: "ROJO",
+    };
+    instalar(async url => {
+      const pathname = new URL(url).pathname;
+      if (pathname === "/api/v1/expedientes") {
+        return respuesta({ elementos: [resumen(A), resumen(B, "EN_REVISION"), resumen(idRojo, "EN_REVISION")],
+          contadores, siguienteCursor: null, tieneMas: false });
+      }
+      const idSla = /\/api\/v1\/expedientes\/([^/]+)\/sla-status$/.exec(pathname)?.[1];
+      if (idSla) return respuesta({ ...sla(idSla), estado: estadoPorId[idSla] });
+      return normal(url);
+    });
+    montar("/expedientes");
+    await screen.findByRole("button", { name: /Total/ });
+    const porVencer = screen.getByRole("button", { name: /Por vencer/ });
+    await screen.findByText("Por vencer", { selector: "tbody span" });
+
+    fireEvent.click(porVencer);
+    expect(porVencer).toHaveAttribute("aria-pressed", "true");
+    const tabEnTramite = screen.getByRole("tab", { name: "En trámite (6)" });
+    fireEvent.click(tabEnTramite);
+    await waitFor(() => expect(tabEnTramite).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Total/ })).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByRole("button", { name: /Por vencer/ })).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(screen.getByRole("button", { name: /Por vencer/ }));
+    expect(screen.getByRole("button", { name: /Por vencer/ })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Total/ })).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByRole("button", { name: /Por vencer/ })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("exporta en CSV solo las filas visibles al seleccionar una tarjeta SLA", async () => {
+    const idRojo = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const estadoPorId: Record<string, "VERDE" | "AMARILLO" | "ROJO"> = {
+      [A]: "VERDE", [B]: "AMARILLO", [idRojo]: "ROJO",
+    };
+    instalar(async url => {
+      const pathname = new URL(url).pathname;
+      if (pathname === "/api/v1/expedientes") {
+        return respuesta({ elementos: [resumen(A), resumen(B, "EN_REVISION"), resumen(idRojo, "EN_REVISION")],
+          contadores, siguienteCursor: null, tieneMas: false });
+      }
+      const idSla = /\/api\/v1\/expedientes\/([^/]+)\/sla-status$/.exec(pathname)?.[1];
+      if (idSla) return respuesta({ ...sla(idSla), estado: estadoPorId[idSla] });
+      return normal(url);
+    });
+    const OriginalURL = URL;
+    const OriginalBlob = Blob;
+    const createObjectURL = vi.fn((_blob: Blob) => "blob:rutadoc-csv");
+    const revokeObjectURL = vi.fn();
+    let contenidoCsv = "";
+    class UrlConCsv extends OriginalURL {
+      static createObjectURL(blob: Blob): string { return createObjectURL(blob); }
+      static revokeObjectURL(url: string): void { revokeObjectURL(url); }
+    }
+    class BlobCapturable extends OriginalBlob {
+      constructor(partes: BlobPart[], opciones?: BlobPropertyBag) {
+        super(partes, opciones);
+        contenidoCsv = partes.map(String).join("");
+      }
+    }
+    vi.stubGlobal("URL", UrlConCsv);
+    vi.stubGlobal("Blob", BlobCapturable);
+    const clickEnlace = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    montar("/expedientes");
+
+    const porVencer = await screen.findByRole("button", { name: /Por vencer/ });
+    await screen.findByText("Por vencer", { selector: "tbody span" });
+    fireEvent.click(porVencer);
+    fireEvent.click(screen.getByRole("button", { name: "Exportar CSV" }));
+
+    expect(createObjectURL).toHaveBeenCalledOnce();
+    expect(clickEnlace).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:rutadoc-csv");
+    expect(contenidoCsv).toContain("CUT-B");
+    expect(contenidoCsv).not.toContain("CUT-A");
+    expect(contenidoCsv).not.toContain("CUT-C");
   });
 
   it("muestra estado neutral cuando el expediente no tiene procedimiento TUPA vinculado", async () => {

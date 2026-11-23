@@ -10,7 +10,7 @@ import type { Filtros, Sla } from "./rutadoc/rutadoc.dto";
 import RutaDocEstado from "./rutadoc/RutaDocEstado";
 import { tesoreriaService, type DtoSolicitudDevolucion } from "../../services/tesoreria.service";
 import { rutaDoc } from "./rutadoc/rutadoc.service";
-import { calcularConteosSla, generarCsvExpedientes, type FiltroSlaLocal } from "./rutadoc/rutadoc.summary";
+import { calcularConteosSla, estadoSlaAplicable, generarCsvExpedientes, resolverEstadoSla, type FiltroSlaLocal } from "./rutadoc/rutadoc.summary";
 
 export interface SolicitudVinculacionPendiente {
   solicitudId: string;
@@ -77,7 +77,10 @@ export default function BandejaExpedientesPage() {
       if (controller.signal.aborted) return;
       const estados = new Map<string, Sla["estado"]>();
       resultados.forEach((resultado, indice) => {
-        if (resultado.status === "fulfilled") estados.set(ids[indice], resultado.value.estado);
+        if (resultado.status === "fulfilled") {
+          const estado = resolverEstadoSla(expedientes[indice]?.estadoActual ?? "", resultado.value);
+          if (estado) estados.set(ids[indice], estado);
+        }
       });
       setEstadosSla(estados);
       setSlaConError(resultados.some((resultado) => resultado.status === "rejected"));
@@ -87,9 +90,14 @@ export default function BandejaExpedientesPage() {
   }, [idsExpedientes]);
   const conteosSla = calcularConteosSla(expedientes, estadosSla);
   const [filtroSlaLocal, setFiltroSlaLocal] = useState<FiltroSlaLocal>("TOTAL");
+  useEffect(() => {
+    setFiltroSlaLocal("TOTAL");
+  }, [filtros]);
   const expedientesVisibles = filtroSlaLocal === "TOTAL"
     ? expedientes
-    : expedientes.filter((expediente) => estadosSla.get(expediente.idExpediente) === filtroSlaLocal);
+    : expedientes.filter((expediente) => estadoSlaAplicable(
+      expediente.estadoActual, estadosSla.get(expediente.idExpediente),
+    ) === filtroSlaLocal);
   const exportarCsv = () => {
     const blob = new Blob([generarCsvExpedientes(expedientesVisibles)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -171,6 +179,7 @@ export default function BandejaExpedientesPage() {
 
   function filtrar(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setFiltroSlaLocal("TOTAL");
     const datos = new FormData(event.currentTarget);
     const texto = (nombre: string) => String(datos.get(nombre) ?? "").trim() || undefined;
     setAnteriores([]);
@@ -441,6 +450,7 @@ export default function BandejaExpedientesPage() {
         conteos={consulta.data?.contadores}
         estadoConteos={consulta.isPending ? "cargando" : consulta.isError ? "error" : "disponible"}
         onCambiarEstado={(pestana) => {
+          setFiltroSlaLocal("TOTAL");
           setAnteriores([]);
           setFiltros((f) => ({ ...f, pestana, cursor: undefined }));
         }}
