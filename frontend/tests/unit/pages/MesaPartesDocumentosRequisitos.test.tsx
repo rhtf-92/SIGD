@@ -201,6 +201,43 @@ describe('Mesa de Partes Digital — Paso 3: Documentos, Anexos y Requisitos TUP
     anexosDigitales: [],
   };
 
+  const mockProcedimientoConDoc = {
+    ...mockProcedimientoIngles,
+    registroVersionId: 'b819f4a1-5c3b-410a-8105-d91012a6b412',
+    codigo: 'p3-fila-10',
+    codigoRef: 'p3-fila-10',
+    denominacion: 'Duplicado de Diploma de Egresado',
+  };
+
+  const mockRequisitosConDoc: procedService.DtoRequisitosProcedimiento = {
+    procedimientoId: 'b819f4a1-5c3b-410a-8105-d91012a6b412',
+    codigoRef: 'p3-fila-10',
+    denominacion: 'Duplicado de Diploma de Egresado',
+    generaExpediente: true,
+    totalRequisitos: 1,
+    totalAnexosDigitales: 1,
+    totalAnexosObligatorios: 0,
+    requisitos: [
+      {
+        idRequisito: '11111111-2222-3333-4444-555555555555',
+        idProcedimiento: 'b819f4a1-5c3b-410a-8105-d91012a6b412',
+        registroVersionId: 'b819f4a1-5c3b-410a-8105-d91012a6b412',
+        nombre: 'Copia certificada de denuncia policial (Opcional)',
+        descripcion: 'Constancia oficial de denuncia policial.',
+        tipoRequisito: 'DOCUMENTAL',
+        esAnexoDigital: true,
+        obligatorio: false,
+        orden: 1,
+        formatosPermitidos: 'application/pdf',
+        activo: true,
+        fuenteOriginal: 'Denuncia policial',
+        idAnexo: null,
+        anexo: null,
+      },
+    ],
+    anexosDigitales: [],
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -249,14 +286,12 @@ describe('Mesa de Partes Digital — Paso 3: Documentos, Anexos y Requisitos TUP
       expect(screen.getByText('Documentos y requisitos')).toBeInTheDocument();
     });
 
-    // A) Solicitud Principal Obligatoria según Art. 113 LPAG (D.S. 006-2026-JUS)
-    expect(screen.getByText(/1\. Solicitud o Escrito de Petición \(Documento Principal\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Base legal: Art\. 113 del TUO de la Ley N° 27444/i)).toBeInTheDocument();
+    // A) Trámite 100% Digital Simplificado (Sin requisitos documentales obligatorios)
+    expect(screen.getByText(/Trámite 100% Digital Simplificado/i)).toBeInTheDocument();
+    expect(screen.getByText(/Solicitud Digital Oficial \(FUT Digital — Art\. 113 LPAG\)/i)).toBeInTheDocument();
+    expect(screen.queryByText(/1\. Solicitud o Escrito de Petición \(Documento Principal\)/i)).not.toBeInTheDocument();
 
-    // B) Requisitos documentales específicos: comunica que no hay adicionales en TUPA
-    expect(screen.getByText(/Este procedimiento no contempla requisitos documentales específicos adicionales conforme al TUPA oficial vigente/i)).toBeInTheDocument();
-
-    // C) Requisitos Financieros separados
+    // B) Requisitos Financieros separados
     expect(screen.getByText(/Información Financiera y Orden de Pago Oficial/i)).toBeInTheDocument();
     expect(screen.getByText(/Pago en el Área de Tesorería/i)).toBeInTheDocument();
     expect(screen.getByText(/El pago previo no es obligatorio para presentar su trámite/i)).toBeInTheDocument();
@@ -271,14 +306,14 @@ describe('Mesa de Partes Digital — Paso 3: Documentos, Anexos y Requisitos TUP
 
   it('2. Bloquea avance a Paso 4 si falta la solicitud principal u obligatorios y muestra error explícito', async () => {
     vi.spyOn(procedService, 'obtenerCatalogoProcedimientosTupa').mockResolvedValueOnce([
-      mockProcedimientoIngles as any,
+      mockProcedimientoConDoc as any,
     ]);
     vi.spyOn(procedService, 'obtenerRequisitosProcedimiento').mockResolvedValueOnce(
-      mockRequisitosIngles,
+      mockRequisitosConDoc,
     );
 
     render(
-      <MemoryRouter initialEntries={['/mesa-partes?procedimiento=p1-fila-06']}>
+      <MemoryRouter initialEntries={['/mesa-partes?procedimiento=p3-fila-10']}>
         <Routes>
           <Route path="/mesa-partes" element={<MesaPartesDigitalPage />} />
         </Routes>
@@ -397,14 +432,14 @@ describe('Mesa de Partes Digital — Paso 3: Documentos, Anexos y Requisitos TUP
 
   it('5. Carga de archivo PDF para Solicitud Principal, cálculo de folios (F. 1 a 2) y avance a Paso 4', async () => {
     vi.spyOn(procedService, 'obtenerCatalogoProcedimientosTupa').mockResolvedValueOnce([
-      mockProcedimientoIngles as any,
+      mockProcedimientoConDoc as any,
     ]);
     vi.spyOn(procedService, 'obtenerRequisitosProcedimiento').mockResolvedValueOnce(
-      mockRequisitosIngles,
+      mockRequisitosConDoc,
     );
 
     render(
-      <MemoryRouter initialEntries={['/mesa-partes?procedimiento=p1-fila-06']}>
+      <MemoryRouter initialEntries={['/mesa-partes?procedimiento=p3-fila-10']}>
         <Routes>
           <Route path="/mesa-partes" element={<MesaPartesDigitalPage />} />
         </Routes>

@@ -217,7 +217,7 @@ export const mesaPartesDigitalSchema = z
           totalPaginas: z.number().int().min(1).optional(),
         })
       )
-      .min(1, 'Debe adjuntar al menos un documento o anexo.'),
+      .default([]),
   })
   .strip();
 

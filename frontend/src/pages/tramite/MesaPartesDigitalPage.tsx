@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { contarPaginasPdfArchivo } from '../../utils/foliacionPdf';
+import { generarFutDigitalBase64 } from '../../utils/generarFutDigital';
 import {
   obtenerCatalogoProcedimientosTupa,
   obtenerRequisitosProcedimiento,
@@ -403,39 +404,36 @@ export default function MesaPartesDigitalPage() {
   const handleAvanzarAPaso4 = () => {
     setErrorValidacionDocumentos(null);
 
-    // 1. Validar que la solicitud principal esté presente
-    const tieneSolicitud =
-      adjuntos.some((a) => a.esSolicitudPrincipal) ||
-      (tieneSolicitudEspecifica &&
-        adjuntos.some((a) => {
-          const req = requisitosDocumentales.find((r) => r.idRequisito === a.idRequisito);
-          return req && /solicitud|fut|formulario único|petitorio/i.test(req.nombre);
-        }));
+    // Si el trámite tiene requisitos documentales explícitos en TUPA, validar que se adjunten
+    if (requisitosDocumentales.length > 0) {
+      // 1. Validar que la solicitud principal esté presente (si no tiene solicitud específica en requisitos)
+      const tieneSolicitud =
+        adjuntos.some((a) => a.esSolicitudPrincipal) ||
+        (tieneSolicitudEspecifica &&
+          adjuntos.some((a) => {
+            const req = requisitosDocumentales.find((r) => r.idRequisito === a.idRequisito);
+            return req && /solicitud|fut|formulario único|petitorio/i.test(req.nombre);
+          }));
 
-    if (!tieneSolicitud && !tieneSolicitudEspecifica) {
-      setErrorValidacionDocumentos(
-        'Debe adjuntar la Solicitud o Escrito de Petición formal en formato PDF (Art. 113 LPAG — D.S. 006-2026-JUS) como documento principal.',
+      if (!tieneSolicitud && !tieneSolicitudEspecifica) {
+        setErrorValidacionDocumentos(
+          'Debe adjuntar la Solicitud o Escrito de Petición formal en formato PDF (Art. 113 LPAG — D.S. 006-2026-JUS) como documento principal.',
+        );
+        return;
+      }
+
+      // 2. Validar requisitos documentales obligatorios
+      const faltantes = requisitosDocumentales.filter(
+        (r) => r.obligatorio && !adjuntos.some((a) => a.idRequisito === r.idRequisito),
       );
-      return;
-    }
 
-    // 2. Validar requisitos documentales obligatorios
-    const faltantes = requisitosDocumentales.filter(
-      (r) => r.obligatorio && !adjuntos.some((a) => a.idRequisito === r.idRequisito),
-    );
-
-    if (faltantes.length > 0) {
-      const nombres = faltantes.map((f) => `«${f.nombre}»`).join(', ');
-      setErrorValidacionDocumentos(
-        `Debe adjuntar los siguientes requisitos obligatorios antes de continuar: ${nombres}.`,
-      );
-      return;
-    }
-
-    // 3. Validar que exista al menos 1 documento adjunto en total
-    if (adjuntos.length === 0) {
-      setErrorValidacionDocumentos('Debe adjuntar al menos un documento en formato PDF.');
-      return;
+      if (faltantes.length > 0) {
+        const nombres = faltantes.map((f) => `«${f.nombre}»`).join(', ');
+        setErrorValidacionDocumentos(
+          `Debe adjuntar los siguientes requisitos obligatorios antes de continuar: ${nombres}.`,
+        );
+        return;
+      }
     }
 
     setPaso(4);
@@ -450,7 +448,8 @@ export default function MesaPartesDigitalPage() {
       setErrorEnvio('Debe seleccionar un procedimiento TUPA vigente.');
       return;
     }
-    if (adjuntos.length === 0) {
+    // Si el trámite exige requisitos explícitos y no se adjuntó ninguno
+    if (requisitosDocumentales.length > 0 && adjuntos.length === 0) {
       setErrorEnvio('Debe adjuntar al menos un documento o requisito en formato PDF.');
       return;
     }
@@ -465,6 +464,41 @@ export default function MesaPartesDigitalPage() {
 
     setEnviando(true);
     setErrorEnvio(null);
+
+    let documentosParaEnvio = adjuntos.map((a) => ({
+      idRequisito: a.idRequisito && a.idRequisito.trim() !== '' ? a.idRequisito.trim() : undefined,
+      nombreArchivo: a.nombreArchivo,
+      mimeType: 'application/pdf',
+      base64Content: a.base64,
+      totalPaginas: a.paginas,
+    }));
+
+    // Si el trámite no exigió requisitos y el administrado no subió archivos manuales, generar automáticamente la Solicitud / FUT Digital
+    if (documentosParaEnvio.length === 0) {
+      try {
+        const futBase64 = await generarFutDigitalBase64({
+          solicitante: tipoPersona === 'NATURAL' ? `${nombres} ${apellidoPaterno} ${apellidoMaterno}`.trim() : (razonSocial || 'Administrado'),
+          tipoDocumento,
+          numeroDocumento: numeroDocumento.trim(),
+          correo: correo.trim().toLowerCase(),
+          celular: celular.trim(),
+          direccion: direccion.trim() || undefined,
+          procedimiento: procedimientoSeleccionado.denominacion,
+          asunto: asunto.trim(),
+        });
+        documentosParaEnvio = [
+          {
+            idRequisito: undefined,
+            nombreArchivo: `Solicitud_Digital_${numeroDocumento.trim()}.pdf`,
+            mimeType: 'application/pdf',
+            base64Content: futBase64,
+            totalPaginas: 1,
+          },
+        ];
+      } catch (errFut) {
+        console.warn('Fallback al generar FUT Digital automático:', errFut);
+      }
+    }
 
     const payload = {
       tipoPersona,
@@ -481,13 +515,7 @@ export default function MesaPartesDigitalPage() {
       direccion: direccion.trim() || undefined,
       asunto: asunto.trim(),
       registroVersionId: procedimientoSeleccionado.registroVersionId,
-      documentos: adjuntos.map((a) => ({
-        idRequisito: a.idRequisito && a.idRequisito.trim() !== '' ? a.idRequisito.trim() : undefined,
-        nombreArchivo: a.nombreArchivo,
-        mimeType: 'application/pdf',
-        base64Content: a.base64,
-        totalPaginas: a.paginas,
-      })),
+      documentos: documentosParaEnvio,
     };
 
     try {
@@ -1342,7 +1370,8 @@ export default function MesaPartesDigitalPage() {
                 )}
 
                 {/* SECCIÓN 1: Solicitud o Escrito de Petición Principal (Art. 113 TUO Ley N° 27444 — D.S. 006-2026-JUS) */}
-                {(!tieneSolicitudEspecifica || requisitosDocumentales.length === 0) && (
+                {/* SOLO se exige como obligatorio si el trámite tiene requisitos explícitos en TUPA y no incluye un FUT específico */}
+                {requisitosDocumentales.length > 0 && !tieneSolicitudEspecifica && (
                   <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-2xs">
                     <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-2">
                       <div className="space-y-0.5">
@@ -1512,13 +1541,67 @@ export default function MesaPartesDigitalPage() {
                     })}
                   </div>
                 ) : (
-                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 space-y-1">
-                    <p className="font-semibold text-slate-800">
-                      ℹ️ Requisitos documentales específicos:
-                    </p>
-                    <p>
-                      Este procedimiento no contempla requisitos documentales específicos adicionales conforme al TUPA oficial vigente. Para iniciar el expediente formal únicamente se requiere la Solicitud o Escrito de Petición principal (Punto 1).
-                    </p>
+                  <div className="rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50/70 via-white to-blue-50/40 p-4 sm:p-5 space-y-3 shadow-2xs">
+                    <div className="flex items-start gap-3">
+                      <span className="text-xl">✨</span>
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-sky-950">
+                          Trámite 100% Digital Simplificado (Sin requisitos documentales adicionales)
+                        </h4>
+                        <p className="text-[11px] text-sky-800 mt-0.5">
+                          Conforme al TUPA oficial vigente, este procedimiento no exige que adjunte documentos externos ni solicitudes escaneadas obligatorias.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-white/80 border border-sky-100 rounded-xl text-xs text-slate-700 space-y-1">
+                      <p>
+                        Sus datos de identificación y petitorio registrados en este formulario constituyen formalmente su <strong>Solicitud Digital Oficial (FUT Digital — Art. 113 LPAG)</strong>.
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        El sistema generará automáticamente su expediente y cargo digital con 1 folio certificado. Puede continuar directamente al paso de confirmación.
+                      </p>
+                    </div>
+
+                    {/* Adjunto opcional para el administrado si desea presentar sustento voluntario */}
+                    {adjuntos.length > 0 ? (
+                      <div className="flex flex-wrap items-center justify-between gap-2 bg-emerald-50/60 p-3 rounded-xl border border-emerald-200">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <span className="text-emerald-700 font-bold text-xs">✓ Documento opcional adjuntado:</span>
+                          <span className="text-xs font-bold text-slate-800 truncate max-w-xs sm:max-w-md">
+                            {adjuntos[0].nombreArchivo}
+                          </span>
+                          <span className="text-xs bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded font-mono font-bold">
+                            Folio {adjuntos[0].folioInicio} al {adjuntos[0].folioFin}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoverAdjunto(0)}
+                          className="text-xs text-rose-600 hover:text-rose-800 hover:underline font-semibold"
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center justify-center p-3 border border-dashed border-sky-300 rounded-xl cursor-pointer hover:border-sky-500 bg-sky-50/40 hover:bg-sky-50/70 transition">
+                        <span className="text-xs text-sky-900 font-semibold">
+                          + Adjuntar documento o sustento adicional (Opcional)
+                        </span>
+                        <input
+                          type="file"
+                          accept=".pdf,application/pdf"
+                          className="hidden"
+                          onChange={(e) =>
+                            handleAdjuntarArchivo(
+                              e,
+                              undefined,
+                              `Sustento Opcional - ${procedimientoSeleccionado?.denominacion || 'Trámite'}`,
+                              true,
+                            )
+                          }
+                        />
+                      </label>
+                    )}
                   </div>
                 )}
 
@@ -1668,7 +1751,13 @@ export default function MesaPartesDigitalPage() {
                   </button>
                   <button
                     type="button"
-                    disabled={adjuntos.length === 0 || procesandoArchivo}
+                    disabled={
+                      procesandoArchivo ||
+                      (requisitosDocumentales.length > 0 && (
+                        (!tieneSolicitudEspecifica && !adjuntos.some((a) => a.esSolicitudPrincipal)) ||
+                        requisitosDocumentales.some((r) => r.obligatorio && !adjuntos.some((a) => a.idRequisito === r.idRequisito))
+                      ))
+                    }
                     onClick={handleAvanzarAPaso4}
                     className="px-6 py-2.5 rounded-xl bg-cyan-800 text-white font-semibold text-sm hover:bg-cyan-900 transition disabled:opacity-50"
                   >
@@ -1713,17 +1802,26 @@ export default function MesaPartesDigitalPage() {
                   <div className="pt-2 border-t border-slate-200 space-y-1.5">
                     <div className="flex justify-between items-center">
                       <span className="text-slate-600 font-semibold">Total de páginas foliadas:</span>
-                      <span className="text-sm font-black text-cyan-900 font-mono">{totalFolios} folios</span>
+                      <span className="text-sm font-black text-cyan-900 font-mono">
+                        {adjuntos.length === 0 ? '1 folio (FUT Digital)' : `${totalFolios} ${totalFolios === 1 ? 'folio' : 'folios'}`}
+                      </span>
                     </div>
                     <ul className="text-[11px] text-slate-500 space-y-0.5">
-                      {adjuntos.map((a, i) => (
-                        <li key={i} className="flex justify-between">
-                          <span className="truncate max-w-xs sm:max-w-md">• {a.nombreArchivo}</span>
-                          <span className="font-mono font-bold text-slate-700">
-                            F. {a.folioInicio} a {a.folioFin} ({a.paginas} {a.paginas === 1 ? 'pág' : 'págs'})
-                          </span>
+                      {adjuntos.length === 0 ? (
+                        <li className="flex justify-between">
+                          <span className="truncate max-w-xs sm:max-w-md">• Solicitud_Digital_FUT.pdf (Generado digitalmente)</span>
+                          <span className="font-mono font-bold text-slate-700">F. 1 a 1 (1 pág)</span>
                         </li>
-                      ))}
+                      ) : (
+                        adjuntos.map((a, i) => (
+                          <li key={i} className="flex justify-between">
+                            <span className="truncate max-w-xs sm:max-w-md">• {a.nombreArchivo}</span>
+                            <span className="font-mono font-bold text-slate-700">
+                              F. {a.folioInicio} a {a.folioFin} ({a.paginas} {a.paginas === 1 ? 'pág' : 'págs'})
+                            </span>
+                          </li>
+                        ))
+                      )}
                     </ul>
                   </div>
                 </div>

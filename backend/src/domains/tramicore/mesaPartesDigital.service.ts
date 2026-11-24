@@ -353,9 +353,22 @@ export class MesaPartesDigitalService {
         cliente,
       );
 
-      // 7. Procesar y foliar documentos PDF presentados
+      // 7. Procesar y foliar documentos PDF presentados (o generar Solicitud Digital si el trámite no exigió anexos externos)
+      let documentosEfectivos = datos.documentos || [];
+      if (documentosEfectivos.length === 0) {
+        const futBuffer = await this.generarPdfFallback(`Solicitud Digital - ${datos.asunto}`, cut);
+        documentosEfectivos = [
+          {
+            nombreArchivo: `Solicitud_Digital_${cut}.pdf`,
+            mimeType: 'application/pdf',
+            base64Content: futBuffer.toString('base64'),
+            totalPaginas: 1,
+          },
+        ];
+      }
+
       let totalPaginasFoliadas = 0;
-      for (const doc of datos.documentos) {
+      for (const doc of documentosEfectivos) {
         let buffer: Buffer;
         if (doc.base64Content) {
           const limpio = doc.base64Content.replace(/^data:[^;]+;base64,/, '');
