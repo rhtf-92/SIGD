@@ -43,6 +43,7 @@ import {
   META_TRO,
   META_VTEP,
 } from '../../../../src/domains/corelink/mgdAnalytics.types.js';
+import { RepositorioMgdAnalytics } from '../../../../src/domains/corelink/mgdAnalytics.repository.js';
 import {
   anioEnLima,
   filtrosCuellosBotellaSchema,
@@ -625,5 +626,20 @@ describe('Servicio: agregación y degradación sin caché', () => {
 
     await servicio.distribucionRetencion(null, '2026-03', '2026-06', 'unidad-1');
     expect(obtenerRetencion).toHaveBeenCalledWith(null, '2026-03', '2026-06', 'unidad-1');
+  });
+
+  it('38 consulta las tendencias con límites de fecha explícitos y sin make_date', async () => {
+    const query = vi.fn(async (_sql: string, _valores: unknown[]) => ({ rows: [] }));
+    const repositorio = new RepositorioMgdAnalytics({ query } as never);
+
+    await repositorio.obtenerTendencias(2026, 'unidad-1');
+
+    expect(query).toHaveBeenCalledTimes(1);
+    const [sql, valores] = query.mock.calls[0];
+    expect(sql).toContain('periodo >= $1::date');
+    expect(sql).toContain('periodo < $2::date');
+    expect(sql).toContain('$3::text IS NULL OR unidad_organica_id = $3::text');
+    expect(sql).not.toContain('make_date');
+    expect(valores).toEqual(['2026-01-01', '2027-01-01', 'unidad-1']);
   });
 });

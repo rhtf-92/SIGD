@@ -207,11 +207,11 @@ export class RepositorioMgdAnalytics {
   ): Promise<ContadoresMes[]> {
     const { rows } = await this.pool.query<FilaContadores>(
       `${PROYECCION_CONTADORES}
-        WHERE periodo >= make_date($1, 1, 1)::date
-          AND periodo <  (make_date($1, 1, 1) + INTERVAL '1 year')::date
-          AND ($2::text IS NULL OR unidad_organica_id = $2::text)
+        WHERE periodo >= $1::date
+          AND periodo < $2::date
+          AND ($3::text IS NULL OR unidad_organica_id = $3::text)
         ORDER BY periodo`,
-      [anio, unidadOrganicaId],
+      [`${anio}-01-01`, `${anio + 1}-01-01`, unidadOrganicaId],
     );
     return rows.flatMap((fila): ContadoresMes[] => {
       const periodo = aTextoPeriodo(fila.periodo);
