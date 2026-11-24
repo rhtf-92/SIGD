@@ -5,21 +5,29 @@ import RegistroFoliado from "./RegistroFoliado";
 import "./expedientes.css";
 
 /** Consultas reales; no fabrica catálogos, páginas ni confirmaciones de escritura. */
+interface ResultadoConsulta {
+  clave: string;
+  catalogo: NodoCatalogoCcd[];
+  rangos: RangoServidor[];
+}
+
 export default function CcdFoliadoConectado({ baseUrl, expedienteId }: { baseUrl: string; expedienteId: string }) {
-  const [catalogo, setCatalogo] = useState<NodoCatalogoCcd[] | null>(null);
-  const [rangos, setRangos] = useState<RangoServidor[] | null>(null);
-  const [error, setError] = useState("");
+  const [resultado, setResultado] = useState<ResultadoConsulta | null>(null);
+  const [errorConsulta, setErrorConsulta] = useState<{ clave: string; mensaje: string } | null>(null);
   const [revision, setRevision] = useState(0);
+  const clave = `${baseUrl}::${expedienteId}::${revision}`;
   useEffect(() => {
     const control = new AbortController();
-    setCatalogo(null); setRangos(null); setError("");
     Promise.all([obtenerCatalogo(baseUrl, control.signal), obtenerFoliacion(baseUrl, expedienteId, control.signal)])
-      .then(([ccd, folios]) => { if (!control.signal.aborted) { setCatalogo(ccd); setRangos(folios); } })
-      .catch((e: unknown) => { if (!control.signal.aborted) setError(e instanceof Error ? e.message : "Error de consulta."); });
+      .then(([ccd, folios]) => { if (!control.signal.aborted) { setResultado({ clave, catalogo: ccd, rangos: folios }); setErrorConsulta(null); } })
+      .catch((e: unknown) => { if (!control.signal.aborted) setErrorConsulta({ clave, mensaje: e instanceof Error ? e.message : "Error de consulta." }); });
     return () => control.abort();
-  }, [baseUrl, expedienteId, revision]);
+  }, [baseUrl, expedienteId, revision, clave]);
+  const error = errorConsulta?.clave === clave ? errorConsulta.mensaje : "";
+  const datos = resultado?.clave === clave ? resultado : null;
   if (error) return <section className="m03 m03-panel"><p role="alert">{error}</p><button type="button" className="btn-secondary" onClick={() => setRevision(x => x + 1)}>Reintentar consulta</button></section>;
-  if (!catalogo || !rangos) return <p role="status">Consultando CCD y foliación del servidor…</p>;
+  if (!datos) return <p role="status">Consultando CCD y foliación del servidor…</p>;
+  const { catalogo, rangos } = datos;
   const ultimo = rangos.at(-1)?.folioFin ?? 0;
   return <div className="m03 grid gap-4">
     <section className="m03-panel"><h2 className="m03-heading">Catálogo CCD publicado por el servidor</h2>

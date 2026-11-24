@@ -79,7 +79,7 @@ export default function TimeFilterControls({
           {units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
         </select>
         <span className="mt-1 block text-xs font-normal text-slate-500">
-          Este filtro se aplica al ranking de cuellos de botella; los indicadores son institucionales.
+          El filtro se aplica en el servidor a indicadores, tendencias y cuellos de botella.
         </span>
       </label>
     </section>

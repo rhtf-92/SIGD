@@ -60,14 +60,14 @@ export default function AdminHeader({
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl">
-      <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className="flex h-14 items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Left: Hamburger (mobile) + Institutional Logo */}
         <div className="flex items-center gap-3 sm:gap-4">
           <button
             type="button"
             onClick={onToggleSidebar}
             aria-label={sidebarOpen ? "Cerrar menú lateral" : "Abrir menú lateral"}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700/70 bg-slate-900/80 text-slate-300 hover:text-white hover:border-cyan-500/50 lg:hidden transition"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700/70 bg-slate-900/80 text-slate-300 hover:text-white hover:border-cyan-500/50 xl:hidden transition"
           >
             {sidebarOpen ? (
               <X className="h-5 w-5 text-cyan-400" />

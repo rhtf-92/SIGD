@@ -132,7 +132,10 @@ function createStore() {
       }
       try {
         if (typeof window !== "undefined" && window.location) {
-          window.location.href = "/login";
+          const ruta = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+          window.location.href = ruta.startsWith("/reportes")
+            ? `/login?from=${encodeURIComponent(ruta)}`
+            : "/login";
         }
       } catch {
         // Ignore navigation error in test environments

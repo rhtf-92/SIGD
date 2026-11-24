@@ -23,22 +23,22 @@ const ESTILOS_ESTADO: Record<
   }
 > = {
   NORMAL: {
-    contenedor: "bg-slate-50 text-slate-700 border-slate-300",
-    puntoIndicador: "bg-slate-500",
+    contenedor: "bg-emerald-50 text-emerald-800 border-emerald-300",
+    puntoIndicador: "bg-emerald-600",
     etiquetaTexto: "Al día",
   },
   ALERTA: {
-    contenedor: "bg-amber-50 text-amber-800 border-amber-200",
+    contenedor: "bg-amber-50 text-amber-900 border-amber-300",
     puntoIndicador: "bg-amber-500",
     etiquetaTexto: "Atención",
   },
   CRITICO: {
-    contenedor: "bg-orange-50 text-orange-800 border-orange-200",
-    puntoIndicador: "bg-orange-500",
+    contenedor: "bg-rose-50 text-rose-800 border-rose-300",
+    puntoIndicador: "bg-rose-600",
     etiquetaTexto: "Crítico",
   },
   VENCIDO: {
-    contenedor: "bg-red-50 text-red-800 border-red-200 font-bold",
+    contenedor: "bg-red-100 text-red-900 border-red-500 animate-pulse font-bold shadow-sm",
     puntoIndicador: "bg-red-600",
     etiquetaTexto: "Vencido",
   },

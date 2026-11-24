@@ -10,14 +10,19 @@ import { useCasillaNotifications } from "../../hooks/useCasillaNotifications";
 export function CasillaBadgeRealtime() {
   const { stats, isLoadingStats } = useCasilla();
   const { sseConectado, notificacionesRecibidas } = useCasillaNotifications();
+  const [ultimoEvento, setUltimoEvento] = useState(0);
   const [pulsando, setPulsando] = useState(false);
 
-  useEffect(() => {
-    if (notificacionesRecibidas === 0) return;
+  if (notificacionesRecibidas !== ultimoEvento) {
+    setUltimoEvento(notificacionesRecibidas);
     setPulsando(true);
+  }
+
+  useEffect(() => {
+    if (ultimoEvento === 0) return;
     const temporizador = window.setTimeout(() => setPulsando(false), 1000);
     return () => window.clearTimeout(temporizador);
-  }, [notificacionesRecibidas]);
+  }, [ultimoEvento]);
 
   const noLeidas = stats.noLeidos;
 

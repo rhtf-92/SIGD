@@ -32,6 +32,12 @@ const CHECKSUMS_MIGRACIONES_COMPATIBLES: Readonly<
     migracionCorrectiva: '13_sigd_radicacion_registro_ciudadano.sql',
     checksumCorrectivo: 'b640b41e96e834fae752a1de79252559696e7eb4966db0c3e6a0236b28fdd513',
   },
+  '14_sigd_reportes_mgd_compatible.sql': {
+    checksumRegistrado: '12fa5697814cc2a498a727401bf023913d88d857da31f6097f3afd6fd6831f77',
+    checksumFuente: '178b2c8b537daa71905ae490fd30e1b09e746d0ab134f0b284a3cada7903f719',
+    migracionCorrectiva: '15_sigd_reportes_mgd_reaplicar.sql',
+    checksumCorrectivo: 'dcaa2b2fa9263982143f5c66e54aadd073b6bc4cc4276ad429909bb98d7687c9',
+  },
 };
 
 export function checksumMigracionCompatible(

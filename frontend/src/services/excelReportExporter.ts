@@ -15,7 +15,7 @@ function escapeXml(value: unknown): string {
 }
 
 function worksheetName(reportName: string): string {
-  return (reportName.replace(/[\\/*?:\[\]]/g, " ").trim().slice(0, 31) || "Reporte");
+  return (reportName.replace(/[\\/*?:[\]]/g, " ").trim().slice(0, 31) || "Reporte");
 }
 
 function styleForCell(header: string, value: unknown): string | undefined {

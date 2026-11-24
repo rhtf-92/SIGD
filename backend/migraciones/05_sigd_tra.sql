@@ -106,6 +106,44 @@ CREATE TABLE IF NOT EXISTS sigd_tra.expediente (
     CONSTRAINT chk_tra_expediente_cut CHECK (codigo_expediente ~ '^EXP-[0-9]{4}-[0-9]{6}$')
 );
 
+-- El cluster existente puede tener una versión reducida de sigd_tra.expediente.
+-- Se amplía sin alterar los expedientes ya registrados.
+ALTER TABLE sigd_tra.expediente ADD COLUMN IF NOT EXISTS numero VARCHAR(30);
+UPDATE sigd_tra.expediente SET numero = codigo_expediente WHERE numero IS NULL;
+ALTER TABLE sigd_tra.expediente ALTER COLUMN numero SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tra_expediente_numero
+    ON sigd_tra.expediente (numero);
+
+ALTER TABLE sigd_tra.expediente ADD COLUMN IF NOT EXISTS dni_solicitante CHAR(8);
+ALTER TABLE sigd_tra.expediente ADD COLUMN IF NOT EXISTS tipo_documental_id UUID;
+UPDATE sigd_tra.expediente
+   SET tipo_documental_id = (
+       SELECT d.tipo_documental_id
+         FROM sigd_doc.tipo_documento d
+        WHERE d.codigo = 'REGISTRO_CIUDADANO' AND d.vigente = TRUE
+        ORDER BY d.tipo_documental_id
+        LIMIT 1
+   )
+ WHERE tipo_documental_id IS NULL;
+
+ALTER TABLE sigd_tra.expediente
+    ADD COLUMN IF NOT EXISTS area_destino_id UUID
+        REFERENCES sigd_org.area (area_id) ON DELETE RESTRICT;
+UPDATE sigd_tra.expediente
+   SET area_destino_id = (
+       SELECT a.area_id
+         FROM sigd_org.area a
+        WHERE a.codigo IN ('MESA_PARTES', 'MP-VIRT') AND a.vigente = TRUE
+        ORDER BY CASE WHEN a.codigo = 'MESA_PARTES' THEN 0 ELSE 1 END
+        LIMIT 1
+   )
+ WHERE area_destino_id IS NULL;
+
+ALTER TABLE sigd_tra.expediente
+    ADD COLUMN IF NOT EXISTS estado VARCHAR(30) NOT NULL DEFAULT 'REGISTRADO';
+UPDATE sigd_tra.expediente SET estado = 'REGISTRADO' WHERE estado IS NULL;
+ALTER TABLE sigd_tra.expediente ALTER COLUMN estado SET NOT NULL;
+
 -- Asignación automática del CUT a partir del año de radicación.
 CREATE OR REPLACE FUNCTION sigd_tra.fn_tra_expediente_asignar_cut()
 RETURNS trigger
@@ -425,5 +463,12 @@ CREATE TABLE IF NOT EXISTS sigd_tra.tramite (
         'REGISTRADO', 'EN_TRAMITE', 'OBSERVADO', 'CERRADO', 'ANULADO', 'REABIERTO'
     ))
 );
+
+ALTER TABLE sigd_tra.tramite ADD COLUMN IF NOT EXISTS codigo_tramite VARCHAR(30);
+ALTER TABLE sigd_tra.tramite
+    ADD COLUMN IF NOT EXISTS estado VARCHAR(30) NOT NULL DEFAULT 'REGISTRADO';
+UPDATE sigd_tra.tramite SET estado = 'REGISTRADO' WHERE estado IS NULL;
+ALTER TABLE sigd_tra.tramite ALTER COLUMN estado SET NOT NULL;
+ALTER TABLE sigd_tra.tramite ADD COLUMN IF NOT EXISTS actualizado_en TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_tra_tramite_estado ON sigd_tra.tramite (estado);

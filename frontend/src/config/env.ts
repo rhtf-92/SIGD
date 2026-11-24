@@ -1,5 +1,11 @@
-const apiBaseUrlCrudo =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+/**
+ * La API se consume, por defecto, en el MISMO ORIGEN de la aplicación: en
+ * desarrollo Vite redirige `/api` al backend (`vite.config.ts`) y en producción
+ * lo hace el reverse proxy. Así se evita depender de `localhost:3000` y de CORS.
+ * `VITE_API_BASE_URL` sigue admitiendo un origen explícito para despliegues
+ * donde el frontend y el backend viven en dominios distintos.
+ */
+const apiBaseUrlCrudo = import.meta.env.VITE_API_BASE_URL || "/api";
 
 /**
  * Prefijo canónico de la API (contrato REST v1 del backend).
@@ -10,13 +16,13 @@ export const API_PREFIX = "/api/v1";
 
 /**
  * Se normaliza VITE_API_BASE_URL a un origen puro porque las rutas ya incluyen
- * el prefijo canónico. Así se toleran las tres convenciones que conviven en el
- * repositorio (`http://host`, `http://host/api`, `http://host/api/v1`) sin
- * producir `/api/v1/v1` ni `/api/v1/api/v1`.
+ * el prefijo canónico. Un valor relativo (`/api`, `/api/v1`) se resuelve a ""
+ * y axios usa el origen de la página, donde está el proxy.
  */
 const apiBaseUrl = apiBaseUrlCrudo
-  .replace(/\/api(\/v\d+)?\/?$/i, "")
-  .replace(/\/+$/, "");
+  .trim()
+  .replace(/\/+$/, "")
+  .replace(/\/api(\/v\d+)?$/i, "");
 
 export const env = {
   apiBaseUrl,
@@ -25,3 +31,7 @@ export const env = {
   enableMocks: import.meta.env.VITE_ENABLE_MOCKS === "true",
 } as const;
 
+/** Destino legible para mensajes de diagnóstico (nunca se muestra tal cual al usuario). */
+export const apiDestination =
+  apiBaseUrl ||
+  (typeof window !== "undefined" ? window.location.origin : "el servidor de la aplicación");

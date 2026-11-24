@@ -320,6 +320,25 @@ CREATE TABLE IF NOT EXISTS sigd_rut.estado_actual_expediente (
     fecha_hora TIMESTAMPTZ(3) NOT NULL,
     usuario_operador_id UUID NOT NULL
 );
+
+-- Reconciliación con instalaciones que tenían un estado_actual más simple.
+ALTER TABLE sigd_rut.estado_actual_expediente ADD COLUMN IF NOT EXISTS actualizado_en TIMESTAMPTZ;
+ALTER TABLE sigd_rut.estado_actual_expediente ADD COLUMN IF NOT EXISTS usuario_actual_id UUID;
+ALTER TABLE sigd_rut.estado_actual_expediente ADD COLUMN IF NOT EXISTS secuencia BIGINT;
+UPDATE sigd_rut.estado_actual_expediente SET secuencia = 1 WHERE secuencia IS NULL;
+ALTER TABLE sigd_rut.estado_actual_expediente ALTER COLUMN secuencia SET NOT NULL;
+ALTER TABLE sigd_rut.estado_actual_expediente ADD COLUMN IF NOT EXISTS evento TEXT;
+UPDATE sigd_rut.estado_actual_expediente SET evento = estado_nuevo WHERE evento IS NULL;
+ALTER TABLE sigd_rut.estado_actual_expediente ALTER COLUMN evento SET NOT NULL;
+ALTER TABLE sigd_rut.estado_actual_expediente ADD COLUMN IF NOT EXISTS id_movimiento UUID;
+ALTER TABLE sigd_rut.estado_actual_expediente ADD COLUMN IF NOT EXISTS fecha_hora TIMESTAMPTZ(3);
+UPDATE sigd_rut.estado_actual_expediente SET fecha_hora = actualizado_en WHERE fecha_hora IS NULL;
+ALTER TABLE sigd_rut.estado_actual_expediente ALTER COLUMN fecha_hora SET NOT NULL;
+ALTER TABLE sigd_rut.estado_actual_expediente ADD COLUMN IF NOT EXISTS usuario_operador_id UUID;
+UPDATE sigd_rut.estado_actual_expediente
+   SET usuario_operador_id = usuario_actual_id
+ WHERE usuario_operador_id IS NULL;
+
 CREATE INDEX IF NOT EXISTS ix_estado_actual_estado_expediente
     ON sigd_rut.estado_actual_expediente (estado_nuevo, expediente_id);
 CREATE INDEX IF NOT EXISTS ix_estado_actual_area_estado

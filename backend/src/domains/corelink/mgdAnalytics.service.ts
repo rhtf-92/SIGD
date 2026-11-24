@@ -189,6 +189,7 @@ export function calcularIndicadoresMgd(
     totalExpedientesAtendidos: contadores.nAtendidos + contadores.nArchivados,
     contadores: { ...contadores },
     actualizadoEn: null,
+    unidadOrganicaId: null,
   };
 }
 
@@ -399,10 +400,12 @@ export function riesgoPorPermanencia(diasHabilesPromedio: number): RiesgoCuelloB
  * y por el cambio de clave. Un refresco de la vista materializada queda visible a
  * lo sumo en un TTL, que es la ventana aceptable para un tablero ejecutivo.
  */
-const CACHE_RESUMEN = (periodo: string | null) => `cache:mgd:resumen:${periodo ?? 'todo'}`;
-const CACHE_CUELLOS = (periodo: string | null, diasLimite: number) =>
-  `cache:mgd:cuellos:${periodo ?? 'todo'}:${diasLimite}`;
-const CACHE_TENDENCIAS = (anio: number) => `cache:mgd:tendencias:${anio}`;
+const CACHE_RESUMEN = (periodo: string | null, unidadOrganicaId: string | null) =>
+  `cache:mgd:resumen:${periodo ?? 'todo'}:${unidadOrganicaId ?? 'todas'}`;
+const CACHE_CUELLOS = (periodo: string | null, diasLimite: number, unidadOrganicaId: string | null) =>
+  `cache:mgd:cuellos:${periodo ?? 'todo'}:${diasLimite}:${unidadOrganicaId ?? 'todas'}`;
+const CACHE_TENDENCIAS = (anio: number, unidadOrganicaId: string | null) =>
+  `cache:mgd:tendencias:${anio}:${unidadOrganicaId ?? 'todas'}`;
 
 /** TTL corto: el dato es de un refresco programado, no de un catálogo estático. */
 const TTL_SEGUNDOS = 300;
@@ -459,10 +462,13 @@ export class ServicioMgdAnalytics {
     periodo: string | null,
     periodoDesde: string | null = null,
     periodoHasta: string | null = null,
+    unidadOrganicaId: string | null = null,
   ): Promise<ResumenKpisMgd> {
     const periodoConsulta = periodo ?? (periodoDesde && periodoHasta ? `${periodoDesde}:${periodoHasta}` : null);
-    return this.deCache(CACHE_RESUMEN(periodoConsulta), async () => {
-      const filas = await this.repositorio.obtenerContadores(periodo, periodoDesde, periodoHasta);
+    return this.deCache(CACHE_RESUMEN(periodoConsulta, unidadOrganicaId), async () => {
+      const filas = await this.repositorio.obtenerContadores(
+        periodo, periodoDesde, periodoHasta, unidadOrganicaId,
+      );
       const contadores = sumarContadores(...filas.map((fila) => fila.contadores));
       const base = calcularIndicadoresMgd(contadores);
       const actualizaciones = filas
@@ -475,6 +481,7 @@ export class ServicioMgdAnalytics {
         actualizadoEn: actualizaciones.length > 0
           ? actualizaciones.reduce((max, valor) => (valor > max ? valor : max))
           : null,
+        unidadOrganicaId,
       };
     });
   }
@@ -486,21 +493,22 @@ export class ServicioMgdAnalytics {
    *idimensionalidad: una serie con huecos hace que el frontend dibuje meses
    * intermedios como cero, cuando en realidad son "sin datos".
    */
-  async tendencias(anio: number): Promise<PuntoTendencia[]> {
-    return this.deCache(CACHE_TENDENCIAS(anio), async () => {
-      const porPeriodo = new Map<string, PuntoTendencia>();
-      for (const fila of await this.repositorio.obtenerTendencias(anio)) {
-        const mes = Number(fila.periodo.slice(5, 7));
-        porPeriodo.set(fila.periodo, {
-          mes,
-          radicados: fila.contadores.nRadicados,
-          atendidos: fila.contadores.nAtendidos + fila.contadores.nArchivados,
-          observados: fila.contadores.nObservados,
-        });
+  async tendencias(anio: number, unidadOrganicaId: string | null = null): Promise<PuntoTendencia[]> {
+    return this.deCache(CACHE_TENDENCIAS(anio, unidadOrganicaId), async () => {
+      const porPeriodo = new Map<string, ContadoresMgd>();
+      for (const fila of await this.repositorio.obtenerTendencias(anio, unidadOrganicaId)) {
+        const acumulados = porPeriodo.get(fila.periodo) ?? CONTADORES_VACIOS;
+        porPeriodo.set(fila.periodo, sumarContadores(acumulados, fila.contadores));
       }
       return Array.from({ length: 12 }, (_, indice) => {
         const clave = `${anio}-${String(indice + 1).padStart(2, '0')}`;
-        return porPeriodo.get(clave) ?? { mes: indice + 1, radicados: 0, atendidos: 0, observados: 0 };
+        const contadores = porPeriodo.get(clave) ?? CONTADORES_VACIOS;
+        return {
+          mes: indice + 1,
+          radicados: contadores.nRadicados,
+          atendidos: contadores.nAtendidos + contadores.nArchivados,
+          observados: contadores.nObservados,
+        };
       });
     });
   }
@@ -521,12 +529,15 @@ export class ServicioMgdAnalytics {
     nombres: ReadonlyMap<string, { nombre: string; sigla: string | null }>,
     periodoDesde: string | null = null,
     periodoHasta: string | null = null,
+    unidadOrganicaId: string | null = null,
   ): Promise<CuelloBotellaArea[]> {
     const limiteAplicado = alinearUmboloATramo(diasLimite);
     const periodoConsulta = periodo ?? (periodoDesde && periodoHasta ? `${periodoDesde}:${periodoHasta}` : null);
-    return this.deCache(CACHE_CUELLOS(periodoConsulta, diasLimite), async () => {
+    return this.deCache(CACHE_CUELLOS(periodoConsulta, diasLimite, unidadOrganicaId), async () => {
       const porArea = new Map<string, TramoAcumulado>();
-      for (const tramo of await this.repositorio.obtenerRetencion(periodo, periodoDesde, periodoHasta)) {
+      for (const tramo of await this.repositorio.obtenerRetencion(
+        periodo, periodoDesde, periodoHasta, unidadOrganicaId,
+      )) {
         const id = tramo.unidadOrganicaId;
         const acumulado = porArea.get(id) ?? {
           nExpedientes: 0,
@@ -584,9 +595,16 @@ export class ServicioMgdAnalytics {
   }
 
   /** Distribución por tramo de una unidad, para el mapa de calor del frontend. */
-  async distribucionRetencion(periodo: string | null): Promise<Map<string, TramoRetencion[]>> {
+  async distribucionRetencion(
+    periodo: string | null,
+    periodoDesde: string | null = null,
+    periodoHasta: string | null = null,
+    unidadOrganicaId: string | null = null,
+  ): Promise<Map<string, TramoRetencion[]>> {
     const porArea = new Map<string, TramoRetencion[]>();
-    for (const tramo of await this.repositorio.obtenerRetencion(periodo)) {
+    for (const tramo of await this.repositorio.obtenerRetencion(
+      periodo, periodoDesde, periodoHasta, unidadOrganicaId,
+    )) {
       const lista = porArea.get(tramo.unidadOrganicaId) ?? [];
       lista.push({
         tramo: tramo.tramo,

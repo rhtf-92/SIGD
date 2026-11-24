@@ -22,8 +22,8 @@ export default function AdminPageHeader({
 
   return (
     <header className="border-b border-slate-800/80 bg-slate-950/40 backdrop-blur-md">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="mx-auto w-[88%] max-w-[1500px] py-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <AdminBreadcrumbs />
 
@@ -31,7 +31,7 @@ export default function AdminPageHeader({
               <button
                 type="button"
                 onClick={() => navigate("/")}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700/60 bg-slate-900/60 px-3 py-1.5 text-xs font-semibold text-slate-300 backdrop-blur-md transition-all duration-200 hover:border-cyan-500/40 hover:bg-slate-800/80 hover:text-white cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700/60 bg-slate-900/60 px-2.5 py-1.5 text-[11px] font-semibold text-slate-300 backdrop-blur-md transition-all duration-200 hover:border-cyan-500/40 hover:bg-slate-800/80 hover:text-white cursor-pointer"
                 title="Volver a la portada principal del SIGD"
               >
                 <ArrowLeft className="h-3.5 w-3.5 text-cyan-400" />
@@ -49,15 +49,15 @@ export default function AdminPageHeader({
               </div>
             </div>
 
-            <div className="mt-3 flex items-start gap-3.5">
+            <div className="mt-2 flex items-start gap-3">
               {Icon && (
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600/20 via-cyan-500/15 to-transparent border border-cyan-400/30 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.15)]">
-                  <Icon className="h-6 w-6" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600/20 via-cyan-500/15 to-transparent border border-cyan-400/30 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.15)]">
+                  <Icon className="h-5 w-5" />
                 </div>
               )}
               <div>
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-sm">
+                  <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white drop-shadow-sm">
                     {title}
                   </h1>
                   {badge && (
@@ -66,7 +66,7 @@ export default function AdminPageHeader({
                     </span>
                   )}
                 </div>
-                <p className="mt-1 text-xs sm:text-sm text-slate-400 max-w-3xl leading-relaxed">
+                <p className="mt-1 text-xs sm:text-sm text-slate-400 max-w-2xl leading-relaxed">
                   {description}
                 </p>
               </div>

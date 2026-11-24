@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   User,
   Lock,
@@ -45,8 +45,32 @@ const CLAVE_ROL = "sigd_rol";
 const CLAVE_PERMISOS = "sigd_permisos";
 const CLAVE_REMEMBER_USER = "sigd_remembered_user";
 
+function rutaSolicitada(estado: unknown, busqueda: string): string | null {
+  const desdeEstado = (estado as { from?: unknown } | null)?.from;
+  const desdeQuery = new URLSearchParams(busqueda).get("from");
+  const candidato =
+    typeof desdeEstado === "string"
+      ? desdeEstado
+      : desdeEstado && typeof desdeEstado === "object"
+        ? (() => {
+            const { pathname, search, hash } = desdeEstado as {
+              pathname?: unknown;
+              search?: unknown;
+              hash?: unknown;
+            };
+            return typeof pathname === "string"
+              ? `${pathname}${typeof search === "string" ? search : ""}${typeof hash === "string" ? hash : ""}`
+              : null;
+          })()
+        : desdeQuery;
+  return candidato && candidato.startsWith("/") && !candidato.startsWith("//")
+    ? candidato
+    : null;
+}
+
 export default function LoginFormCard(): React.JSX.Element {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Estados controlados exigidos con inicializadores perezosos para evitar re-renderizados
   const [identificador, setIdentificador] = useState<string>(() => {
@@ -119,6 +143,24 @@ export default function LoginFormCard(): React.JSX.Element {
     setSugerenciaRol(null);
   };
 
+  const limpiarSesion = () => {
+    window.localStorage.removeItem(CLAVE_TOKEN);
+    window.localStorage.removeItem("token");
+    window.localStorage.removeItem("sigd_refresh");
+    window.localStorage.removeItem("sigd_refresh_token");
+    window.localStorage.removeItem(CLAVE_ROL);
+    window.localStorage.removeItem(CLAVE_PERMISOS);
+    window.localStorage.removeItem("sigd_usuario_nombre");
+    window.localStorage.removeItem("sigd_usuario_correo");
+
+    useAuthStore.setState({
+      accessToken: null,
+      refreshToken: null,
+      usuario: null,
+      isAuthenticated: false,
+    });
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage(null);
@@ -138,7 +180,6 @@ export default function LoginFormCard(): React.JSX.Element {
     setIsSubmitting(true);
 
     try {
-      // Validación estricta con el servicio institucional mock (simulando BD segura)
       const authResult = await autenticarCredenciales({
         identificador: trimmedUser,
         password,
@@ -146,21 +187,7 @@ export default function LoginFormCard(): React.JSX.Element {
       });
 
       if (!authResult.exito) {
-        // Bloqueo de acceso indebido: limpiar cualquier token y credencial residual
-        window.localStorage.removeItem(CLAVE_TOKEN);
-        window.localStorage.removeItem("token");
-        window.localStorage.removeItem(CLAVE_ROL);
-        window.localStorage.removeItem(CLAVE_PERMISOS);
-        window.localStorage.removeItem("sigd_usuario_nombre");
-        window.localStorage.removeItem("sigd_usuario_correo");
-
-        useAuthStore.setState({
-          accessToken: null,
-          refreshToken: null,
-          usuario: null,
-          isAuthenticated: false,
-        });
-
+        limpiarSesion();
         setErrorMessage(authResult.mensaje);
         if (authResult.sugerenciaRol) {
           setSugerenciaRol(authResult.sugerenciaRol);
@@ -168,14 +195,12 @@ export default function LoginFormCard(): React.JSX.Element {
         return;
       }
 
-      // Autenticación Exitosa: Persistencia de usuario recordado
       if (remember) {
         window.localStorage.setItem(CLAVE_REMEMBER_USER, trimmedUser);
       } else {
         window.localStorage.removeItem(CLAVE_REMEMBER_USER);
       }
 
-      // Persistir variables de sesión en localStorage únicamente tras autenticación válida
       window.localStorage.setItem(CLAVE_TOKEN, authResult.token);
       window.localStorage.setItem("token", authResult.token);
       window.localStorage.setItem(CLAVE_ROL, authResult.usuario.rol);
@@ -183,7 +208,6 @@ export default function LoginFormCard(): React.JSX.Element {
       window.localStorage.setItem("sigd_usuario_nombre", authResult.usuario.nombreCompleto);
       window.localStorage.setItem("sigd_usuario_correo", authResult.usuario.correo);
 
-      // Sincronizar en el almacén reactivo useAuthStore
       useAuthStore.setState({
         accessToken: authResult.token,
         refreshToken: `sigd-refresh-${Date.now()}`,
@@ -196,14 +220,17 @@ export default function LoginFormCard(): React.JSX.Element {
         isAuthenticated: true,
       });
 
-      // Redirección al panel institucional correspondiente según su rol RBAC
-      navigate(authResult.destino, { replace: true });
+      navigate(
+        rutaSolicitada(location.state, location.search) ?? authResult.destino,
+        { replace: true },
+      );
     } catch (err: unknown) {
-      const errorMsg =
+      limpiarSesion();
+      setErrorMessage(
         err instanceof Error
           ? err.message
-          : "Ocurrió un error al verificar sus credenciales. Intente nuevamente.";
-      setErrorMessage(errorMsg);
+          : "Ocurrió un error inesperado al autenticar sus credenciales.",
+      );
     } finally {
       setIsSubmitting(false);
     }

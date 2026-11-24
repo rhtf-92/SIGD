@@ -78,8 +78,11 @@ export function crearControladorReportes(
   return {
     resumen: async (req, res) => {
       await autorizado(req);
-      const { periodo, periodoDesde, periodoHasta } = filtrosResumenSchema.parse(req.query ?? {});
-      const resumen = await servicio.resumen(periodo ?? null, periodoDesde ?? null, periodoHasta ?? null);
+      const { periodo, periodoDesde, periodoHasta, unidadOrganicaId } =
+        filtrosResumenSchema.parse(req.query ?? {});
+      const resumen = await servicio.resumen(
+        periodo ?? null, periodoDesde ?? null, periodoHasta ?? null, unidadOrganicaId ?? null,
+      );
       // `periodo` y `actualizadoEn` son metadatos de la lectura; el contrato de
       // §4.7 define los seis campos de primer nivel, pero sin ellos el frontend no
       // puede distinguir "0 %" de "sin datos" ni saber de cuándo es el dato.
@@ -88,7 +91,8 @@ export function crearControladorReportes(
 
     cuellosBotella: async (req, res) => {
       await autorizado(req);
-      const { periodo, periodoDesde, periodoHasta, diasLimite } = filtrosCuellosBotellaSchema.parse(req.query ?? {});
+      const { periodo, periodoDesde, periodoHasta, diasLimite, unidadOrganicaId } =
+        filtrosCuellosBotellaSchema.parse(req.query ?? {});
       const nombres = await repositorio.obtenerNombresUnidades();
       res.json(await servicio.cuellosBotella(
         periodo ?? null,
@@ -96,13 +100,14 @@ export function crearControladorReportes(
         nombres,
         periodoDesde ?? null,
         periodoHasta ?? null,
+        unidadOrganicaId ?? null,
       ));
     },
 
     tendencias: async (req, res) => {
       await autorizado(req);
-      const { anio } = filtrosTendenciasSchema.parse(req.query ?? {});
-      res.json(await servicio.tendencias(anio ?? anioEnLima()));
+      const { anio, unidadOrganicaId } = filtrosTendenciasSchema.parse(req.query ?? {});
+      res.json(await servicio.tendencias(anio ?? anioEnLima(), unidadOrganicaId ?? null));
     },
 
     /**
@@ -114,8 +119,14 @@ export function crearControladorReportes(
      */
     tiemposAtencion: async (req, res) => {
       await autorizado(req);
-      const { periodo } = filtrosResumenSchema.parse(req.query ?? {});
-      const distribucion = await servicio.distribucionRetencion(periodo ?? null);
+      const { periodo, periodoDesde, periodoHasta, unidadOrganicaId } =
+        filtrosResumenSchema.parse(req.query ?? {});
+      const distribucion = await servicio.distribucionRetencion(
+        periodo ?? null,
+        periodoDesde ?? null,
+        periodoHasta ?? null,
+        unidadOrganicaId ?? null,
+      );
       const nombres = await repositorio.obtenerNombresUnidades();
       res.json(Array.from(distribucion.entries()).map(([areaId, tramos]) => ({
         areaId,
