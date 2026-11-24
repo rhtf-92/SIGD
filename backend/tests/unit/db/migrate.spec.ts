@@ -1,3 +1,6 @@
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { checksumMigracionCompatible } from '../../../src/db/migrate.js';
 
@@ -40,5 +43,19 @@ describe('compatibilidad de checksum de migraciones', () => {
     expect(
       checksumMigracionCompatible('03_sigd_org.sql', 'checksum-desconocido', 'actual'),
     ).toBe(false);
+  });
+
+  it('conserva byte a byte el contenido de las migraciones del tablero ejecutivo', () => {
+    const checksums: Record<string, string> = {
+      '14_sigd_reportes_mgd_compatible.sql':
+        '178b2c8b537daa71905ae490fd30e1b09e746d0ab134f0b284a3cada7903f719',
+      '15_sigd_reportes_mgd_reaplicar.sql':
+        'dcaa2b2fa9263982143f5c66e54aadd073b6bc4cc4276ad429909bb98d7687c9',
+    };
+
+    for (const [archivo, esperado] of Object.entries(checksums)) {
+      const contenido = fs.readFileSync(path.resolve('migraciones', archivo), 'utf8');
+      expect(crypto.createHash('sha256').update(contenido).digest('hex')).toBe(esperado);
+    }
   });
 });

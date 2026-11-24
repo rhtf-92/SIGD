@@ -32,10 +32,12 @@
 
 import type { Request, RequestHandler } from 'express';
 import { ForbiddenError, UnauthorizedError } from '../../shared/domain/errors/index.js';
+import { getRequestContext } from '../../shared/request-context/request-context.js';
 import type { ActorProviderRutaDoc } from '../rutadoc/rutadoc.actor-provider.js';
 import type { ActorRutaDoc } from '../rutadoc/rutadoc.types.js';
 import type { RepositorioMgdAnalytics } from './mgdAnalytics.repository.js';
-import { ServicioMgdAnalytics } from './mgdAnalytics.service.js';
+import { calcularIndicadoresMgd, ServicioMgdAnalytics } from './mgdAnalytics.service.js';
+import { CONTADORES_VACIOS } from './mgdAnalytics.types.js';
 import {
   anioEnLima,
   filtrosCuellosBotellaSchema,
@@ -80,13 +82,24 @@ export function crearControladorReportes(
       await autorizado(req);
       const { periodo, periodoDesde, periodoHasta, unidadOrganicaId } =
         filtrosResumenSchema.parse(req.query ?? {});
-      const resumen = await servicio.resumen(
-        periodo ?? null, periodoDesde ?? null, periodoHasta ?? null, unidadOrganicaId ?? null,
-      );
-      // `periodo` y `actualizadoEn` son metadatos de la lectura; el contrato de
-      // §4.7 define los seis campos de primer nivel, pero sin ellos el frontend no
-      // puede distinguir "0 %" de "sin datos" ni saber de cuándo es el dato.
-      res.json({ ...resumen });
+      try {
+        const resumen = await servicio.resumen(
+          periodo ?? null, periodoDesde ?? null, periodoHasta ?? null, unidadOrganicaId ?? null,
+        );
+        // `periodo` y `actualizadoEn` son metadatos de la lectura; el contrato de
+        // §4.7 define los seis campos de primer nivel, pero sin ellos el frontend no
+        // puede distinguir "0 %" de "sin datos" ni saber de cuándo es el dato.
+        res.json({ ...resumen });
+      } catch (error) {
+        const correlationId = getRequestContext()?.correlation_id ?? 'sin-correlacion';
+        console.error(`[REPORTES] Fallo al calcular resumen correlation_id=${correlationId}`, error);
+        res.json({
+          ...calcularIndicadoresMgd(CONTADORES_VACIOS),
+          periodo: periodo ?? (periodoDesde && periodoHasta ? `${periodoDesde} — ${periodoHasta}` : null),
+          actualizadoEn: null,
+          unidadOrganicaId: unidadOrganicaId ?? null,
+        });
+      }
     },
 
     cuellosBotella: async (req, res) => {

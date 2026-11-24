@@ -1,10 +1,18 @@
 import 'dotenv/config';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { crearPool } from '../database.js';
 
 const databaseUrl =
   process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/sigd_prueba';
 
 const pool = crearPool(databaseUrl);
+const directorioMigraciones = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../migraciones',
+);
 
 const MIGRACIONES = [
   '14_sigd_reportes_mgd_compatible.sql',
@@ -45,13 +53,25 @@ async function main(): Promise<void> {
   );
 
   console.log('[DIAG] Migraciones de reportes:');
+  const problemas: string[] = [];
   for (const nombre of MIGRACIONES) {
     const registro = migraciones.rows.find((fila) => fila.nombre_script === nombre);
+    if (!registro) {
+      console.log(`  [FALTA] ${nombre}`);
+      problemas.push(`${nombre}: no está registrada`);
+      continue;
+    }
+
+    const contenido = fs.readFileSync(path.join(directorioMigraciones, nombre), 'utf8');
+    const checksumArchivo = crypto.createHash('sha256').update(contenido).digest('hex');
+    const coincide = registro.checksum_sha256 === checksumArchivo;
     console.log(
-      registro
-        ? `  [OK] ${nombre} · aplicada ${registro.ejecutado_en.toISOString()} · ${registro.checksum_sha256}`
-        : `  [FALTA] ${nombre}`,
+      `  [${coincide ? 'OK' : 'ERROR'}] ${nombre} · aplicada ${registro.ejecutado_en.toISOString()} · ` +
+        `registro=${registro.checksum_sha256} archivo=${checksumArchivo}`,
     );
+    if (!coincide) {
+      problemas.push(`${nombre}: checksum del archivo distinto del registrado`);
+    }
   }
 
   const columnas = await pool.query<{ tabla: string; columna: string }>(
@@ -66,7 +86,6 @@ async function main(): Promise<void> {
   );
 
   console.log('[DIAG] Contrato de vistas materializadas:');
-  const problemas: string[] = [];
 
   for (const [tabla, esperadas] of Object.entries(COLUMNAS_ESPERADAS)) {
     const presentes = new Set(
@@ -83,7 +102,7 @@ async function main(): Promise<void> {
   }
 
   if (problemas.length > 0) {
-    console.error('[DIAG] El contrato del tablero no coincide. Reinicia el backend para aplicar la migración 15.');
+    console.error('[DIAG] El entorno del tablero no es válido:', problemas.join('; '));
     process.exitCode = 1;
     return;
   }
