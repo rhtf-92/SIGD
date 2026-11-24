@@ -3,7 +3,6 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import AccesoDenegadoPage from "../pages/AccesoDenegadoPage";
 import HomePage from "../pages/HomePage";
 
-import SeguridadPage from "../pages/administracion/SeguridadPage";
 import DashboardEjecutivoPage from "../pages/DashboardEjecutivoPage";
 import FlujoValidezLegalPage from "../pages/flujos/FlujoValidezLegalPage";
 import PasarelaFirmaPage from "../pages/flujos/PasarelaFirmaPage";
@@ -63,7 +62,6 @@ export default function AppRouter() {
         path="/ventanilla"
         element={<VentanillaPresencialPage />}
       />
-      <Route path="/administracion/seguridad" element={<SeguridadPage />} />
       <Route path="/flujo-validez-legal" element={<FlujoValidezLegalPage />} />
       <Route path="/flujos/titulacion" element={<WorkflowAcademicoPage />} />
       <Route
@@ -100,8 +98,10 @@ export default function AppRouter() {
       <Route path="/expedientes" element={<BandejaExpedientesPage />} />
       <Route path="/expedientes/:id" element={<ExpedienteDetallePage />} />
 
-      <Route path="/reportes" element={<DashboardEjecutivoPage />} />
-      <Route path="/reportes/dashboard" element={<DashboardEjecutivoPage />} />
+      <Route element={<ProtectedRoute requiredRoles={["DIRECTOR", "SUPER_ADMIN"]} />}>
+        <Route path="/reportes" element={<DashboardEjecutivoPage />} />
+        <Route path="/reportes/dashboard" element={<DashboardEjecutivoPage />} />
+      </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
 

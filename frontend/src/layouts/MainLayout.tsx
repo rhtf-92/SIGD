@@ -19,6 +19,8 @@ export default function MainLayout({ children }: MainLayoutProps): React.JSX.Ele
     location.pathname === "/" &&
     (typeof window === "undefined" || !window.localStorage.getItem("sigd_token"));
   const isExpedientesInbox = location.pathname === "/expedientes";
+  const isAdminArea =
+    location.pathname === "/admin" || location.pathname.startsWith("/administracion");
 
   if (isLoginPage || isAcademicCatalogPage || isPublicHome) {
     return <>{children}</>;
@@ -45,29 +47,39 @@ export default function MainLayout({ children }: MainLayoutProps): React.JSX.Ele
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
-      <div className="flex flex-1 flex-col min-w-0">
+      <div className={`flex flex-1 flex-col min-w-0 ${isAdminArea ? "h-screen min-h-0 overflow-hidden" : ""}`}>
         <TopHeaderBar onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
         <main
-          className={`flex-1 ${
-            isRegistrationPage
+          className={`flex-1 min-w-0 ${
+            isAdminArea ? "min-h-0 overflow-hidden" : ""
+          } ${
+            isRegistrationPage || isAdminArea
               ? "bg-transparent p-0"
               : "bg-[#f8fafc] p-4 sm:p-6 lg:p-8"
           }`}
         >
-          <div className={isRegistrationPage ? "h-full w-full" : "mx-auto max-w-7xl"}>
+          <div
+            className={
+              isRegistrationPage || isAdminArea
+                ? "h-full w-full min-h-0"
+                : "mx-auto max-w-7xl"
+            }
+          >
             {children}
           </div>
         </main>
-        <footer className="border-t border-slate-200/90 bg-white px-4 py-3.5 text-center text-xs text-slate-500 sm:px-6 lg:px-8 print:hidden">
-          <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 sm:flex-row">
-            <span>
-              IESTP "Suiza" — Sistema Integral de Gestión Documentaria (SIGD)
-            </span>
-            <span className="text-[11px] text-slate-400">
-              © {new Date().getFullYear()} • Pucallpa, Ucayali — República del Perú
-            </span>
-          </div>
-        </footer>
+        {!isAdminArea && (
+          <footer className="border-t border-slate-200/90 bg-white px-4 py-3.5 text-center text-xs text-slate-500 sm:px-6 lg:px-8 print:hidden">
+            <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 sm:flex-row">
+              <span>
+                IESTP "Suiza" — Sistema Integral de Gestión Documentaria (SIGD)
+              </span>
+              <span className="text-[11px] text-slate-400">
+                © {new Date().getFullYear()} • Pucallpa, Ucayali — República del Perú
+              </span>
+            </div>
+          </footer>
+        )}
       </div>
     </div>
   );

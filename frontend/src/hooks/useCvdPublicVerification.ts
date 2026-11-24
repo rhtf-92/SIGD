@@ -5,7 +5,11 @@ import axios from "axios";
 import { apiClient } from "../api/client";
 import { env } from "../config/env";
 import type { ApiProblemDetails } from "../types/api";
-import type { ErrorValidacionCvd, ValidacionCVDResult } from "../types/validadorCvd";
+import type {
+  DocumentoValidacionCvd,
+  ErrorValidacionCvd,
+  ValidacionCVDResult,
+} from "../types/validadorCvd";
 import { normalizarCvd, validarCvd } from "../utils/cvdValidator";
 
 export const CVD_VALIDO = "CVD-2026-RD-000412-892F";
@@ -106,9 +110,22 @@ async function consultarMock(codigoCvd: string): Promise<ValidacionCVDResult> {
   );
 }
 
+interface RespuestaValidacionCvdApi {
+  esValido?: boolean;
+  valido?: boolean;
+  selloTiempoTsa?: string | null;
+  fecha_sello_tsa?: string | null;
+  documento?: DocumentoValidacionCvd | null;
+  firmante?: string;
+  sha256_firmado?: string;
+  descarga_copia_certificada?: string;
+  cvd?: string;
+  mensajeSeguridad?: string;
+}
+
 async function consultarApi(codigoCvd: string): Promise<ValidacionCVDResult> {
   const normalizado = normalizarCvd(codigoCvd);
-  const { data } = await apiClient.get<any>(
+  const { data } = await apiClient.get<RespuestaValidacionCvdApi>(
     `/api/v1/validador/cvd/${encodeURIComponent(normalizado)}`,
   );
   const esValido = Boolean(data.esValido ?? data.valido);

@@ -2,8 +2,8 @@ import { MapPin } from "lucide-react";
 
 export default function AdminFooter() {
   return (
-    <footer className="mt-auto border-t border-slate-800/80 bg-slate-950/80 py-5 text-slate-400 text-xs backdrop-blur-md print:hidden">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <footer className="mt-auto shrink-0 border-t border-slate-800/80 bg-slate-950/80 py-4 text-slate-400 text-[11px] backdrop-blur-md print:hidden">
+      <div className="mx-auto w-[88%] max-w-[1500px]">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Institutional Info Left */}
           <div className="flex items-center gap-3 text-center md:text-left">

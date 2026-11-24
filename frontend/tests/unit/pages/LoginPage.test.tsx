@@ -25,6 +25,7 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    window.history.pushState({}, "", "/login");
   });
 
   describe("1. Columna Izquierda — Branding Institucional", () => {
@@ -203,6 +204,25 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
         expect(window.localStorage.getItem("sigd_rol")).toBe("SUPER_ADMIN");
         expect(window.localStorage.getItem("sigd_remembered_user")).toBe("70123456");
         expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true });
+      });
+    });
+
+    test("Regresa a la ruta solicitada después de iniciar sesión", async () => {
+      window.history.pushState({}, "", "/login?from=%2Freportes%2Fdashboard");
+      renderLoginPage();
+      const user = userEvent.setup();
+
+      await user.type(
+        screen.getByLabelText(/Usuario, DNI o Correo Institucional/i),
+        "70123456",
+      );
+      await user.type(screen.getByLabelText(/^Contraseña$/i), "ClaveSegura2026");
+      await user.click(screen.getByRole("button", { name: /Ingresar/i }));
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith("/reportes/dashboard", {
+          replace: true,
+        });
       });
     });
 

@@ -70,20 +70,20 @@ export default function KpiCard({
 
   return (
     <article
-      className={`relative overflow-hidden rounded-2xl bg-slate-900/60 p-5 backdrop-blur-xl border ${styles.border} ${styles.glow} transition-all duration-300 hover:-translate-y-0.5 hover:bg-slate-900/80`}
+      className={`relative overflow-hidden rounded-xl bg-slate-900/60 p-3 backdrop-blur-xl border ${styles.border} ${styles.glow} transition-all duration-300 hover:-translate-y-0.5 hover:bg-slate-900/80`}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-semibold tracking-wider uppercase text-slate-400">
+          <p className="truncate text-[11px] font-semibold tracking-wider uppercase text-slate-400">
             {title}
           </p>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${styles.valueText}`}>
+            <span className={`text-lg sm:text-xl font-extrabold tracking-tight ${styles.valueText}`}>
               {value}
             </span>
             {badge && (
               <span
-                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-semibold ${
                   BADGE_STYLES[badge.variant ?? "neutral"]
                 }`}
               >
@@ -92,14 +92,14 @@ export default function KpiCard({
             )}
           </div>
           {subtitle && (
-            <p className="mt-1.5 truncate text-xs text-slate-400">{subtitle}</p>
+            <p className="mt-0.5 truncate text-[11px] text-slate-400">{subtitle}</p>
           )}
         </div>
 
         <div
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border backdrop-blur-md ${styles.iconBg} shadow-inner`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border backdrop-blur-md ${styles.iconBg} shadow-inner`}
         >
-          <Icon className="h-6 w-6 drop-shadow-[0_0_8px_currentColor]" />
+          <Icon className="h-4 w-4 drop-shadow-[0_0_8px_currentColor]" />
         </div>
       </div>
     </article>

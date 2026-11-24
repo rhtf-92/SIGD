@@ -37,42 +37,49 @@ export interface DtoConsultaPublica {
 export default function ConsultaPublicaPage() {
   const { cut } = useParams<{ cut: string }>();
   const navigate = useNavigate();
+  const claveConsulta = cut?.trim().toUpperCase() ?? '';
   const [cutInput, setCutInput] = useState(cut ?? '');
-  const [resultado, setResultado] = useState<DtoConsultaPublica | null>(null);
-  const [cargando, setCargando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [claveSincronizada, setClaveSincronizada] = useState(cut ?? null);
+  const [consulta, setConsulta] = useState<{
+    clave: string;
+    datos: DtoConsultaPublica | null;
+    error: string | null;
+  } | null>(null);
+
+  if (cut !== claveSincronizada) {
+    setClaveSincronizada(cut ?? null);
+    setCutInput(cut ?? '');
+  }
+
+  const cargando = claveConsulta.length > 0 && consulta?.clave !== claveConsulta;
+  const error = consulta?.clave === claveConsulta ? consulta.error : null;
+  const resultado = consulta?.clave === claveConsulta ? consulta.datos : null;
 
   useEffect(() => {
-    if (cut) {
-      setCutInput(cut);
-      consultar(cut);
-    }
-  }, [cut]);
-
-  const consultar = async (codigoCut: string) => {
-    const trimmed = codigoCut.trim().toUpperCase();
-    if (!trimmed) {
-      setError('Por favor, ingrese un código CUT válido.');
-      return;
-    }
-
-    setCargando(true);
-    setError(null);
-
-    try {
-      const res = await apiClient.get<DtoConsultaPublica>(
-        `/api/v1/tramites/consulta-publica/${encodeURIComponent(trimmed)}`
-      );
-      setResultado(res.data);
-    } catch (err: unknown) {
-      setResultado(null);
-      setError(
-        'No se encontró ningún expediente con el código CUT ingresado o ocurrió un error en la consulta.'
-      );
-    } finally {
-      setCargando(false);
-    }
-  };
+    if (!claveConsulta) return;
+    const control = new AbortController();
+    apiClient
+      .get<DtoConsultaPublica>(
+        `/api/v1/tramites/consulta-publica/${encodeURIComponent(claveConsulta)}`,
+        { signal: control.signal },
+      )
+      .then((res) => {
+        if (!control.signal.aborted) {
+          setConsulta({ clave: claveConsulta, datos: res.data, error: null });
+        }
+      })
+      .catch(() => {
+        if (!control.signal.aborted) {
+          setConsulta({
+            clave: claveConsulta,
+            datos: null,
+            error:
+              'No se encontró ningún expediente con el código CUT ingresado o ocurrió un error en la consulta.',
+          });
+        }
+      });
+    return () => control.abort();
+  }, [claveConsulta]);
 
   const handleBuscar = (e: React.FormEvent) => {
     e.preventDefault();
