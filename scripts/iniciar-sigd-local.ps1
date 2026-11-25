@@ -66,7 +66,7 @@ $state = $null
 $startedHere = @()
 try {
     $coordinator = Enter-SigdLock
-    if ((& git -C $repo branch --show-current) -ne 'B_JACOBO' -or $LASTEXITCODE -ne 0) { throw 'Este iniciador requiere B_JACOBO. No se cambia de rama.' }
+    if ((& git -C $repo branch --show-current) -notin @('B_JACOBO', 'F_JESUS', 'B_TAPULLIMA') -or $LASTEXITCODE -ne 0) { throw 'Este iniciador requiere B_JACOBO, F_JESUS o B_TAPULLIMA. No se cambia de rama.' }
     $nodeExe = (Get-Command node.exe -ErrorAction Stop).Source
     $dockerExe = (Get-Command docker.exe -ErrorAction Stop).Source
     $version = [version]((& $nodeExe --version).TrimStart('v'))
