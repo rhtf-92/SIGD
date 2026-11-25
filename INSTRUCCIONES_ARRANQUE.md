@@ -4,6 +4,22 @@ Esta rama contiene el 100% de las funcionalidades, migraciones y módulos actual
 
 ---
 
+## 0. Arranque Rápido en 1 Clic (Recomendado para Windows)
+
+Simplemente haz **doble clic** en el archivo:
+📁 **`iniciar.bat`**
+
+Este archivo se encarga automáticamente de:
+1. Crear tus archivos `.env` y `.env.local` si no existen.
+2. Instalar dependencias `npm install` si hacen falta.
+3. Iniciar los contenedores Docker (`postgres`, `redis`, `minio`).
+4. Abrir las ventanas de ejecución para el Backend y el Frontend.
+5. Abrir el navegador en `http://localhost:5178/`.
+
+Para detener todo, simplemente haz doble clic en **`detener.bat`**.
+
+---
+
 ## 1. Requisitos Previos
 
 * **Node.js** v20 o v24
