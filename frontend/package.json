@@ -5,8 +5,9 @@
   "description": "Estructura base del frontend académico del SIGD del Instituto Suiza.",
   "type": "module",
   "scripts": {
-    "dev": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ../scripts/iniciar-sigd-local.ps1",
+    "dev": "vite --open /tramite/mesa-partes-virtual",
     "dev:ui": "vite --open /tramite/mesa-partes-virtual",
+    "dev:local": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ../scripts/iniciar-sigd-local.ps1",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

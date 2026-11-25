@@ -9,8 +9,9 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ../scripts/iniciar-sigd-local.ps1",
+    "dev": "tsx watch src/server.ts",
     "dev:api": "tsx watch src/server.ts",
+    "dev:local": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ../scripts/iniciar-sigd-local.ps1",
     "start": "node dist/src/server.js",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",

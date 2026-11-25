@@ -7,6 +7,8 @@
   },
   "scripts": {
     "dev": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/iniciar-sigd-local.ps1",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
     "start": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/iniciar-sigd-local.ps1",
     "status": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/estado-demo.ps1",
     "stop": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/detener-demo.ps1",
