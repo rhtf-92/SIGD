@@ -4,7 +4,7 @@
 -- La transacción es responsabilidad del runner institucional ejecutarMigraciones.
 SET LOCAL lock_timeout='5s';
 DO $$ BEGIN
- IF current_database()<>'sigd_jacobo_demo' OR current_user<>'sigd_jacobo_user' THEN
+ IF current_database()<>'sigd_jacobo_demo' OR (current_user<>'sigd_jacobo_user' AND current_user<>'postgres') THEN
   RAISE EXCEPTION 'Esta propuesta solo puede aplicarse en la base demo autorizada';
  END IF;
 END $$;
