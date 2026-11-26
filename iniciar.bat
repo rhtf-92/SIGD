@@ -30,13 +30,17 @@ if not exist "frontend\node_modules" (
     cd frontend && call npm install && cd ..
 )
 
-echo [3/4] Verificando servicios Docker (PostgreSQL, Redis, MinIO)...
+echo [3/4] Verificando servicios Docker y base de datos...
 where docker >nul 2>nul
 if %ERRORLEVEL% EQU 0 (
     docker info >nul 2>nul
     if %ERRORLEVEL% EQU 0 (
         echo Iniciando contenedores Docker de base de datos y servicios...
         docker compose up -d postgres redis minio
+        echo Esperando que PostgreSQL este listo...
+        timeout /t 4 /nobreak > nul
+        echo Sincronizando migraciones de base de datos (Catalogos, Ubigeo, Roles)...
+        cd backend && call npm run migrate && cd ..
     ) else (
         echo [AVISO] Docker Desktop no esta activo. Inicielo si usara la base de datos por Docker.
     )
