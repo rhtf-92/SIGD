@@ -419,6 +419,8 @@ CREATE TRIGGER trg_expediente_vincular_tupa_vigente
     EXECUTE FUNCTION sigd_doc.fn_expediente_vincular_tupa_vigente();
 
 -- 14. Trigger de congelamiento definitivo de identidad TUPA en expedientes ya radicados
+ALTER TABLE sigd_doc.expediente ADD COLUMN IF NOT EXISTS tupa_historico_auditoria_id uuid;
+
 CREATE OR REPLACE FUNCTION sigd_doc.fn_expediente_proteger_tupa_historico()
 RETURNS TRIGGER AS $$
 BEGIN

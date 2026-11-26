@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/iniciar-sigd-local.ps1",
+    "migrate": "npm --prefix backend run migrate",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "start": "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/iniciar-sigd-local.ps1",
