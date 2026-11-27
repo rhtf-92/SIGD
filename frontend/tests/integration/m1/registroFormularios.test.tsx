@@ -25,6 +25,24 @@ function renderRegistroCiudadanoPage() {
 }
 
 describe("Suite de Pruebas de Formularios de Registro Ciudadano (ENT-M01-01 / ENT-M01-04 / ENT-M01-05)", () => {
+  it("muestra el acceso a registros solo a personal institucional autorizado", () => {
+    window.localStorage.setItem("sigd_token", "token-admin");
+    window.localStorage.setItem("sigd_rol", "SUPER_ADMIN");
+    const vistaAdministrativa = renderRegistroCiudadanoPage();
+
+    expect(
+      screen.getByRole("link", { name: /Ver usuarios registrados/i }),
+    ).toHaveAttribute("href", "/administracion/registros-ciudadanos");
+    vistaAdministrativa.unmount();
+
+    window.localStorage.removeItem("sigd_token");
+    window.localStorage.removeItem("sigd_rol");
+    renderRegistroCiudadanoPage();
+    expect(
+      screen.queryByRole("link", { name: /Ver usuarios registrados/i }),
+    ).not.toBeInTheDocument();
+  });
+
   it("a) RegistroCiudadanoPage: el conmutador role=\"tablist\" alterna entre Persona Natural y Persona Jurídica sin recargar, y cambia los campos visibles", async () => {
     const user = userEvent.setup();
     renderRegistroCiudadanoPage();

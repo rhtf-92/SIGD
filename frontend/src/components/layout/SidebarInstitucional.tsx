@@ -23,6 +23,7 @@ export interface ModuloNavegacion {
   icono: React.ElementType;
   badge?: string;
   exact?: boolean;
+  roles: readonly string[];
 }
 
 export const MODULOS_SIDEBAR: ModuloNavegacion[] = [
@@ -32,6 +33,7 @@ export const MODULOS_SIDEBAR: ModuloNavegacion[] = [
     ruta: "/",
     icono: LayoutDashboard,
     exact: true,
+    roles: ["SUPER_ADMIN"],
   },
   {
     id: "mesa-partes",
@@ -39,42 +41,49 @@ export const MODULOS_SIDEBAR: ModuloNavegacion[] = [
     ruta: "/tramite/mesa-partes-virtual",
     icono: Send,
     badge: "TUPA",
+    roles: ["MESA_PARTES"],
   },
   {
     id: "casilla",
     nombre: "Casilla Electrónica",
     ruta: "/casilla",
     icono: Mail,
+    roles: ["ESTUDIANTE", "CIUDADANO"],
   },
   {
     id: "validador-cvd",
     nombre: "Validador CVD",
     ruta: "/validador-cvd",
     icono: ShieldCheck,
+    roles: ["DIRECTOR"],
   },
   {
     id: "registro",
     nombre: "Registro Ciudadano",
     ruta: "/registro",
     icono: UserCheck,
+    roles: ["SUPER_ADMIN"],
   },
   {
     id: "expedientes",
     nombre: "Bandeja de Expedientes",
     ruta: "/expedientes",
     icono: FolderKanban,
+    roles: ["DOCENTE"],
   },
   {
     id: "firma-digital",
     nombre: "Flujo y Firma Digital",
     ruta: "/flujo-validez-legal",
     icono: FileSignature,
+    roles: ["DIRECTOR"],
   },
   {
     id: "reportes",
     nombre: "Reportes & Métricas",
     ruta: "/reportes/dashboard",
     icono: BarChart3,
+    roles: ["DIRECTOR"],
   },
   {
     id: "administracion",
@@ -82,6 +91,7 @@ export const MODULOS_SIDEBAR: ModuloNavegacion[] = [
     ruta: "/administracion",
     icono: Sliders,
     badge: "RBAC",
+    roles: ["SUPER_ADMIN"],
   },
 ];
 
@@ -103,8 +113,8 @@ export default function SidebarInstitucional({
   const rolActivo =
     usuario?.rol ||
     (typeof window !== "undefined"
-      ? window.localStorage.getItem("sigd_rol") || "SUPER_ADMIN"
-      : "SUPER_ADMIN");
+      ? window.localStorage.getItem("sigd_rol") || ""
+      : "");
 
   const nombreUsuario =
     usuario?.nombreCompleto ||
@@ -217,7 +227,10 @@ export default function SidebarInstitucional({
             Módulos del Sistema
           </div>
 
-          {MODULOS_SIDEBAR.map((modulo) => {
+          {MODULOS_SIDEBAR.filter(
+            (modulo) =>
+              rolActivo === "SUPER_ADMIN" || modulo.roles.includes(rolActivo),
+          ).map((modulo) => {
             const activo = isRutaActiva(modulo);
             const Icono = modulo.icono;
 

@@ -50,7 +50,7 @@ export function crearRouterAuth(pool: Pool): Router {
              c.password_hash, c.activo,
              COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
              COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo,
-             p.area_id
+             COALESCE(p.area_id, ur.area_id) AS area_id
         FROM sigd_auth.cuenta_usuario c
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = c.id_persona
@@ -90,6 +90,7 @@ export function crearRouterAuth(pool: Pool): Router {
     const accessToken = firmarTokenAcceso({
       sub: usuario.id_usuario,
       roles: [rol],
+      areaId: usuario.area_id ?? null,
       expiraSegundos: 900, // 15 minutos
     });
 
@@ -147,10 +148,12 @@ export function crearRouterAuth(pool: Pool): Router {
 
     const query = `
       SELECT s.id_usuario, s.expira_en, s.revocado_en,
-             COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo
+           COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo,
+             COALESCE(p.area_id, ur.area_id) AS area_id
         FROM sigd_auth.sesion_usuario s
         LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = s.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
         LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+         LEFT JOIN sigd_auth.perfil_usuario p ON p.id_usuario = s.id_usuario
        WHERE s.refresh_token = $1
        LIMIT 1;
     `;
@@ -167,6 +170,7 @@ export function crearRouterAuth(pool: Pool): Router {
     const nuevoAccessToken = firmarTokenAcceso({
       sub: sesion.id_usuario,
       roles: [sesion.rol_codigo],
+      areaId: sesion.area_id ?? null,
       expiraSegundos: 900,
     });
 
@@ -206,7 +210,7 @@ export function crearRouterAuth(pool: Pool): Router {
       SELECT c.id_usuario, c.id_persona, c.usuario, c.correo,
              COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
              COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo,
-             p.area_id, p.cargo_id, p.telefono
+             COALESCE(p.area_id, ur.area_id) AS area_id, p.cargo_id, p.telefono
         FROM sigd_auth.cuenta_usuario c
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = c.id_persona

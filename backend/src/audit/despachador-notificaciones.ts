@@ -86,16 +86,20 @@ export class DestinoCasilla implements DestinoNotificacion {
 
     const payload = (evento.payload ?? {}) as Record<string, unknown>;
     const correo = typeof payload.correo_destinatario === 'string' ? payload.correo_destinatario : null;
-    if (!correo) return;
+    const usuarioId = typeof payload.usuario_id === 'string' ? payload.usuario_id : null;
+    if (!correo || !usuarioId) return;
 
     await this.pool.query(
-      `INSERT INTO ${this.tabla} (correo_destinatario, asunto, cuerpo, referencia, estado)
-       VALUES ($1, $2, $3::jsonb, $4, 'PENDIENTE')`,
+      `INSERT INTO ${this.tabla} (usuario_id, correo_destinatario, cut, asunto, tipo_acto, cuerpo, referencia, estado)
+       VALUES ($1::uuid, $2, $3, $4, $5, $6::jsonb, $7, 'PENDIENTE')`,
       [
+        usuarioId,
         correo,
+        typeof payload.cut === 'string' ? payload.cut : null,
         typeof payload.asunto === 'string' ? payload.asunto : evento.tipo_evento,
-        JSON.stringify(payload),
-        evento.correlation_id ?? evento.id_evento,
+        typeof payload.tipo_acto === 'string' ? payload.tipo_acto : 'Notificación de Acto Administrativo',
+        JSON.stringify(payload.cuerpo ?? payload),
+        typeof payload.referencia === 'string' ? payload.referencia : evento.correlation_id ?? evento.id_evento,
       ],
     );
   }

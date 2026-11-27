@@ -18,7 +18,7 @@ export default function TopHeaderBar({
   const rol =
     usuario?.rol ||
     (typeof window !== "undefined"
-      ? window.localStorage.getItem("sigd_rol") || "SUPER_ADMIN"
+      ? window.localStorage.getItem("sigd_rol") || "INVITADO"
       : "SUPER_ADMIN");
 
   // Formato oficial de fecha en español (Perú)

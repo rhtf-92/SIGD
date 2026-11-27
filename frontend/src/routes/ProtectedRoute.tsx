@@ -4,6 +4,7 @@ import type { JSX, ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 import type { ClavePermiso, MatrizPermisos } from "../types/rbacRoles";
+import { useAuthStore } from "../stores/authStore";
 
 const CLAVE_TOKEN = "sigd_token";
 const CLAVE_ROL = "sigd_rol";
@@ -44,14 +45,20 @@ export default function ProtectedRoute({
   requiredAction = "ver",
 }: ProtectedRouteProps): JSX.Element {
   const location = useLocation();
-  const token = window.localStorage.getItem(CLAVE_TOKEN);
-  const rol = window.localStorage.getItem(CLAVE_ROL);
+  const usuarioRol = useAuthStore((state) => state.usuario?.rol);
+  const tokenStore = useAuthStore((state) => state.accessToken);
+  const token = tokenStore ?? window.localStorage.getItem(CLAVE_TOKEN);
+  const rol = usuarioRol ?? window.localStorage.getItem(CLAVE_ROL);
 
   if (!token) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (requiredRoles.length > 0 && !requiredRoles.includes(rol ?? "")) {
+  if (
+    requiredRoles.length > 0 &&
+    rol !== "SUPER_ADMIN" &&
+    !requiredRoles.includes(rol ?? "")
+  ) {
     return <Navigate to="/acceso-denegado" replace />;
   }
 

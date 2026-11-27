@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SIGD – Iniciar Sesión · IESTP "Suiza" Pucallpa</title>
+  <meta name="description" content="Accede a tu casilla y bandeja de gestión institucional del Sistema de Gestión Documentaria SIGD – IESTP Suiza Pucallpa." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ============================================================
+       DESIGN TOKENS & RESET
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --font: 'Inter', system-ui, sans-serif;
+      --sigd-dark: #0c2340;
+      --sigd-mid:  #0f3261;
+      --sigd-blue: #006EC7;
+      --sigd-teal: #116b83;
+      --bg:        #101520;
+      --card:      #141c2e;
+      --border:    rgba(255,255,255,0.06);
+      --label-clr: rgba(255,255,255,0.35);
+      --input-bg:  rgba(255,255,255,0.05);
+      --text:      rgba(255,255,255,0.80);
+      --glow:      transparent;
+      --accent:    #4a9eff;
+      --btn-bg:    linear-gradient(135deg, #0c2340 0%, #0f3261 100%);
+      --link-clr:  #60a5fa;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      transition: background 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* FONDO AMBIENTAL */
+    .ambient-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .ambient-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0;
+      transition: opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1), background 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .ambient-blob.b1 { width: 420px; height: 420px; top: -80px; right: -60px; }
+    .ambient-blob.b2 { width: 320px; height: 320px; bottom: -60px; left: 20px; }
+    .ambient-blob.b3 { width: 200px; height: 200px; top: 40%; left: 50%; transform: translate(-50%,-50%); }
+
+    .grid-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      mask-image: radial-gradient(ellipse at 60% 40%, black 0%, transparent 70%);
+    }
+
+    /* WRAPPER PRINCIPAL */
+    .login-wrapper {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 440px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    /* LAMPARA */
+    .lamp-container {
+      position: relative;
+      width: 180px;
+      height: 160px;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: -8px;
+      z-index: 20;
+    }
+    .lamp-container:focus-visible { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 8px; }
+
+    .lamp-svg {
+      width: 160px;
+      height: 130px;
+      overflow: visible;
+      transition: filter 0.5s ease;
+    }
+    .lamp-base  { fill: #2a2f3e; transition: fill 0.5s ease; }
+    .lamp-arm   { stroke: #3a4155; stroke-width: 5; fill: none; stroke-linecap: round; transition: stroke 0.5s ease; }
+    .lamp-shade { fill: #2a2f3e; transition: fill 0.5s ease; }
+    .lamp-bulb  { fill: rgba(255,255,255,0.08); transition: fill 0.5s ease; }
+    .lamp-shine { fill: rgba(255,255,255,0.00); transition: fill 0.5s ease; }
+    .lamp-cone  { fill: rgba(255,255,255,0.00); transition: fill 0.5s ease, opacity 0.5s ease; opacity: 0; }
+
+    .lamp-rope-wrap {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: -4px;
+    }
+    .lamp-rope {
+      width: 2px;
+      height: 36px;
+      background: linear-gradient(to bottom, #4a5568, #2d3748);
+      border-radius: 1px;
+      transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transform-origin: top center;
+    }
+    .lamp-rope-knob {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #718096, #2d3748);
+      border: 2px solid #4a5568;
+      cursor: pointer;
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, background 0.5s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+
+    .lamp-theme-label {
+      position: absolute;
+      top: -28px;
+      left: 50%;
+      transform: translateX(-50%) scale(0.85);
+      background: rgba(0,0,0,0.75);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      padding: 3px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      backdrop-filter: blur(4px);
+    }
+    .lamp-container:hover .lamp-theme-label { opacity: 1; transform: translateX(-50%) scale(1); }
+
+    @keyframes ropeSwing {
+      0%   { transform: rotate(0deg); }
+      20%  { transform: rotate(18deg); }
+      45%  { transform: rotate(-10deg); }
+      65%  { transform: rotate(6deg); }
+      80%  { transform: rotate(-3deg); }
+      100% { transform: rotate(0deg); }
+    }
+    .rope-swing { animation: ropeSwing 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+
+    @keyframes knobPulse {
+      0%   { transform: scale(1); }
+      30%  { transform: scale(0.80); }
+      70%  { transform: scale(1.15); }
+      100% { transform: scale(1); }
+    }
+    .knob-pulse { animation: knobPulse 0.3s ease forwards; }
+
+    /* TARJETA */
+    .login-card {
+      width: 100%;
+      max-width: 440px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 32px 32px 28px;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 24px 64px rgba(0,0,0,0.5), 0 0 80px var(--glow);
+      transition: background 0.7s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.7s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    .card-top-bar {
+      position: absolute;
+      top: 0; left: 32px; right: 32px;
+      height: 3px;
+      border-radius: 0 0 6px 6px;
+      background: linear-gradient(90deg, #006EC7, #22d3ee, #38bdf8);
+      transition: background 0.7s ease;
+    }
+    .card-inner-glow {
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 200px; height: 200px;
+      border-radius: 50%;
+      background: var(--glow);
+      opacity: 0.5;
+      filter: blur(50px);
+      pointer-events: none;
+      transition: background 0.7s ease, opacity 0.7s ease;
+    }
+
+    /* ENCABEZADO */
+    .form-header { margin-bottom: 24px; position: relative; }
+    .form-title {
+      font-size: 1.75rem; font-weight: 800; letter-spacing: -0.025em;
+      color: var(--text); transition: color 0.6s ease; line-height: 1.1;
+    }
+    .form-subtitle {
+      font-size: 0.8rem; color: var(--label-clr); margin-top: 6px; line-height: 1.6; transition: color 0.6s ease;
+    }
+
+    /* ERROR */
+    .error-alert {
+      display: none;
+      align-items: flex-start;
+      gap: 10px;
+      background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+      animation: slideDown 0.3s ease;
+    }
+    .error-alert.visible { display: flex; }
+    .error-alert-icon { width: 16px; height: 16px; color: #ef4444; flex-shrink: 0; margin-top: 1px; }
+    .error-alert-text { font-size: 0.75rem; color: #fca5a5; line-height: 1.5; flex: 1; }
+    .error-close { background: none; border: none; color: #f87171; cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* CAMPOS */
+    .form-group { margin-bottom: 16px; }
+    .form-label {
+      display: block; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--label-clr); margin-bottom: 6px; transition: color 0.6s ease;
+    }
+    .input-wrap { position: relative; display: flex; align-items: center; }
+    .input-icon {
+      position: absolute; left: 12px; width: 16px; height: 16px;
+      color: var(--label-clr); pointer-events: none; transition: color 0.5s ease;
+    }
+    .form-input {
+      width: 100%; background: var(--input-bg); border: 1px solid var(--border);
+      border-radius: 12px; padding: 11px 14px 11px 40px;
+      font-size: 0.875rem; font-family: var(--font); color: var(--text); outline: none;
+      transition: background 0.5s ease, border-color 0.4s ease, box-shadow 0.3s ease, color 0.5s ease;
+    }
+    .form-input::placeholder { color: var(--label-clr); opacity: 0.65; }
+    .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
+    .input-toggle {
+      position: absolute; right: 10px; background: none; border: none; cursor: pointer;
+      color: var(--label-clr); display: flex; align-items: center; justify-content: center;
+      padding: 4px; border-radius: 6px; transition: color 0.3s, background 0.2s;
+    }
+    .input-toggle:hover { color: var(--text); background: rgba(255,255,255,0.08); }
+    .input-toggle svg { width: 16px; height: 16px; }
+
+    /* FILA MEDIO */
+    .form-row-mid { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 20px; }
+    .checkbox-label {
+      display: flex; align-items: center; gap: 8px; cursor: pointer;
+      font-size: 0.8rem; font-weight: 500; color: var(--label-clr); transition: color 0.5s ease; user-select: none;
+    }
+    .checkbox-label input[type="checkbox"] { width: 15px; height: 15px; border-radius: 4px; accent-color: var(--accent); cursor: pointer; }
+    .forgot-link {
+      font-size: 0.8rem; font-weight: 600; color: var(--link-clr); text-decoration: none;
+      background: none; border: none; cursor: pointer; font-family: var(--font); transition: color 0.3s, text-decoration 0.2s;
+    }
+    .forgot-link:hover { text-decoration: underline; }
+
+    /* BOTÓN SUBMIT */
+    .btn-submit {
+      width: 100%; padding: 13px 20px; border: none; border-radius: 12px;
+      font-family: var(--font); font-size: 0.9rem; font-weight: 700; color: #fff;
+      background: var(--btn-bg); cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, filter 0.2s ease, background 0.6s ease;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3); position: relative; overflow: hidden;
+    }
+    .btn-submit::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 60%); border-radius: inherit;
+    }
+    .btn-submit:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,0.4); filter: brightness(1.1); }
+    .btn-submit:active:not(:disabled) { transform: translateY(0); }
+    .btn-submit:disabled { opacity: 0.65; cursor: not-allowed; }
+    .btn-spinner {
+      width: 16px; height: 16px; border: 2.5px solid rgba(255,255,255,0.3);
+      border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-icon { width: 18px; height: 18px; }
+
+    /* SEPARADOR */
+    .divider { position: relative; margin: 22px 0 18px; display: flex; align-items: center; }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); transition: background 0.6s ease; }
+    .divider-label {
+      font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--label-clr); padding: 0 12px; white-space: nowrap; transition: color 0.6s ease;
+    }
+
+    /* BLOQUE CIUDADANO */
+    .citizen-block {
+      background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+      border-radius: 14px; padding: 14px 16px; text-align: center;
+      transition: background 0.6s ease, border-color 0.6s ease;
+    }
+    .citizen-text { font-size: 0.75rem; color: var(--label-clr); line-height: 1.6; margin-bottom: 6px; transition: color 0.6s ease; }
+    .citizen-link {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 0.78rem; font-weight: 700; color: var(--link-clr); text-decoration: none; transition: color 0.3s;
+    }
+    .citizen-link:hover { text-decoration: underline; }
+    .citizen-link svg { width: 13px; height: 13px; }
+
+    /* CONTROLES */
+    .extra-controls {
+      position: fixed; top: 16px; right: 16px; z-index: 100; display: flex; gap: 8px;
+    }
+    .ctrl-btn {
+      width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.08); backdrop-filter: blur(8px); color: rgba(255,255,255,0.7);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s, color 0.2s, transform 0.2s; font-size: 14px;
+    }
+    .ctrl-btn:hover { background: rgba(255,255,255,0.15); color: #fff; transform: scale(1.05); }
+
+    /* MODAL */
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center;
+      padding: 16px; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+    }
+    .modal-backdrop.open { opacity: 1; pointer-events: all; }
+    .modal-box {
+      background: #1e2a3e; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px;
+      padding: 24px; width: 100%; max-width: 400px;
+      transform: scale(0.95) translateY(10px);
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    }
+    .modal-backdrop.open .modal-box { transform: scale(1) translateY(0); }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 14px; margin-bottom: 16px; }
+    .modal-title { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; font-weight: 700; color: #e2e8f0; }
+    .modal-title svg { width: 18px; height: 18px; color: #60a5fa; }
+    .modal-close { background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.4); border-radius: 8px; padding: 4px; display: flex; transition: color 0.2s, background 0.2s; }
+    .modal-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
+    .modal-close svg { width: 18px; height: 18px; }
+    .modal-body { font-size: 0.8rem; color: rgba(255,255,255,0.65); line-height: 1.65; }
+    .modal-info-box { background: rgba(96,165,250,0.08); border: 1px solid rgba(96,165,250,0.2); border-radius: 10px; padding: 12px 14px; margin-top: 14px; font-size: 0.75rem; color: #93c5fd; line-height: 1.6; }
+    .modal-email { display: block; text-align: center; font-family: monospace; font-weight: 700; font-size: 0.8rem; color: #60a5fa; background: rgba(96,165,250,0.1); border: 1px solid rgba(96,165,250,0.2); border-radius: 8px; padding: 8px; margin: 10px 0 6px; }
+    .modal-footer { margin-top: 18px; display: flex; justify-content: flex-end; }
+    .modal-btn { padding: 9px 20px; background: linear-gradient(135deg, #0c2340, #0f3261); border: none; border-radius: 10px; font-family: var(--font); font-size: 0.8rem; font-weight: 700; color: #fff; cursor: pointer; transition: transform 0.2s, filter 0.2s; }
+    .modal-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+
+    /* ANIMACIONES DE ENTRADA */
+    @keyframes cardEnter {
+      from { opacity: 0; transform: translateY(24px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes lampEnter {
+      from { opacity: 0; transform: translateY(-20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .lamp-container { animation: lampEnter 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both; }
+    .login-card     { animation: cardEnter 0.6s cubic-bezier(0.2, 0.75, 0.25, 1) 0.25s both; }
+
+    @media (max-width: 480px) {
+      .login-card { padding: 24px 20px 20px; border-radius: 20px; }
+      .form-title { font-size: 1.5rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .lamp-container, .login-card { animation: none; }
+      * { transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="ambient-bg" aria-hidden="true">
+    <div class="ambient-blob b1" id="ambientB1"></div>
+    <div class="ambient-blob b2" id="ambientB2"></div>
+    <div class="ambient-blob b3" id="ambientB3"></div>
+  </div>
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <div class="extra-controls" role="toolbar" aria-label="Controles de accesibilidad">
+    <button class="ctrl-btn" id="soundToggle" title="Activar/desactivar sonido" aria-pressed="true">🔊</button>
+  </div>
+
+  <div class="login-wrapper">
+
+    <!-- LAMPARA INTERACTIVA -->
+    <div
+      class="lamp-container"
+      id="lampContainer"
+      role="button"
+      tabindex="0"
+      aria-label="Lampara interactiva — clic para encender/apagar y cambiar el tema de color"
+    >
+      <div class="lamp-theme-label" id="lampThemeLabel" aria-hidden="true">Apagada</div>
+
+      <svg class="lamp-svg" id="lampSvg" viewBox="0 0 160 130" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <!-- Base y columna -->
+        <ellipse class="lamp-base" cx="80" cy="122" rx="30" ry="6" />
+        <rect class="lamp-base" x="74" y="100" width="12" height="24" rx="4" />
+        <!-- Brazo articulado -->
+        <line class="lamp-arm" x1="80" y1="100" x2="70" y2="68" />
+        <line class="lamp-arm" x1="70" y1="68"  x2="88" y2="38" />
+        <!-- Junta central -->
+        <circle class="lamp-base" cx="70" cy="68" r="5" />
+        <circle fill="#4a5568" cx="70" cy="68" r="3" />
+        <!-- Pantalla -->
+        <path class="lamp-shade" d="M68 42 Q88 24 108 36 L102 52 Q88 42 74 52 Z" />
+        <path class="lamp-shade" d="M86 36 L90 24 L94 36 Z" />
+        <!-- Bulbo -->
+        <ellipse class="lamp-bulb" id="lampBulb" cx="88" cy="46" rx="7" ry="6" />
+        <ellipse class="lamp-shine" id="lampShine" cx="85" cy="43" rx="3" ry="2.5" />
+        <!-- Cono de luz -->
+        <path class="lamp-cone" id="lampConeShape" d="M74 52 Q88 54 102 52 L115 110 Q88 118 61 110 Z" />
+      </svg>
+
+      <div class="lamp-rope-wrap" aria-hidden="true">
+        <div class="lamp-rope" id="lampRope"></div>
+        <div class="lamp-rope-knob" id="lampKnob"></div>
+      </div>
+    </div>
+
+    <!-- TARJETA DE LOGIN -->
+    <section class="login-card" id="loginCard" aria-labelledby="login-titulo" role="region">
+      <div class="card-top-bar" id="cardTopBar" aria-hidden="true"></div>
+      <div class="card-inner-glow" id="cardInnerGlow" aria-hidden="true"></div>
+
+      <div class="form-header">
+        <h1 class="form-title" id="login-titulo">Iniciar Sesión</h1>
+        <p class="form-subtitle">
+          Ingrese sus credenciales institucionales para acceder a su casilla y bandeja de gestión.
+        </p>
+      </div>
+
+      <div class="error-alert" id="errorAlert" role="alert" aria-live="polite">
+        <svg class="error-alert-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        </svg>
+        <span class="error-alert-text" id="errorText"></span>
+        <button class="error-close" id="errorClose" aria-label="Cerrar mensaje de error">x</button>
+      </div>
+
+      <form id="loginForm" novalidate>
+
+        <!-- Campo Usuario -->
+        <div class="form-group">
+          <label class="form-label" for="identificador">
+            Usuario, DNI o Correo Institucional
+          </label>
+          <div class="input-wrap">
+            <svg class="input-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+            </svg>
+            <input
+              class="form-input"
+              id="identificador"
+              name="identificador"
+              type="text"
+              placeholder="30456789 o usuario@iestpsuiza.edu.pe"
+              autocomplete="username"
+              required
+              aria-required="true"
+            />
+          </div>
+        </div>
+
+        <!-- Campo Contrasena -->
+        <div class="form-group">
+          <label class="form-label" for="password">Contrasena</label>
+          <div class="input-wrap">
+            <svg class="input-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+            <input
+              class="form-input"
+              id="password"
+              name="password"
+              type="password"
+              placeholder="••••••••"
+              autocomplete="current-password"
+              required
+              aria-required="true"
+              style="padding-right: 42px;"
+            />
+            <button
+              type="button"
+              class="input-toggle"
+              id="togglePassword"
+              aria-label="Mostrar contrasena"
+              aria-controls="password"
+              aria-pressed="false"
+            >
+              <svg id="eyeOpen" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+              </svg>
+              <svg id="eyeClosed" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true" style="display:none">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.477 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Recordar + Olvidó -->
+        <div class="form-row-mid">
+          <label class="checkbox-label" for="remember">
+            <input type="checkbox" id="remember" name="remember" />
+            <span>Recordar sesion</span>
+          </label>
+          <button type="button" class="forgot-link" id="forgotBtn" aria-haspopup="dialog">
+            Olvido su clave?
+          </button>
+        </div>
+
+        <!-- Boton Ingresar -->
+        <button type="submit" class="btn-submit" id="submitBtn">
+          <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+          </svg>
+          <span id="btnText">Ingresar</span>
+        </button>
+
+      </form>
+
+      <!-- Separador -->
+      <div class="divider" aria-hidden="true">
+        <span class="divider-label">Atencion al Ciudadano</span>
+      </div>
+
+      <!-- Bloque Mesa de Partes -->
+      <div class="citizen-block">
+        <p class="citizen-text">Es ciudadano o no cuenta con usuario interno?</p>
+        <a href="/tramite/mesa-partes-virtual" class="citizen-link" aria-label="Presentar solicitud en Mesa de Partes Virtual">
+          <span>Presentar solicitud en Mesa de Partes Virtual</span>
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+          </svg>
+        </a>
+      </div>
+
+    </section>
+  </div>
+
+  <!-- Modal Olvido clave -->
+  <div class="modal-backdrop" id="forgotModal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+          </svg>
+          <h2 id="modal-title">Restablecimiento de Credenciales</h2>
+        </div>
+        <button class="modal-close" id="modalClose" aria-label="Cerrar ventana de ayuda">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>Por razones de seguridad institucional, las claves de acceso al SIGD no se envian por canales no verificados.</p>
+        <div class="modal-info-box">
+          <p>Para restablecer su contrasena, contacte a la <strong>Oficina de Tecnologias de la Informacion (OTI)</strong> del IESTP "Suiza" o envie un correo desde su casilla institucional a:</p>
+          <span class="modal-email">soporte.sigd@iestpsuiza.edu.pe</span>
+          <p style="font-size:0.7rem; opacity:0.8;">Indique su DNI, nombres completos y cargo o programa de estudio correspondiente.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn" id="modalOk">Entendido</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    'use strict';
+
+    /* =====================================================
+       TEMAS DE LAMPARA
+    ===================================================== */
+    const TEMAS = [
+      { id: 'off', label: 'Apagada' },
+      {
+        id: 'amber', label: 'Luz Calida',
+        vars: {
+          '--bg': '#1a1200', '--card': '#1f1a04', '--border': 'rgba(255,183,50,0.22)',
+          '--label-clr': '#c88a30', '--input-bg': 'rgba(34,25,0,0.5)', '--text': '#fdf0d5',
+          '--glow': 'rgba(255,165,30,0.25)', '--accent': '#f59e0b',
+          '--btn-bg': 'linear-gradient(135deg,#b45309 0%,#d97706 100%)', '--link-clr': '#fbbf24',
+        },
+        bulbColor: 'rgba(255,200,50,0.9)', shineColor: 'rgba(255,240,180,0.95)', coneColor: 'rgba(255,180,20,0.18)',
+        blobColors: ['rgba(255,150,20,0.15)', 'rgba(255,100,0,0.1)', 'rgba(255,200,80,0.08)'],
+        armColor: '#8b6914', baseColor: '#5a4010', shadeColor: '#8b5e1a',
+        cardTopBar: 'linear-gradient(90deg,#d97706,#fbbf24,#f59e0b)',
+        knobBg: 'radial-gradient(circle at 35% 35%,#fbbf24,#92400e)',
+        lampDropShadow: 'drop-shadow(0 0 12px rgba(255,200,50,0.8)) drop-shadow(0 0 4px rgba(255,240,180,0.9))',
+        ropeColor: '#92400e',
+      },
+      {
+        id: 'rose', label: 'Luz Rosa',
+        vars: {
+          '--bg': '#1a0012', '--card': '#200016', '--border': 'rgba(255,80,180,0.22)',
+          '--label-clr': '#d946a8', '--input-bg': 'rgba(42,0,25,0.5)', '--text': '#ffe0f5',
+          '--glow': 'rgba(236,72,153,0.28)', '--accent': '#ec4899',
+          '--btn-bg': 'linear-gradient(135deg,#9d174d 0%,#db2777 100%)', '--link-clr': '#f472b6',
+        },
+        bulbColor: 'rgba(255,100,200,0.9)', shineColor: 'rgba(255,200,240,0.95)', coneColor: 'rgba(240,60,180,0.18)',
+        blobColors: ['rgba(236,72,153,0.18)', 'rgba(190,24,93,0.12)', 'rgba(244,114,182,0.08)'],
+        armColor: '#7e174a', baseColor: '#4a0d2e', shadeColor: '#7e1d50',
+        cardTopBar: 'linear-gradient(90deg,#db2777,#f472b6,#ec4899)',
+        knobBg: 'radial-gradient(circle at 35% 35%,#f472b6,#831843)',
+        lampDropShadow: 'drop-shadow(0 0 12px rgba(255,100,200,0.8)) drop-shadow(0 0 4px rgba(255,200,240,0.9))',
+        ropeColor: '#831843',
+      },
+      {
+        id: 'green', label: 'Luz Neon',
+        vars: {
+          '--bg': '#001209', '--card': '#001a0d', '--border': 'rgba(52,211,153,0.22)',
+          '--label-clr': '#10b981', '--input-bg': 'rgba(0,35,14,0.5)', '--text': '#d1fae5',
+          '--glow': 'rgba(52,211,153,0.28)', '--accent': '#34d399',
+          '--btn-bg': 'linear-gradient(135deg,#065f46 0%,#059669 100%)', '--link-clr': '#6ee7b7',
+        },
+        bulbColor: 'rgba(50,220,150,0.9)', shineColor: 'rgba(200,255,230,0.95)', coneColor: 'rgba(30,200,130,0.18)',
+        blobColors: ['rgba(52,211,153,0.15)', 'rgba(16,185,129,0.10)', 'rgba(110,231,183,0.08)'],
+        armColor: '#065f46', baseColor: '#022c22', shadeColor: '#065f46',
+        cardTopBar: 'linear-gradient(90deg,#059669,#34d399,#10b981)',
+        knobBg: 'radial-gradient(circle at 35% 35%,#34d399,#022c22)',
+        lampDropShadow: 'drop-shadow(0 0 12px rgba(50,220,150,0.8)) drop-shadow(0 0 4px rgba(200,255,230,0.9))',
+        ropeColor: '#022c22',
+      },
+    ];
+
+    let temaIndex   = 0;
+    let soundEnabled = true;
+    let audioCtx    = null;
+
+    /* REFERENCIAS DOM */
+    const lampContainer  = document.getElementById('lampContainer');
+    const lampRope       = document.getElementById('lampRope');
+    const lampKnob       = document.getElementById('lampKnob');
+    const lampBulb       = document.getElementById('lampBulb');
+    const lampShine      = document.getElementById('lampShine');
+    const lampConeShape  = document.getElementById('lampConeShape');
+    const lampThemeLabel = document.getElementById('lampThemeLabel');
+    const lampSvg        = document.getElementById('lampSvg');
+    const ambientB1      = document.getElementById('ambientB1');
+    const ambientB2      = document.getElementById('ambientB2');
+    const ambientB3      = document.getElementById('ambientB3');
+    const cardTopBar     = document.getElementById('cardTopBar');
+    const soundToggle    = document.getElementById('soundToggle');
+    const errorAlert     = document.getElementById('errorAlert');
+    const errorText      = document.getElementById('errorText');
+    const errorClose     = document.getElementById('errorClose');
+    const forgotBtn      = document.getElementById('forgotBtn');
+    const forgotModal    = document.getElementById('forgotModal');
+    const modalClose     = document.getElementById('modalClose');
+    const modalOk        = document.getElementById('modalOk');
+    const submitBtn      = document.getElementById('submitBtn');
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput  = document.getElementById('password');
+    const eyeOpen        = document.getElementById('eyeOpen');
+    const eyeClosed      = document.getElementById('eyeClosed');
+    const loginForm      = document.getElementById('loginForm');
+    const svgArms        = lampSvg.querySelectorAll('.lamp-arm');
+    const svgBases       = lampSvg.querySelectorAll('.lamp-base');
+    const svgShades      = lampSvg.querySelectorAll('.lamp-shade');
+
+    /* =====================================================
+       WEB AUDIO API
+    ===================================================== */
+    function getAudioCtx() {
+      if (!audioCtx) {
+        try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        catch { return null; }
+      }
+      return audioCtx;
+    }
+
+    function playClickSound() {
+      if (!soundEnabled) return;
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      try {
+        const buffer = ctx.createBuffer(1, ctx.sampleRate * 0.08, ctx.sampleRate);
+        const data   = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 4);
+        }
+        const src    = ctx.createBufferSource();
+        src.buffer   = buffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type            = 'bandpass';
+        filter.frequency.value = 1200;
+        filter.Q.value         = 2;
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.6, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+        src.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        src.start();
+        src.stop(ctx.currentTime + 0.1);
+      } catch {}
+    }
+
+    function playHumSound(tema) {
+      if (!soundEnabled || !tema) return;
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      try {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const freqMap = { amber: 60, rose: 80, green: 100 };
+        osc.frequency.value = freqMap[tema.id] || 60;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.5);
+      } catch {}
+    }
+
+    /* =====================================================
+       APLICAR TEMA
+    ===================================================== */
+    function applyTheme(index) {
+      const root = document.documentElement;
+      const tema = TEMAS[index];
+
+      if (index === 0) {
+        root.style.setProperty('--bg',        '#101520');
+        root.style.setProperty('--card',      '#141c2e');
+        root.style.setProperty('--border',    'rgba(255,255,255,0.06)');
+        root.style.setProperty('--label-clr', 'rgba(255,255,255,0.35)');
+        root.style.setProperty('--input-bg',  'rgba(255,255,255,0.05)');
+        root.style.setProperty('--text',      'rgba(255,255,255,0.80)');
+        root.style.setProperty('--glow',      'transparent');
+        root.style.setProperty('--accent',    '#4a9eff');
+        root.style.setProperty('--btn-bg',    'linear-gradient(135deg,#0c2340 0%,#0f3261 100%)');
+        root.style.setProperty('--link-clr',  '#60a5fa');
+        lampBulb.setAttribute('fill', 'rgba(255,255,255,0.08)');
+        lampShine.setAttribute('fill', 'rgba(255,255,255,0.00)');
+        lampConeShape.setAttribute('fill', 'rgba(255,255,255,0.00)');
+        lampSvg.style.filter = '';
+        lampKnob.style.background = 'radial-gradient(circle at 35% 35%,#718096,#2d3748)';
+        lampRope.style.background = 'linear-gradient(to bottom,#4a5568,#2d3748)';
+        svgArms.forEach(el  => el.setAttribute('stroke', '#3a4155'));
+        svgBases.forEach(el => el.setAttribute('fill', '#2a2f3e'));
+        svgShades.forEach(el => el.setAttribute('fill', '#2a2f3e'));
+        ambientB1.style.opacity = '0';
+        ambientB2.style.opacity = '0';
+        ambientB3.style.opacity = '0';
+        cardTopBar.style.background = 'linear-gradient(90deg,#006EC7,#22d3ee,#38bdf8)';
+        lampThemeLabel.textContent  = 'Apagada';
+      } else {
+        Object.entries(tema.vars).forEach(([k, v]) => root.style.setProperty(k, v));
+        lampBulb.setAttribute('fill', tema.bulbColor);
+        lampShine.setAttribute('fill', tema.shineColor);
+        lampConeShape.setAttribute('fill', tema.coneColor);
+        lampSvg.style.filter = tema.lampDropShadow || '';
+        lampKnob.style.background = tema.knobBg;
+        lampRope.style.background = `linear-gradient(to bottom,${tema.ropeColor},${tema.armColor})`;
+        svgArms.forEach(el  => el.setAttribute('stroke', tema.armColor));
+        svgBases.forEach(el => el.setAttribute('fill', tema.baseColor));
+        svgShades.forEach(el => el.setAttribute('fill', tema.shadeColor));
+        ambientB1.style.background = tema.blobColors[0];
+        ambientB2.style.background = tema.blobColors[1];
+        ambientB3.style.background = tema.blobColors[2];
+        ambientB1.style.opacity = '1';
+        ambientB2.style.opacity = '1';
+        ambientB3.style.opacity = '1';
+        cardTopBar.style.background = tema.cardTopBar;
+        lampThemeLabel.textContent  = tema.label;
+      }
+    }
+
+    /* =====================================================
+       ANIMACION CUERDA
+    ===================================================== */
+    function triggerRopeAnimation() {
+      lampRope.classList.remove('rope-swing');
+      void lampRope.offsetWidth;
+      lampRope.classList.add('rope-swing');
+      lampRope.addEventListener('animationend', () => lampRope.classList.remove('rope-swing'), { once: true });
+      lampKnob.classList.remove('knob-pulse');
+      void lampKnob.offsetWidth;
+      lampKnob.classList.add('knob-pulse');
+      lampKnob.addEventListener('animationend', () => lampKnob.classList.remove('knob-pulse'), { once: true });
+    }
+
+    /* CLIC LAMPARA */
+    function onLampClick() {
+      temaIndex = (temaIndex + 1) % TEMAS.length;
+      triggerRopeAnimation();
+      playClickSound();
+      if (temaIndex !== 0) setTimeout(() => playHumSound(TEMAS[temaIndex]), 60);
+      applyTheme(temaIndex);
+    }
+
+    lampContainer.addEventListener('click', onLampClick);
+    lampContainer.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onLampClick(); }
+    });
+
+    /* TOGGLE CONTRASENA */
+    let passwordVisible = false;
+    togglePassword.addEventListener('click', () => {
+      passwordVisible = !passwordVisible;
+      passwordInput.type = passwordVisible ? 'text' : 'password';
+      eyeOpen.style.display   = passwordVisible ? 'none'  : 'block';
+      eyeClosed.style.display = passwordVisible ? 'block' : 'none';
+      togglePassword.setAttribute('aria-label',   passwordVisible ? 'Ocultar contrasena' : 'Mostrar contrasena');
+      togglePassword.setAttribute('aria-pressed', String(passwordVisible));
+    });
+
+    /* SUBMIT */
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideError();
+      const idVal   = document.getElementById('identificador').value.trim();
+      const passVal = document.getElementById('password').value;
+      if (!idVal)   { showError('Por favor, ingrese su usuario, DNI o correo institucional.'); return; }
+      if (!passVal) { showError('Por favor, ingrese su contrasena de acceso.'); return; }
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span><span>Validando credenciales...</span>';
+
+      await new Promise(r => setTimeout(r, 1800));
+
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `
+        <svg class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+        </svg>
+        <span>Ingresar</span>`;
+      showError('Credenciales no validas (modo demo). Integra tu authService real aqui.');
+    });
+
+    function showError(msg) { errorText.textContent = msg; errorAlert.classList.add('visible'); }
+    function hideError()    { errorAlert.classList.remove('visible'); errorText.textContent = ''; }
+    errorClose.addEventListener('click', hideError);
+
+    /* MODAL */
+    function openModal()  { forgotModal.classList.add('open');    modalOk.focus(); }
+    function closeModal() { forgotModal.classList.remove('open'); forgotBtn.focus(); }
+    forgotBtn.addEventListener('click', openModal);
+    modalClose.addEventListener('click', closeModal);
+    modalOk.addEventListener('click', closeModal);
+    forgotModal.addEventListener('click', (e) => { if (e.target === forgotModal) closeModal(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && forgotModal.classList.contains('open')) closeModal(); });
+
+    /* SONIDO TOGGLE */
+    soundToggle.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      soundToggle.textContent = soundEnabled ? 'xx' : 'xx';
+      soundToggle.textContent = soundEnabled ? String.fromCodePoint(0x1F50A) : String.fromCodePoint(0x1F507);
+      soundToggle.title       = soundEnabled ? 'Desactivar sonido' : 'Activar sonido';
+      soundToggle.setAttribute('aria-pressed', String(soundEnabled));
+    });
+
+    /* RECORDAR SESION */
+    const CLAVE_REMEMBER     = 'sigd_remembered_user';
+    const rememberChk        = document.getElementById('remember');
+    const identificadorInput = document.getElementById('identificador');
+    try {
+      const savedUser = localStorage.getItem(CLAVE_REMEMBER);
+      if (savedUser) { identificadorInput.value = savedUser; rememberChk.checked = true; }
+    } catch {}
+    loginForm.addEventListener('submit', () => {
+      try {
+        if (rememberChk.checked) localStorage.setItem(CLAVE_REMEMBER, identificadorInput.value.trim());
+        else                     localStorage.removeItem(CLAVE_REMEMBER);
+      } catch {}
+    }, true);
+
+    /* INIT */
+    applyTheme(0);
+
+  })();
+  </script>
+
+</body>
+</html>

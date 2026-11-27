@@ -1,120 +1,117 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, BookOpenCheck, GraduationCap } from "lucide-react";
-import BrandingColumn from "../components/auth/BrandingColumn";
-import LoginFormCard, { ROLES_CANONICOS } from "../components/auth/LoginFormCard";
-import LoginFooter from "../components/auth/LoginFooter";
+import { ArrowLeft, Clock, GraduationCap, LogIn, Mail, UserPlus } from "lucide-react";
+import { ROLES_CANONICOS } from "../components/auth/LoginFormCard";
+import LoginFormCardLampara from "../components/auth/LoginFormCardLampara";
 
 export { ROLES_CANONICOS };
 
 export function LoginSIGD(): React.JSX.Element {
   return (
-    <main className="min-h-screen w-full flex flex-col lg:flex-row bg-[#f8fafc] text-slate-900 font-sans antialiased selection:bg-[#0c2340] selection:text-white">
-      <BrandingColumn />
+    <main className="relative flex min-h-screen flex-col overflow-hidden bg-slate-950 font-sans text-slate-900 antialiased">
+      <video
+        aria-hidden="true"
+        autoPlay
+        className="pointer-events-none absolute inset-0 h-full w-full scale-[1.03] object-cover object-center blur-[2px]"
+        loop
+        muted
+        playsInline
+        preload="metadata"
+      >
+        <source
+          src="https://iestpsuiza.edu.pe/wp-content/uploads/2023/09/instituto.mp4"
+          type="video/mp4"
+        />
+      </video>
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-slate-950/55"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-gradient-to-br from-blue-950/30 via-transparent to-slate-950/30"
+      />
+
+      <header className="relative z-10 flex w-full items-center justify-between px-5 py-5 sm:px-8">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white/85 transition hover:bg-white/10 hover:text-white"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          <span>Volver al portal público</span>
+        </Link>
+        <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-slate-950/30 px-3 py-1.5 text-xs font-semibold text-white/90 backdrop-blur">
+          <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
+          Portal Oficial v1.0
+        </span>
+      </header>
 
       <section
         aria-label="Acceso al Sistema SIGD"
-        className="relative isolate flex min-h-screen flex-1 flex-col overflow-hidden bg-[#edf4fc] px-4 py-8 sm:px-8 lg:px-4 xl:px-6"
+        className="relative z-10 flex flex-1 items-center justify-center px-4 py-6"
       >
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center"
-          style={{
-            backgroundImage: "url('/aula-carreras.jpg')",
-          }}
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-[1]"
-          style={{
-            backgroundImage:
-              "linear-gradient(135deg, rgba(247, 250, 255, 0.48) 0%, rgba(234, 244, 255, 0.38) 52%, rgba(220, 246, 244, 0.48) 100%)",
-          }}
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-[2] opacity-[0.18]"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(12, 35, 64, 0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(12, 35, 64, 0.07) 1px, transparent 1px)",
-            backgroundSize: "42px 42px",
-            maskImage:
-              "radial-gradient(ellipse at 70% 50%, black, transparent 72%)",
-          }}
-        />
-        <GraduationCap
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-20 top-1/4 z-[3] h-96 w-96 rotate-[-12deg] text-blue-900/[0.045]"
-          strokeWidth={0.7}
-        />
-
-        <div className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200/60 hover:text-[#0c2340] transition-colors"
+        <div className="w-full max-w-[390px] overflow-hidden rounded-2xl border border-white/80 bg-white shadow-2xl shadow-slate-950/35">
+          <nav
+            aria-label="Opciones de acceso"
+            role="tablist"
+            className="grid grid-cols-2 border-b border-slate-200 bg-slate-50"
           >
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            <span>Volver al portal público</span>
-          </Link>
-        </div>
+            <Link
+              to="/login"
+              role="tab"
+              aria-selected="true"
+              className="inline-flex min-h-14 items-center justify-center gap-2 border-b-[3px] border-blue-800 bg-white px-3 text-sm font-bold text-slate-900"
+            >
+              <LogIn className="h-4 w-4" aria-hidden="true" />
+              Iniciar Sesión
+            </Link>
+            <Link
+              to="/registro"
+              role="tab"
+              aria-selected="false"
+              className="inline-flex min-h-14 items-center justify-center gap-2 border-b-[3px] border-transparent px-3 text-sm font-semibold text-slate-500 transition hover:bg-white hover:text-slate-800"
+            >
+              <UserPlus className="h-4 w-4" aria-hidden="true" />
+              Registro Externo
+            </Link>
+          </nav>
 
-        <div className="relative z-10 my-auto flex w-full flex-1 items-center justify-center py-6 lg:py-3">
-          <div className="grid w-full max-w-6xl grid-cols-1 items-center gap-8 lg:grid-cols-[minmax(0,0.78fr)_minmax(300px,1fr)] lg:gap-5">
-            <aside className="relative hidden overflow-hidden rounded-3xl border border-white/90 bg-gradient-to-br from-white/95 via-[#f5f9ff]/95 to-[#e8f4fb]/95 p-7 shadow-2xl shadow-[#0c2340]/20 ring-1 ring-[#0c2340]/10 backdrop-blur-md lg:flex lg:min-h-[25rem] lg:flex-col lg:justify-between xl:p-9">
-              <div aria-hidden="true" className="absolute inset-x-8 top-0 h-1 rounded-b-full bg-gradient-to-r from-blue-700 via-cyan-500 to-teal-400" />
-              <div aria-hidden="true" className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-cyan-200/70 blur-2xl" />
-              <div aria-hidden="true" className="absolute -bottom-24 -left-20 h-52 w-52 rounded-full bg-blue-200/50 blur-3xl" />
-              <div className="relative">
-                <div className="mb-7 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0c2340] to-[#176b91] text-white shadow-lg shadow-blue-950/25 ring-4 ring-white/80">
-                  <GraduationCap className="h-6 w-6" aria-hidden="true" />
-                </div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-blue-700">
-                  IESTP “Suiza” · Pucallpa
-                </p>
-                <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-[#0c2340] xl:text-3xl">
-                  Tu próximo paso empieza aquí
-                </h1>
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  Conoce nuestras 11 carreras profesionales y crea tu usuario externo para realizar tus trámites institucionales.
+          <div className="px-6 pb-6 pt-5 sm:px-7">
+            <div className="mb-5 flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-[#0c2340] shadow-md ring-1 ring-slate-200">
+                <GraduationCap className="h-7 w-7" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-3xl font-black tracking-tight text-[#0c2340]">SIGD</h1>
+                <p className="text-xs leading-5 text-slate-600">
+                  Sistema Integral de Gestión Documentaria
                 </p>
               </div>
-
-              <div className="relative mt-8">
-                <div className="mb-5 flex items-center gap-3 rounded-2xl border border-blue-100/90 bg-gradient-to-r from-blue-50 to-cyan-50/90 p-4 shadow-sm shadow-blue-950/5">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-800 shadow-sm ring-1 ring-blue-100">
-                    <BookOpenCheck className="h-5 w-5" aria-hidden="true" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">11 programas de estudio</p>
-                    <p className="mt-0.5 text-xs text-slate-500">Explora la oferta académica</p>
-                  </div>
-                </div>
-                <Link
-                  to="/oferta-academica"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#0c2340] via-[#123f68] to-[#116b83] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-950/20 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-950/25 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-500/30"
-                >
-                  <span>Registro de usuario</span>
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </Link>
-                <p className="mt-3 text-center text-xs leading-5 text-slate-500">
-                  Mira las carreras y continúa al registro en línea.
-                </p>
-              </div>
-            </aside>
-
-            <div className="mx-auto w-full max-w-md">
-              <LoginFormCard />
             </div>
-          </div>
-        </div>
 
-        <div className="relative z-10 mx-auto grid w-full max-w-6xl grid-cols-1 lg:grid-cols-[minmax(0,0.78fr)_minmax(300px,1fr)] lg:gap-5">
-          <div aria-hidden="true" className="hidden lg:block" />
-          <div className="mx-auto w-full max-w-md">
-            <LoginFooter />
+            <LoginFormCardLampara embedded minimal />
           </div>
         </div>
       </section>
+
+      <footer className="relative z-10 px-4 pb-5 text-center text-xs text-white/85">
+        <div className="mb-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+          <span className="inline-flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+            Atención: Lun - Vie 08:00 a 16:30 hrs
+          </span>
+          <a
+            href="mailto:soporte.sigd@iestpsuiza.edu.pe"
+            className="inline-flex items-center gap-1.5 transition hover:text-white hover:underline"
+          >
+            <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+            soporte.sigd@iestpsuiza.edu.pe
+          </a>
+        </div>
+        <p>
+          © {new Date().getFullYear()} IESTP "Suiza" — Pucallpa, Ucayali. Todos los derechos reservados.
+        </p>
+      </footer>
     </main>
   );
 }

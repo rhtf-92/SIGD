@@ -6,13 +6,19 @@ import PersonaJuridicaForm from "../../components/registro/PersonaJuridicaForm";
 import type { Natural, Juridical } from "../../types/registroCiudadano";
 import { apiClient } from "../../api/client";
 import { ApiHttpError } from "../../types/api";
-import { AlertCircle, ArrowLeft, Building2, CheckCircle2, ShieldCheck, UserRound } from "lucide-react";
+import { AlertCircle, ArrowLeft, Building2, CheckCircle2, ShieldCheck, UserRound, UsersRound } from "lucide-react";
 
 export default function RegistroCiudadanoPage() {
   const [activeTab, setActiveTab] = useState<"NATURAL" | "JURIDICA">("NATURAL");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const rolActual =
+    typeof window !== "undefined" ? window.localStorage.getItem("sigd_rol") : null;
+  const puedeConsultarRegistros =
+    typeof window !== "undefined" &&
+    Boolean(window.localStorage.getItem("sigd_token")) &&
+    ["SUPER_ADMIN", "ADMINISTRADOR", "DIRECTOR"].includes(rolActual ?? "");
 
   const mostrarErrorRegistro = (error: unknown) => {
     setSuccessMessage(null);
@@ -158,9 +164,20 @@ export default function RegistroCiudadanoPage() {
               </p>
             </div>
           </div>
-          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
-            <ShieldCheck aria-hidden="true" className="h-4 w-4" />
-            Registro seguro
+          <div className="flex flex-wrap items-center gap-3">
+            {puedeConsultarRegistros && (
+              <Link
+                to="/administracion/registros-ciudadanos"
+                className="inline-flex w-fit items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-900 shadow-sm transition hover:border-blue-300 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/20"
+              >
+                <UsersRound aria-hidden="true" className="h-4 w-4" />
+                Ver usuarios registrados
+              </Link>
+            )}
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+              <ShieldCheck aria-hidden="true" className="h-4 w-4" />
+              Registro seguro
+            </div>
           </div>
         </header>
 

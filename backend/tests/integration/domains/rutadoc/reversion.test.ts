@@ -75,8 +75,16 @@ describe('POST reversión RutaDoc en PostgreSQL 18 aislado', () => {
         fecha_radicacion TIMESTAMPTZ NOT NULL, fecha_limite TIMESTAMPTZ);
       CREATE TABLE sigd_tra.tramite (
         expediente_id UUID PRIMARY KEY, codigo_tramite VARCHAR(30), asunto VARCHAR(500) NOT NULL,
-        estado VARCHAR(30) NOT NULL, creado_en TIMESTAMPTZ NOT NULL DEFAULT now())`);
+        estado VARCHAR(30) NOT NULL, creado_en TIMESTAMPTZ NOT NULL DEFAULT now());
+      CREATE TABLE sigd_tra.expediente_documento_folio (
+        expediente_id UUID NOT NULL REFERENCES sigd_tra.expediente (expediente_id),
+        id_documento UUID NOT NULL, folio_inicio INT NOT NULL,
+        folio_fin INT NOT NULL, total_folios INT NOT NULL);
+      CREATE SCHEMA sigd_auth;
+      CREATE TABLE sigd_auth.persona_natural (id_persona UUID PRIMARY KEY, nombre_completo TEXT);
+      CREATE TABLE sigd_auth.persona_juridica (id_persona UUID PRIMARY KEY, razon_social TEXT)`);
     await pool.query(readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8'));
+    await pool.query(readFileSync(path.resolve(process.cwd(), 'migraciones/14_sigd_rutadoc_clasificacion_ccd.sql'), 'utf8'));
     for (const id of [101, 102, 103, 104, 105, 106, 107, 108, 109, 110]) await crearExpediente(id);
     await pool.query(`INSERT INTO sigd_rut.movimiento_tramite
       (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id, datos)

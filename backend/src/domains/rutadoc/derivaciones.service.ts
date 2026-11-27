@@ -32,7 +32,8 @@ async function obtenerEstado(
     estado_nuevo: EstadoRutaDoc | null;
     area_actual_id: string | null;
   }>(`
-    SELECT actual.estado_nuevo, actual.area_actual_id
+    SELECT actual.estado_nuevo,
+           COALESCE(actual.area_actual_id, expediente.area_destino_id) AS area_actual_id
       FROM sigd_tra.expediente expediente
       LEFT JOIN sigd_rut.estado_actual_expediente actual
         ON actual.expediente_id = expediente.expediente_id
@@ -45,6 +46,16 @@ async function obtenerEstado(
     estado: fila.estado_nuevo ?? 'REGISTRADO',
     areaActualId: fila.area_actual_id,
   };
+}
+
+function exigirAreaActual(
+  expediente: EstadoExpediente,
+  contexto = getRequestContext(),
+): void {
+  const areaActor = contexto?.unidad_organica_id;
+  if (!areaActor || areaActor !== expediente.areaActualId) {
+    throw new ForbiddenError({ detail: 'El usuario no pertenece al área donde se encuentra el expediente.' });
+  }
 }
 
 function obtenerActorId(contexto = getRequestContext()): string {
@@ -82,8 +93,10 @@ export async function derivarExpediente(
   expedienteId: string,
   datos: DerivarExpedienteDTO,
 ): Promise<void> {
-  const actorId = obtenerActorId();
+  const contexto = getRequestContext();
+  const actorId = obtenerActorId(contexto);
   const expediente = await obtenerEstado(cliente, expedienteId);
+  exigirAreaActual(expediente, contexto);
   const areaIds = [...new Set(datos.destinos.map((destino) => destino.area_destino_id))];
   const areas = await cliente.query<{ area_id: string }>(`
     SELECT area_id::text
@@ -129,17 +142,42 @@ export async function derivarExpediente(
   }
 }
 
+export async function recepcionarExpediente(
+  cliente: PoolClient,
+  expedienteId: string,
+): Promise<{ estado: EstadoRutaDoc }> {
+  const contexto = getRequestContext();
+  const actorId = obtenerActorId(contexto);
+  const expediente = await obtenerEstado(cliente, expedienteId);
+  exigirAreaActual(expediente, contexto);
+  const movimiento = await registrarMovimiento({
+    cliente,
+    expedienteId,
+    estado: expediente.estado,
+    evento: 'RECEPCION',
+    actorId,
+    datos: { areaId: expediente.areaActualId },
+  });
+  await insertarEvento(cliente, {
+    agregado: 'Expediente',
+    tipo_evento: 'ExpedienteRecepcionado',
+    payload: {
+      identidad: { expediente_id: expedienteId, movimiento_id: movimiento.idMovimiento },
+      contexto: { usuario_actor_id: actorId, area_contexto_id: expediente.areaActualId },
+    },
+  });
+  return { estado: movimiento.estadoNuevo };
+}
+
 export async function atenderExpediente(
   cliente: PoolClient,
   expedienteId: string,
   datos: AtenderExpedienteDTO,
-): Promise<void> {
+): Promise<{ estado: EstadoRutaDoc; notificadoCasilla: boolean }> {
   const contexto = getRequestContext();
   const actorId = obtenerActorId(contexto);
   const expediente = await obtenerEstado(cliente, expedienteId);
-  if (contexto?.unidad_organica_id !== expediente.areaActualId) {
-    throw new ForbiddenError({ detail: 'El usuario no pertenece al área donde se encuentra el expediente.' });
-  }
+  exigirAreaActual(expediente, contexto);
 
   const movimiento = await registrarMovimiento({
     cliente,
@@ -158,6 +196,43 @@ export async function atenderExpediente(
       datos_especificos: { resultado_resumen: datos.resultado_resumen },
     },
   });
+
+  const destinatario = await cliente.query<{
+    usuario_id: string | null;
+    correo: string | null;
+    cut: string;
+    asunto: string;
+  }>(`
+    SELECT cuenta.id_usuario::text AS usuario_id, cuenta.correo,
+           expediente.codigo_expediente AS cut, tramite.asunto
+      FROM sigd_tra.expediente expediente
+      JOIN sigd_tra.tramite tramite ON tramite.expediente_id = expediente.expediente_id
+      LEFT JOIN sigd_auth.cuenta_usuario cuenta
+        ON cuenta.id_persona = expediente.solicitante_id AND cuenta.activo = TRUE
+     WHERE expediente.expediente_id = $1::uuid
+     LIMIT 1`, [expedienteId]);
+  const cuenta = destinatario.rows[0];
+  if (cuenta?.usuario_id) {
+    await insertarEvento(cliente, {
+      agregado: 'Expediente',
+      tipo_evento: 'casilla_notificacion',
+      payload: {
+        usuario_id: cuenta.usuario_id,
+        correo_destinatario: cuenta.correo,
+        cut: cuenta.cut,
+        asunto: `Respuesta a ${cuenta.cut}`,
+        tipo_acto: 'Respuesta de trámite',
+        referencia: movimiento.idMovimiento,
+        expediente_id: expedienteId,
+        cuerpo: {
+          asunto: cuenta.asunto,
+          resultado: datos.resultado_resumen,
+          cut: cuenta.cut,
+        },
+      },
+    });
+  }
+  return { estado: movimiento.estadoNuevo, notificadoCasilla: Boolean(cuenta?.usuario_id) };
 }
 
 export async function archivarExpediente(
@@ -165,8 +240,10 @@ export async function archivarExpediente(
   expedienteId: string,
   datos: ArchivarExpedienteDTO,
 ): Promise<void> {
-  const actorId = obtenerActorId();
+  const contexto = getRequestContext();
+  const actorId = obtenerActorId(contexto);
   const expediente = await obtenerEstado(cliente, expedienteId);
+  exigirAreaActual(expediente, contexto);
   const movimiento = await registrarMovimiento({
     cliente,
     expedienteId,
@@ -202,8 +279,10 @@ export async function observarExpediente(
   expedienteId: string,
   motivo: string,
 ): Promise<void> {
-  const actorId = obtenerActorId();
+  const contexto = getRequestContext();
+  const actorId = obtenerActorId(contexto);
   const expediente = await obtenerEstado(cliente, expedienteId);
+  exigirAreaActual(expediente, contexto);
   const movimiento = await registrarMovimiento({
     cliente,
     expedienteId,
@@ -224,8 +303,10 @@ export async function subsanarExpediente(
   expedienteId: string,
   motivo: string,
 ): Promise<void> {
-  const actorId = obtenerActorId();
+  const contexto = getRequestContext();
+  const actorId = obtenerActorId(contexto);
   const expediente = await obtenerEstado(cliente, expedienteId);
+  exigirAreaActual(expediente, contexto);
   const movimiento = await registrarMovimiento({
     cliente,
     expedienteId,

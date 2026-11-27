@@ -4,6 +4,7 @@ import { UnauthorizedError } from '../../shared/domain/errors/index.js';
 export interface ClaimsJwt {
   sub: string;
   roles: string[];
+  areaId?: string | null;
   iat: number;
   exp: number;
   typ: 'access';
@@ -12,6 +13,7 @@ export interface ClaimsJwt {
 export interface OpcionesFirma {
   sub: string;
   roles?: string[];
+  areaId?: string | null;
   expiraSegundos?: number;
   ahora?: number;
   secreto?: string;
@@ -45,6 +47,7 @@ export function firmarTokenAcceso(opciones: OpcionesFirma): string {
   const claims: ClaimsJwt = {
     sub: opciones.sub,
     roles: opciones.roles ?? [],
+    ...(opciones.areaId ? { areaId: opciones.areaId } : {}),
     iat: ahora,
     exp: ahora + (opciones.expiraSegundos ?? 900),
     typ: 'access',

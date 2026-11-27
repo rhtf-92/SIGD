@@ -89,6 +89,20 @@ export type EstadoFlujoExpediente =
   | "NOTIFICADO"
   | "ARCHIVADO";
 
+/** Proyección operativa devuelta por RutaDoc para la tabla de la bandeja. */
+export interface ExpedienteFilaBandeja {
+  id: string;
+  codigoExpediente: string;
+  asunto: string;
+  solicitanteNombre: string | null;
+  codigoSerie: string | null;
+  nombreSerie: string | null;
+  cantidadFolios: number;
+  fechaIngreso: string;
+  estadoFlujo: EstadoFlujoExpediente;
+  areaActualId: string | null;
+}
+
 /** Nivel de prioridad procesal del expediente. */
 export type PrioridadExpediente = "NORMAL" | "URGENTE" | "MUY_URGENTE";
 

@@ -154,17 +154,31 @@ export function construirApp(
 
   // Rutas
   const jwtActorProvider: ActorProviderRutaDoc = {
-    obtenerActor: (req) => {
+    obtenerActor: async (req) => {
       const auth = req.headers.authorization;
       if (auth && auth.startsWith('Bearer ')) {
         const token = auth.slice(7).trim();
         try {
           const claims = verificarTokenAcceso(token);
+          const unidadOrganicaId = claims.areaId ?? null;
           return {
             id: claims.sub,
             roles: claims.roles ?? [],
-            unidadOrganicaId: null,
-            puedeVerExpediente: () => true,
+            unidadOrganicaId,
+            puedeVerExpediente: async (expedienteId) => {
+              if (claims.roles?.includes('SUPER_ADMIN')) return true;
+              if (!unidadOrganicaId) return false;
+              const visibilidad = await pool.query<{ permitido: boolean }>(`
+                SELECT EXISTS (
+                  SELECT 1
+                    FROM sigd_tra.expediente e
+                    LEFT JOIN sigd_rut.estado_actual_expediente actual
+                      ON actual.expediente_id = e.expediente_id
+                   WHERE e.expediente_id = $1::uuid
+                     AND COALESCE(actual.area_actual_id, e.area_destino_id) = $2::uuid
+                ) AS permitido`, [expedienteId, unidadOrganicaId]);
+              return visibilidad.rows[0]?.permitido === true;
+            },
           };
         } catch {
           return null;

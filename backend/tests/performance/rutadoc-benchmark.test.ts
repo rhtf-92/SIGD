@@ -62,9 +62,17 @@ describe('medición no bloqueante de RutaDoc con 50 000 expedientes', () => {
           fecha_radicacion TIMESTAMPTZ NOT NULL, fecha_limite TIMESTAMPTZ);
         CREATE TABLE sigd_tra.tramite (
           expediente_id UUID PRIMARY KEY REFERENCES sigd_tra.expediente (expediente_id),
-          asunto TEXT NOT NULL, estado TEXT)`);
+          asunto TEXT NOT NULL, estado TEXT);
+        CREATE TABLE sigd_tra.expediente_documento_folio (
+          expediente_id UUID NOT NULL REFERENCES sigd_tra.expediente (expediente_id),
+          id_documento UUID NOT NULL, folio_inicio INT NOT NULL,
+          folio_fin INT NOT NULL, total_folios INT NOT NULL);
+        CREATE SCHEMA sigd_auth;
+        CREATE TABLE sigd_auth.persona_natural (id_persona UUID PRIMARY KEY, nombre_completo TEXT);
+        CREATE TABLE sigd_auth.persona_juridica (id_persona UUID PRIMARY KEY, razon_social TEXT)`);
       // Reejecutar la migración propia tras el fixture externo instala su índice de bandeja.
       await pool.query(readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8'));
+      await pool.query(readFileSync(path.resolve(process.cwd(), 'migraciones/14_sigd_rutadoc_clasificacion_ccd.sql'), 'utf8'));
       await pool.query('ALTER TABLE sigd_tra.expediente DISABLE TRIGGER tr_rutadoc_contador_expediente');
       await pool.query(`INSERT INTO sigd_tra.expediente
         (expediente_id, codigo_expediente, numero, estado, fecha_radicacion)
@@ -137,7 +145,7 @@ describe('medición no bloqueante de RutaDoc con 50 000 expedientes', () => {
         WHERE NOT EXISTS (SELECT 1 FROM sigd_rut.estado_actual_expediente u
                           WHERE u.expediente_id = e.expediente_id)`;
       const actual = await pool.query(SQL_CONTADORES_SIN_TERMINO_RUTADOC,
-        [null, null, null, null]);
+        [null, null, null, null, null]);
       const agrupado = await pool.query<{ estado_nuevo: string; total: number }>(sqlDirecto);
       const faltantes = await pool.query<{ total: number }>(sqlSinMovimiento);
       const reconstruido: Record<string, number> = Object.fromEntries(
@@ -187,11 +195,11 @@ describe('medición no bloqueante de RutaDoc con 50 000 expedientes', () => {
       const servidorActivo = app.listen(0);
       servidor = servidorActivo;
       const escenarios = [
-        { nombre: 'base', filtro: [null, null, null, null] },
-        { nombre: 'cursor', filtro: [null, null, null, null], cursor: ['2026-09-24T09:00:01.900Z', uuidExpediente(101900)] },
-        { nombre: 'termino', filtro: ['laboratorio 42', null, null, null] },
-        { nombre: 'area', filtro: [null, AREA, null, null] },
-        { nombre: 'fechas', filtro: [null, null, '2026-09-24', '2026-09-24'] },
+        { nombre: 'base', filtro: [null, null, null, null, null] },
+        { nombre: 'cursor', filtro: [null, null, null, null, null], cursor: ['2026-09-24T09:00:01.900Z', uuidExpediente(101900)] },
+        { nombre: 'termino', filtro: ['laboratorio 42', null, null, null, null] },
+        { nombre: 'area', filtro: [null, AREA, null, null, null] },
+        { nombre: 'fechas', filtro: [null, null, '2026-09-24', '2026-09-24', null] },
       ] as const;
       for (const escenario of escenarios) {
         const comunes = [...escenario.filtro];
@@ -258,7 +266,7 @@ describe('medición no bloqueante de RutaDoc con 50 000 expedientes', () => {
       await pool.query('ANALYZE sigd_tra.tramite');
       for (const [nombre, sql, valores] of [
         ['termino:actual_con_GIN', SQL_CONTADORES_RUTADOC,
-          ['laboratorio 42', null, null, null]],
+          ['laboratorio 42', null, null, null, null]],
         ['termino:asunto_GIN', `SELECT count(*) FROM sigd_tra.tramite
           WHERE lower(asunto) LIKE '%laboratorio 42%'`, []],
       ] as const) {
