@@ -63,6 +63,7 @@ export function calcularSla(entrada: EntradaSla): ResultadoSla {
 }
 
 interface FilaFechaExpediente { fecha_inicio: string }
+interface FechaExpedienteActivo { fecha_inicio: string }
 
 function fechaHoyLima(): string {
   const partes = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima',
@@ -80,6 +81,18 @@ export class RepositorioSlaRutaDoc {
         FROM sigd_tra.expediente
        WHERE expediente_id = $1::uuid`, [idExpediente]);
     return resultado.rows[0]?.fecha_inicio ?? null;
+  }
+
+  async listarFechasActivas(areaId?: string | null): Promise<FechaExpedienteActivo[]> {
+    const resultado = await this.pool.query<FechaExpedienteActivo>(`
+      SELECT (e.fecha_radicacion AT TIME ZONE 'America/Lima')::date::text AS fecha_inicio
+        FROM sigd_tra.expediente e
+        LEFT JOIN sigd_rut.estado_actual_expediente actual
+          ON actual.expediente_id = e.expediente_id
+       WHERE ($1::uuid IS NULL OR COALESCE(actual.area_actual_id, e.area_destino_id) = $1::uuid)
+         AND COALESCE(actual.estado_nuevo, 'REGISTRADO') NOT IN ('RESUELTO', 'ARCHIVADO')`,
+    [areaId ?? null]);
+    return resultado.rows;
   }
 }
 
@@ -103,5 +116,33 @@ export class ServicioSlaRutaDoc {
     return calcularSla({ fechaInicio, fechaActual, diasNoLaborables: new Set(diasNoLaborables),
       diasHabilesLimite: 30,
       porcentajeAmarilloDesde: this.politica.porcentajeAmarilloDesde });
+  }
+
+  async obtenerIndicadores(areaId?: string | null) {
+    const filas = await this.repositorio.listarFechasActivas(areaId);
+    if (filas.length === 0) return { volumenActivo: 0, urgentes: 0, proximosAVencer: 0 };
+
+    const fechaActual = this.hoy();
+    const inicioMasAntiguo = filas.reduce((anterior, fila) =>
+      fila.fecha_inicio < anterior ? fila.fecha_inicio : anterior, filas[0].fecha_inicio);
+    const hasta = new Date(validarFecha(fechaActual) + 150 * MS_DIA).toISOString().slice(0, 10);
+    const diasNoLaborables = new Set(await this.calendario.obtenerDiasNoLaborables(
+      inicioMasAntiguo,
+      fechaActual > hasta ? fechaActual : hasta,
+    ));
+    let urgentes = 0;
+    let proximosAVencer = 0;
+    for (const fila of filas) {
+      const resultado = calcularSla({
+        fechaInicio: fila.fecha_inicio,
+        fechaActual,
+        diasNoLaborables,
+        diasHabilesLimite: 30,
+        porcentajeAmarilloDesde: this.politica.porcentajeAmarilloDesde,
+      });
+      if (resultado.diasHabilesRestantes <= 4) urgentes++;
+      else if (resultado.estado === 'AMARILLO') proximosAVencer++;
+    }
+    return { volumenActivo: filas.length, urgentes, proximosAVencer };
   }
 }

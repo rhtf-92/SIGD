@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router-dom";
 import { describe, test, expect, beforeEach, vi } from "vitest";
@@ -28,61 +28,36 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
     window.history.pushState({}, "", "/login");
   });
 
-  describe("1. Columna Izquierda — Branding Institucional", () => {
-    test("Renderiza el logotipo oficial 'S', texto institucional y badge de portal", () => {
+  describe("1. Diseño de acceso", () => {
+    test("Renderiza accesos de navegación y el badge de portal", () => {
       renderLoginPage();
 
-      // Logotipo oficial 'S'
-      expect(screen.getByLabelText(/Logotipo oficial S del IESTP Suiza/i)).toBeInTheDocument();
-      expect(screen.getByText("S")).toBeInTheDocument();
-
-      // Textos del instituto
-      expect(screen.getByText("IESTP SUIZA")).toBeInTheDocument();
-      expect(screen.getByText(/PUCALLPA • UCAYALI/i)).toBeInTheDocument();
-
-      // Badge oficial
+      expect(screen.getByRole("link", { name: /Volver al portal público/i })).toHaveAttribute("href", "/");
       expect(screen.getByText("Portal Oficial v1.0")).toBeInTheDocument();
     });
 
-    test("Renderiza etiquetas temáticas, título SIGD y subtítulo institucional", () => {
+    test("Renderiza la marca institucional junto al formulario", () => {
       renderLoginPage();
 
-      // Etiquetas de gestión documentaria
-      expect(screen.getByText("Trámite Documentario")).toBeInTheDocument();
-      expect(screen.getByText("Firma Digital Legal")).toBeInTheDocument();
-      expect(screen.getByText("Cero Papel")).toBeInTheDocument();
-
-      // Título y Subtítulo
       expect(screen.getByRole("heading", { name: "SIGD" })).toBeInTheDocument();
       expect(screen.getByText("Sistema Integral de Gestión Documentaria")).toBeInTheDocument();
-
-      // Descripción institucional
-      expect(
-        screen.getByText(/Plataforma oficial para la administración, tramitación y seguimiento de expedientes/i)
-      ).toBeInTheDocument();
     });
 
-    test("Renderiza distintivo de licenciamiento MINEDU y footer de República del Perú", () => {
+    test("Muestra pestañas para iniciar sesión o registrarse externamente", () => {
       renderLoginPage();
 
-      // Distintivo MINEDU
-      expect(screen.getByText("INSTITUCIÓN LICENCIADA POR MINEDU")).toBeInTheDocument();
-      expect(screen.getByText(/Resolución Ministerial N° 409-2019-MINEDU/i)).toBeInTheDocument();
-
-      // Footer institucional
-      expect(screen.getByText('IESTP "Suiza"')).toBeInTheDocument();
-      expect(screen.getByText("Dirección Regional de Educación de Ucayali")).toBeInTheDocument();
-      expect(screen.getByText("REPÚBLICA DEL PERÚ")).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /Iniciar Sesión/i })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("tab", { name: /Registro Externo/i })).toHaveAttribute("href", "/registro");
     });
   });
 
-  describe("2. Columna Derecha — Formulario de Login", () => {
-    test("Ofrece acceso al portal de carreras y registro de usuario", () => {
+  describe("2. Formulario de acceso", () => {
+    test("Ofrece navegación al registro externo", () => {
       renderLoginPage();
 
       expect(
-        screen.getByRole("link", { name: /Registro de usuario/i }),
-      ).toHaveAttribute("href", "/oferta-academica");
+        screen.getByRole("tab", { name: /Registro Externo/i }),
+      ).toHaveAttribute("href", "/registro");
     });
 
     test("Renderiza encabezado del formulario y campos requeridos con iconos", () => {
@@ -203,47 +178,26 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
         expect(window.localStorage.getItem("sigd_token")).toBeTruthy();
         expect(window.localStorage.getItem("sigd_rol")).toBe("SUPER_ADMIN");
         expect(window.localStorage.getItem("sigd_remembered_user")).toBe("70123456");
-        expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true });
+        expect(mockNavigate).toHaveBeenCalledWith("/administracion", { replace: true });
       });
     });
 
-    test("Regresa a la ruta solicitada después de iniciar sesión", async () => {
-      window.history.pushState({}, "", "/login?from=%2Freportes%2Fdashboard");
-      renderLoginPage();
-      const user = userEvent.setup();
-
-      await user.type(
-        screen.getByLabelText(/Usuario, DNI o Correo Institucional/i),
-        "70123456",
-      );
-      await user.type(screen.getByLabelText(/^Contraseña$/i), "ClaveSegura2026");
-      await user.click(screen.getByRole("button", { name: /Ingresar/i }));
-
-      await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith("/reportes/dashboard", {
-          replace: true,
-        });
-      });
-    });
-
-    test("Permite seleccionar otro rol canónico (DOCENTE) y redirige a su destino", async () => {
+    test("Detecta otro rol canónico (DOCENTE) y redirige a su destino", async () => {
       renderLoginPage();
       const user = userEvent.setup();
 
       const userInput = screen.getByLabelText(/Usuario, DNI o Correo Institucional/i);
       const passInput = screen.getByLabelText(/^Contraseña$/i);
-      const roleSelect = screen.getByLabelText(/Perfil \/ Rol Institucional Canónico/i);
       const btnIngresar = screen.getByRole("button", { name: /Ingresar/i });
 
       await user.type(userInput, "docente@iestpsuiza.edu.pe");
       await user.type(passInput, "Docente2026!");
-      fireEvent.change(roleSelect, { target: { value: "DOCENTE" } });
 
       await user.click(btnIngresar);
 
       await waitFor(() => {
         expect(window.localStorage.getItem("sigd_rol")).toBe("DOCENTE");
-        expect(mockNavigate).toHaveBeenCalledWith("/flujos/titulacion", { replace: true });
+        expect(mockNavigate).toHaveBeenCalledWith("/expedientes", { replace: true });
       });
     });
   });
@@ -289,73 +243,5 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
       });
     });
 
-    test("Deniega acceso si el rol seleccionado en el selector no corresponde al usuario (RBAC)", async () => {
-      renderLoginPage();
-      const user = userEvent.setup();
-
-      const userInput = screen.getByLabelText(/Usuario, DNI o Correo Institucional/i);
-      const passInput = screen.getByLabelText(/^Contraseña$/i);
-      const roleSelect = screen.getByLabelText(/Perfil \/ Rol Institucional Canónico/i);
-      const btnIngresar = screen.getByRole("button", { name: /Ingresar/i });
-
-      // Usuario es SUPER_ADMIN pero se selecciona intencionalmente ESTUDIANTE
-      await user.type(userInput, "70123456");
-      await user.type(passInput, "ClaveSegura2026");
-      fireEvent.change(roleSelect, { target: { value: "ESTUDIANTE" } });
-
-      await user.click(btnIngresar);
-
-      await waitFor(() => {
-        expect(screen.getByRole("alert")).toBeInTheDocument();
-        expect(screen.getByText(/Acceso denegado \(RBAC\)/i)).toBeInTheDocument();
-        expect(screen.getByText(/Su rol autorizado es 'SUPER_ADMIN'/i)).toBeInTheDocument();
-        expect(window.localStorage.getItem("sigd_token")).toBeNull();
-        expect(mockNavigate).not.toHaveBeenCalled();
-      });
-
-      // El botón de ajuste rápido a SUPER_ADMIN debe estar disponible en la alerta
-      const btnAjustar = screen.getByRole("button", { name: /Ajustar a SUPER_ADMIN/i });
-      expect(btnAjustar).toBeInTheDocument();
-
-      // Al pulsar el botón de ajuste rápido, se sincroniza el rol y se limpia el error
-      await user.click(btnAjustar);
-      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-      expect((roleSelect as HTMLSelectElement).value).toBe("SUPER_ADMIN");
-
-      // Ahora reintentar login con el rol corregido debe autenticar y redirigir
-      await user.click(btnIngresar);
-
-      await waitFor(() => {
-        expect(window.localStorage.getItem("sigd_token")).toBeTruthy();
-        expect(window.localStorage.getItem("sigd_rol")).toBe("SUPER_ADMIN");
-        expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true });
-      });
-    });
-
-    test("Permite alternar el panel asistente de credenciales autorizadas de prueba", async () => {
-      renderLoginPage();
-      const user = userEvent.setup();
-
-      const btnAsistente = screen.getByRole("button", {
-        name: /Ver usuarios de prueba autorizados \(5 Roles RBAC\)/i,
-      });
-      expect(btnAsistente).toBeInTheDocument();
-
-      // Abrir acordeón
-      await user.click(btnAsistente);
-      expect(
-        screen.getByText(/Haga clic sobre un rol para cargar automáticamente sus credenciales/i)
-      ).toBeInTheDocument();
-
-      // Cargar credenciales de MESA_PARTES con un clic
-      const btnRolMesa = screen.getByRole("button", { name: /Cargar credenciales MESA_PARTES/i });
-      await user.click(btnRolMesa);
-
-      const userInput = screen.getByLabelText(/Usuario, DNI o Correo Institucional/i) as HTMLInputElement;
-      const roleSelect = screen.getByLabelText(/Perfil \/ Rol Institucional Canónico/i) as HTMLSelectElement;
-
-      expect(userInput.value).toBe("30456789");
-      expect(roleSelect.value).toBe("MESA_PARTES");
-    });
   });
 });

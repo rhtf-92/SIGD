@@ -7,6 +7,7 @@ import AdministracionPage from "../pages/administracion/AdministracionPage";
 import AuditoriaPage from "../pages/administracion/AuditoriaPage";
 import CalendarioLaboralPage from "../pages/administracion/CalendarioLaboralPage";
 import RolesPermisosPage from "../pages/administracion/RolesPermisosPage";
+import RegistrosCiudadanosPage from "../pages/administracion/RegistrosCiudadanosPage";
 import SeguridadPage from "../pages/administracion/SeguridadPage";
 import TablasMaestrasPage from "../pages/administracion/TablasMaestrasPage";
 import UsuariosPage from "../pages/administracion/UsuariosPage";
@@ -27,6 +28,18 @@ export default function AdminRoutes() {
             requiredAction="editar"
           >
             <UsuariosPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="registros-ciudadanos"
+        element={
+          <ProtectedRoute
+            requiredRoles={["SUPER_ADMIN", "ADMINISTRADOR", "DIRECTOR"]}
+            requiredModule="Administración"
+            requiredAction="ver"
+          >
+            <RegistrosCiudadanosPage />
           </ProtectedRoute>
         }
       />

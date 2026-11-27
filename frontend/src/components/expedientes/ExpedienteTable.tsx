@@ -1,10 +1,10 @@
 import { ArrowRight } from "lucide-react";
-import type { ExpedienteSGD } from "../../types/expediente";
+import type { ExpedienteFilaBandeja } from "../../types/expediente";
 import SlaBadge from "./SlaBadge";
 
 interface ExpedienteTableProps {
-  expedientes: ExpedienteSGD[];
-  onVerExpediente: (expediente: ExpedienteSGD) => void;
+  expedientes: ExpedienteFilaBandeja[];
+  onVerExpediente: (expediente: ExpedienteFilaBandeja) => void;
 }
 
 const formateadorFecha = new Intl.DateTimeFormat("es-PE", {
@@ -51,10 +51,10 @@ export default function ExpedienteTable({
                   {expediente.asunto}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                  {expediente.solicitante.nombreOrazonSocial}
+                  {expediente.solicitanteNombre ?? "No identificado"}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                  {expediente.clasificacionCCD.serieDocumental}
+                  {expediente.nombreSerie ?? expediente.codigoSerie ?? "Sin clasificar"}
                 </td>
                 <td className="px-4 py-3 text-center tabular-nums text-slate-600">
                   {expediente.cantidadFolios}
@@ -65,7 +65,6 @@ export default function ExpedienteTable({
                 <td className="whitespace-nowrap px-4 py-3">
                   <SlaBadge
                     fechaIngreso={expediente.fechaIngreso}
-                    fechaLimiteAtencion={expediente.fechaLimiteAtencion}
                   />
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-right">

@@ -1,132 +1,101 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FolderOpen, Search } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowDown, FolderOpen, Search } from "lucide-react";
 
 import BandejaTabFilter from "../../components/expedientes/BandejaTabFilter";
 import ExpedienteTable from "../../components/expedientes/ExpedienteTable";
 import CcdTreeSelector from "../../components/expedientes/CcdTreeSelector";
-import { useBandejaExpedientes, useExpedientesBase } from "../../hooks/useBandejaExpedientes";
+import { useBandejaExpedientes } from "../../hooks/useBandejaExpedientes";
+import { apiClient } from "../../api/client";
 import {
   ORDEN_PESTANAS_BANDEJA,
   type EstadoFlujoExpediente,
-  type ExpedienteSGD,
 } from "../../types/expediente";
 import type {
+  EstadoRecurso,
   FondoDocumental,
   RutaCcdSeleccionada,
+  SeccionOrganica,
+  SerieDocumental,
 } from "../../types/ccdArchivistica";
 
-const FONDOS_CCD_INSTITUCIONALES: readonly FondoDocumental[] = [
-  {
-    tipo: "fondo",
-    id: "fondo-iestp",
-    nombre: "IESTP_SUIZA",
-    secciones: [
-      {
-        tipo: "seccion",
-        id: "sec-sa",
-        nombre: "Secretaría Académica",
-        series: [
-          {
-            tipo: "serie",
-            id: "ser-tit",
-            nombre: "Expedientes de Titulación Profesional",
-            codigo: "CCD-SA-TIT",
-          },
-          {
-            tipo: "serie",
-            id: "ser-act",
-            nombre: "Actas de Evaluación y Certificados",
-            codigo: "CCD-SA-ACTA",
-          },
-        ],
-      },
-      {
-        tipo: "seccion",
-        id: "sec-dg",
-        nombre: "Dirección General",
-        series: [
-          {
-            tipo: "serie",
-            id: "ser-res",
-            nombre: "Resoluciones Directorales",
-            codigo: "CCD-DG-RES",
-          },
-        ],
-      },
-    ],
-  },
-];
+const ETIQUETAS_SECCION: Record<string, string> = {
+  SECRETARIA_ACADEMICA: "Secretaría Académica",
+  DIRECCION_GENERAL: "Dirección General",
+};
 
-function calcularConteosPorEstado(
-  expedientes: ExpedienteSGD[] | undefined,
-): Record<EstadoFlujoExpediente, number> {
-  const conteos = ORDEN_PESTANAS_BANDEJA.reduce(
-    (acc, estado) => ({ ...acc, [estado]: 0 }),
-    {} as Record<EstadoFlujoExpediente, number>,
-  );
-
-  if (!expedientes) {
-    return conteos;
-  }
-
-  for (const expediente of expedientes) {
-    conteos[expediente.estadoFlujo] += 1;
-  }
-
-  return conteos;
+interface NodoCcdApi {
+  id: string;
+  codigo: string;
+  nombre: string;
+  tipo: "SERIE" | "SUBSERIE";
+  seccion?: string;
+  hijos: NodoCcdApi[];
 }
 
 export default function BandejaExpedientesPage() {
   const navigate = useNavigate();
+  const ccdQuery = useQuery({
+    queryKey: ["expedientes", "clasificador-ccd"],
+    queryFn: async () => (await apiClient.get<{ elementos: NodoCcdApi[] }>(
+      "/api/v1/expedientes/clasificador-ccd",
+    )).data.elementos,
+    staleTime: 5 * 60_000,
+  });
   const [estadoActivo, setEstadoActivo] = useState<EstadoFlujoExpediente>("PENDIENTE");
   const [busqueda, setBusqueda] = useState("");
   const [filtroCcd, setFiltroCcd] = useState<RutaCcdSeleccionada | null>(null);
   const [mostrarFiltroCcd, setMostrarFiltroCcd] = useState(false);
-  const [ahora, setAhora] = useState(() => Date.now());
+  const {
+    data: datosBandeja,
+    indicadores,
+    isLoading,
+    isError,
+    errorIndicadores,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } =
+    useBandejaExpedientes({ estado: estadoActivo, busqueda, codigoSerie: filtroCcd?.serie.codigo });
 
-  useEffect(() => {
-    const interval = window.setInterval(() => setAhora(Date.now()), 60_000);
-    return () => window.clearInterval(interval);
-  }, []);
+  const expedientesVisibles = datosBandeja?.expedientes ?? [];
 
-  const { data: expedientesBase } = useExpedientesBase();
-  const { data: expedientesFiltradosApi, isLoading, isError } =
-    useBandejaExpedientes({ estado: estadoActivo, busqueda });
-
-  // Filtrado compuesto local por serie CCD seleccionada
-  const expedientesVisibles = useMemo(() => {
-    if (!expedientesFiltradosApi) return [];
-    if (!filtroCcd) return expedientesFiltradosApi;
-
-    return expedientesFiltradosApi.filter(
-      (exp) =>
-        exp.clasificacionCCD.codigoSerie === filtroCcd.serie.codigo ||
-        exp.clasificacionCCD.serieDocumental.toLowerCase().includes(filtroCcd.serie.nombre.toLowerCase()),
-    );
-  }, [expedientesFiltradosApi, filtroCcd]);
-
-  const conteos = useMemo(
-    () => calcularConteosPorEstado(expedientesBase),
-    [expedientesBase],
+  const conteos = datosBandeja?.conteos ?? ORDEN_PESTANAS_BANDEJA.reduce(
+    (resultado, estado) => ({ ...resultado, [estado]: 0 }),
+    {} as Record<EstadoFlujoExpediente, number>,
   );
 
-  const volumenActivo = expedientesBase?.length ?? 0;
-  const urgentes =
-    expedientesBase?.filter(
-      (exp) => exp.prioridad === "URGENTE" || exp.prioridad === "MUY_URGENTE",
-    ).length ?? 0;
-  const proximosAVencer =
-    expedientesBase?.filter((exp) => {
-      const diasRestantes = Math.ceil(
-        (new Date(exp.fechaLimiteAtencion).getTime() - ahora) /
-          (1000 * 60 * 60 * 24),
-      );
-      return diasRestantes >= 0 && diasRestantes <= 2;
-    }).length ?? 0;
+  const volumenActivo = indicadores?.volumenActivo ?? 0;
+  const seccionesPorCodigo = (ccdQuery.data ?? []).reduce<Record<string, SerieDocumental[]>>(
+    (secciones, nodo) => {
+      if (nodo.tipo !== "SERIE" || !nodo.seccion) return secciones;
+      const lista = secciones[nodo.seccion] ?? [];
+      lista.push({ tipo: "serie", id: nodo.id, codigo: nodo.codigo, nombre: nodo.nombre });
+      secciones[nodo.seccion] = lista;
+      return secciones;
+    },
+    {},
+  );
+  const fondosCcd: readonly FondoDocumental[] = [{
+    tipo: "fondo",
+    id: "IESTP_SUIZA",
+    nombre: "IESTP_SUIZA",
+    secciones: Object.entries(seccionesPorCodigo).map(([codigo, series]): SeccionOrganica => ({
+      tipo: "seccion",
+      id: codigo,
+      nombre: ETIQUETAS_SECCION[codigo] ?? codigo,
+      series,
+    })),
+  }];
+  const recursoCcd: EstadoRecurso<readonly FondoDocumental[]> = ccdQuery.isLoading
+    ? { estado: "cargando" }
+    : ccdQuery.isError
+      ? { estado: "error", mensaje: "No se pudo cargar el catálogo de series CCD." }
+      : { estado: "listo", datos: fondosCcd };
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-800">
+    <main className="bandeja-expedientes-page min-h-screen text-slate-800">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-5">
           <button
@@ -137,10 +106,10 @@ export default function BandejaExpedientesPage() {
             ← Volver al inicio
           </button>
 
-          <p className="text-sm font-bold text-blue-800">SIGD · IESTP "Suiza"</p>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Bandeja de Trabajo Diario</h1>
+          <p className="text-sm font-bold text-blue-800">SIGD SUIZA · Módulo de Expedientes</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Bandeja de Expedientes</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Gestión operativa de expedientes, semáforo SLA de 30 días LPAG y taxonomía archivística CCD.
+            Administración, seguimiento, recepción y gestión de documentos institucionales.
           </p>
         </div>
       </header>
@@ -149,23 +118,29 @@ export default function BandejaExpedientesPage() {
         className="relative mx-auto my-8 max-w-7xl rounded-2xl border border-slate-200 bg-white px-4 py-6 shadow-sm sm:px-8 sm:py-8"
       >
         {/* Panel de KPIs */}
-        <div className="mb-6 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-center">
-            <p className="text-3xl font-bold tabular-nums text-blue-800">{volumenActivo}</p>
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+            <p className="text-3xl font-bold tabular-nums text-slate-900">{volumenActivo}</p>
             <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
-              Volumen Activo
+              Expedientes registrados
             </p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-center">
-            <p className="text-3xl font-bold tabular-nums text-slate-900">{urgentes}</p>
+            <p className="text-3xl font-bold tabular-nums text-blue-800">{conteos.PENDIENTE}</p>
             <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
-              Trámites Urgentes
+              Pendientes
             </p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-center">
-            <p className="text-3xl font-bold tabular-nums text-slate-900">{proximosAVencer}</p>
+            <p className="text-3xl font-bold tabular-nums text-slate-900">{conteos.EN_PROCESO}</p>
             <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
-              Próximos a Vencer (LPAG)
+              En trámite
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-center">
+            <p className="text-3xl font-bold tabular-nums text-slate-900">{conteos.ARCHIVADO}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Finalizados
             </p>
           </div>
         </div>
@@ -224,7 +199,7 @@ export default function BandejaExpedientesPage() {
               </button>
             </div>
             <CcdTreeSelector
-              recurso={{ estado: "listo", datos: FONDOS_CCD_INSTITUCIONALES }}
+              recurso={recursoCcd}
               seleccion={filtroCcd}
               onSeleccionar={(ruta) => {
                 setFiltroCcd(ruta);
@@ -247,18 +222,31 @@ export default function BandejaExpedientesPage() {
         {isLoading && (
           <p className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600" role="status">Cargando expedientes…</p>
         )}
-        {isError && (
+        {(isError || errorIndicadores) && (
           <p className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-800" role="alert">
-            Ocurrió un error al cargar los expedientes. Intenta nuevamente.
+            No se pudieron actualizar los datos desde el servidor. Intenta nuevamente.
           </p>
         )}
         {!isLoading && !isError && (
-          <ExpedienteTable
-            expedientes={expedientesVisibles}
-            onVerExpediente={(expediente) =>
-              navigate(`/expedientes/${expediente.id}`)
-            }
-          />
+          <>
+            <ExpedienteTable
+              expedientes={expedientesVisibles}
+              onVerExpediente={(expediente) => navigate(`/expedientes/${expediente.id}`)}
+            />
+            {hasNextPage && (
+              <div className="mt-4 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => void fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50"
+                >
+                  <ArrowDown aria-hidden="true" className="h-4 w-4" />
+                  {isFetchingNextPage ? "Cargando…" : "Cargar más expedientes"}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
     </main>

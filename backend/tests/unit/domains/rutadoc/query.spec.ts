@@ -6,12 +6,18 @@ import { codificarCursor, decodificarCursor } from '../../../../src/domains/ruta
 import { filtrosSchema, idSchema } from '../../../../src/domains/rutadoc/rutadoc.schemas.js';
 import type { RepositorioRutaDoc } from '../../../../src/domains/rutadoc/rutadoc.repository.js';
 
-const actor: ActorRutaDoc = { id: 'operador-1', roles: ['MESA_PARTES'], puedeVerExpediente: () => true };
+const AREA_ID = 'a3401043-807f-41f3-9de8-a042e4b312d4';
+const actor: ActorRutaDoc = {
+  id: 'operador-1', roles: ['MESA_PARTES'], unidadOrganicaId: AREA_ID,
+  puedeVerExpediente: () => true,
+};
 const filtros: FiltrosRutaDoc = { pestana: 'PENDIENTES', limite: 20 };
 
 const fila: ExpedienteResumen = {
   idExpediente: 'c3401043-807f-41f3-9de8-a042e4b312d4', cut: 'EXP-2026-000017', asunto: 'Solicitud',
-  fechaRadicacion: '2026-09-24T14:30:00.000Z', estadoActual: 'REGISTRADO', areaActualId: null,
+  fechaRadicacion: '2026-09-24T14:30:00.000Z', estadoActual: 'REGISTRADO', areaActualId: AREA_ID,
+  solicitanteNombre: 'Solicitante de prueba', totalFolios: 0,
+  codigoSerie: null, nombreSerie: null,
 };
 
 function repositorioSimulado(): RepositorioRutaDoc {
@@ -80,10 +86,31 @@ describe('Consulta RutaDoc', () => {
   it('delega al repositorio con los estados de la pestaña y construye contadores', async () => {
     const repo = repositorioSimulado();
     const resultado = await new ServicioRutaDoc(repo).listar(filtros, actor);
-    expect(repo.listar).toHaveBeenCalledWith(filtros, ESTADOS_POR_PESTANA.PENDIENTES, null);
+    expect(repo.listar).toHaveBeenCalledWith(
+      { ...filtros, areaId: AREA_ID }, ESTADOS_POR_PESTANA.PENDIENTES, null,
+    );
     expect(resultado.elementos).toEqual([fila]);
     expect(resultado.contadores).toEqual({ PENDIENTES: 1, EN_TRAMITE: 0, DERIVADOS: 0,
       POR_FIRMAR: 0, ATENDIDOS: 0, ARCHIVADOS: 0 });
+  });
+
+  it('permite pedir estados operativos exactos sin ampliar la pestaña histórica', async () => {
+    const repo = repositorioSimulado();
+    const filtrosExactos: FiltrosRutaDoc = {
+      pestana: 'TODOS', limite: 20, estadosActuales: ['OBSERVADO'],
+    };
+    await new ServicioRutaDoc(repo).listar(filtrosExactos, actor);
+    expect(repo.listar).toHaveBeenCalledWith(
+      { ...filtrosExactos, areaId: AREA_ID }, ['OBSERVADO'], null,
+    );
+  });
+
+  it('ignora el área solicitada por el cliente y usa siempre el área del actor', async () => {
+    const repo = repositorioSimulado();
+    await new ServicioRutaDoc(repo).listar({ ...filtros, areaId: 'b3401043-807f-41f3-9de8-a042e4b312d4' }, actor);
+    expect(repo.listar).toHaveBeenCalledWith(
+      { ...filtros, areaId: AREA_ID }, ESTADOS_POR_PESTANA.PENDIENTES, null,
+    );
   });
 
   it('recorta limite + 1 y emite cursor desde el último elemento visible', async () => {
@@ -92,7 +119,7 @@ describe('Consulta RutaDoc', () => {
     const resultado = await new ServicioRutaDoc(repo).listar({ ...filtros, limite: 1 }, actor);
     expect(resultado.elementos).toEqual([fila]);
     expect(resultado.tieneMas).toBe(true);
-    expect(decodificarCursor(resultado.siguienteCursor!, { ...filtros, limite: 1 })).toEqual({
+    expect(decodificarCursor(resultado.siguienteCursor!, { ...filtros, limite: 1, areaId: AREA_ID })).toEqual({
       fechaRadicacion: fila.fechaRadicacion, idExpediente: fila.idExpediente,
     });
   });

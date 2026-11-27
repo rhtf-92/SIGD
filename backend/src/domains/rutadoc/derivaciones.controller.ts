@@ -4,7 +4,7 @@ import { DerivarExpedienteSchema } from './dto/derivarExpediente.dto.js';
 import { AtenderExpedienteSchema } from './dto/atenderExpediente.dto.js';
 import { ArchivarExpedienteSchema } from './dto/archivarExpediente.dto.js';
 import {
-  derivarExpediente, atenderExpediente, archivarExpediente,
+  derivarExpediente, recepcionarExpediente, atenderExpediente, archivarExpediente,
   observarExpediente, subsanarExpediente,
 } from './derivaciones.service.js';
 import { NotFoundError, ValidationError } from '../../shared/domain/errors/index.js';
@@ -54,6 +54,26 @@ export function crearRouterDerivaciones(pool: Pool): Router {
   router.post('/:id/derivar', handlerDerivar);
   router.post('/:id/movimientos/derivar', handlerDerivar);
 
+  router.post('/:id/recepcionar', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const expedienteId = idSchema.parse(req.params.id);
+      const cliente = await pool.connect();
+      try {
+        await cliente.query('BEGIN');
+        const resultado = await recepcionarExpediente(cliente, expedienteId);
+        await cliente.query('COMMIT');
+        res.status(200).json({ ok: true, expediente_id: expedienteId, nuevoEstado: resultado.estado });
+      } catch (error) {
+        await cliente.query('ROLLBACK').catch(() => {});
+        throw error;
+      } finally {
+        cliente.release();
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Endpoint #25 (T-BE-RD-07) - Atención Resolutiva
   router.post('/:id/atender', async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -62,12 +82,14 @@ export function crearRouterDerivaciones(pool: Pool): Router {
       const cliente = await pool.connect();
       try {
         await cliente.query('BEGIN');
-        await atenderExpediente(cliente, expedienteId, datos);
+        const resultado = await atenderExpediente(cliente, expedienteId, datos);
         await cliente.query('COMMIT');
         res.status(200).json({
           ok: true,
           mensaje: 'Atención resolutiva registrada exitosamente.',
           expediente_id: expedienteId,
+          nuevoEstado: resultado.estado,
+          notificadoCasilla: resultado.notificadoCasilla,
         });
       } catch (error) {
         await cliente.query('ROLLBACK').catch(() => {});

@@ -25,6 +25,8 @@ export function huellaFiltros(filtros: FiltrosRutaDoc): string {
     areaId: filtros.areaId ?? null,
     fechaDesde: filtros.fechaDesde ?? null,
     fechaHasta: filtros.fechaHasta ?? null,
+    codigoSerie: filtros.codigoSerie ?? null,
+    estadosActuales: filtros.estadosActuales ?? null,
   })).digest('hex');
 }
 

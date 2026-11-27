@@ -11,15 +11,18 @@ export const ESTADOS_POR_PESTANA = Object.freeze({
 } as const satisfies Record<string, readonly EstadoRutaDoc[]>);
 
 export type PestanaRutaDoc = keyof typeof ESTADOS_POR_PESTANA;
+export type FiltroPestanaRutaDoc = PestanaRutaDoc | 'TODOS';
 export type ContadoresRutaDoc = Record<PestanaRutaDoc, number>;
 
 export interface FiltrosRutaDoc {
-  pestana: PestanaRutaDoc;
+  pestana: FiltroPestanaRutaDoc;
   limite: number;
   terminoBusqueda?: string;
   areaId?: string;
   fechaDesde?: string;
   fechaHasta?: string;
+  codigoSerie?: string;
+  estadosActuales?: EstadoRutaDoc[];
   cursor?: string;
 }
 
@@ -36,6 +39,10 @@ export interface ExpedienteResumen {
   estadoActual: EstadoRutaDoc;
   /** Procede de datos.areaId del último movimiento, si el escritor lo aporta. */
   areaActualId: string | null;
+  solicitanteNombre: string | null;
+  totalFolios: number;
+  codigoSerie: string | null;
+  nombreSerie: string | null;
 }
 
 export interface UltimoMovimiento {
@@ -60,6 +67,7 @@ export interface ResultadoBandeja {
   siguienteCursor: string | null;
   tieneMas: boolean;
   contadores: ContadoresRutaDoc;
+  conteosEstado: Partial<Record<EstadoRutaDoc, number>>;
 }
 
 export interface ActorRutaDoc {

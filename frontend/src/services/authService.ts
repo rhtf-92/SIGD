@@ -1,6 +1,7 @@
 // Servicio de autenticación institucional SIGD y control RBAC
 // Simula la base de datos segura y el protocolo de validación de credenciales
 // del IESTP "Suiza" (Pucallpa - Ucayali).
+import { obtenerRutaInicialPorRol } from "../utils/rutasPorRol";
 
 export type RolCanonicoId =
   | "SUPER_ADMIN"
@@ -43,7 +44,7 @@ export const USUARIOS_AUTORIZADOS: UsuarioAutorizado[] = [
     cargo: "Administrador General del Sistema",
     area: "Oficina de Tecnologías de la Información",
     activo: true,
-    destino: "/",
+    destino: "/administracion",
   },
   {
     id: "usr-dir-01",
@@ -58,7 +59,7 @@ export const USUARIOS_AUTORIZADOS: UsuarioAutorizado[] = [
     cargo: "Director General IESTP Suiza",
     area: "Dirección General",
     activo: true,
-    destino: "/",
+    destino: "/flujo-validez-legal",
   },
   {
     id: "usr-doc-01",
@@ -76,7 +77,7 @@ export const USUARIOS_AUTORIZADOS: UsuarioAutorizado[] = [
     cargo: "Docente / Coordinador de Titulación",
     area: "Área Académica",
     activo: true,
-    destino: "/flujos/titulacion",
+    destino: "/expedientes",
   },
   {
     id: "usr-mp-01",
@@ -91,7 +92,7 @@ export const USUARIOS_AUTORIZADOS: UsuarioAutorizado[] = [
     cargo: "Operador de Mesa de Partes / Ventanilla",
     area: "Mesa de Partes y Trámite Documentario",
     activo: true,
-    destino: "/tramite/ventanilla-presencial",
+    destino: "/tramite/mesa-partes-virtual",
   },
   {
     id: "usr-est-01",
@@ -301,6 +302,6 @@ export async function autenticarCredenciales(params: {
     exito: true,
     usuario,
     token,
-    destino: usuario.destino,
+    destino: obtenerRutaInicialPorRol(usuario.rol),
   };
 }

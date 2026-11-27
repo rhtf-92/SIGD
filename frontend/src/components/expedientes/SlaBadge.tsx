@@ -23,7 +23,7 @@ const ESTILOS_ESTADO: Record<
   }
 > = {
   NORMAL: {
-    contenedor: "bg-emerald-50 text-emerald-800 border-emerald-300",
+    contenedor: "bg-emerald-50 text-emerald-800 border-emerald-200",
     puntoIndicador: "bg-emerald-600",
     etiquetaTexto: "Al día",
   },
@@ -33,8 +33,8 @@ const ESTILOS_ESTADO: Record<
     etiquetaTexto: "Atención",
   },
   CRITICO: {
-    contenedor: "bg-rose-50 text-rose-800 border-rose-300",
-    puntoIndicador: "bg-rose-600",
+    contenedor: "bg-red-50 text-red-800 border-red-200",
+    puntoIndicador: "bg-red-600",
     etiquetaTexto: "Crítico",
   },
   VENCIDO: {

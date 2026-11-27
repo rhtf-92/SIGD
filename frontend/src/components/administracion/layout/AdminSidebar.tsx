@@ -102,17 +102,17 @@ export default function AdminSidebar({
     <div className="flex h-full flex-col justify-between">
       {/* Top Header / Brand */}
       <div>
-        <div className="flex items-center justify-between border-b border-slate-800/80 px-3 py-3">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4">
           {!colapsado && (
             <div className="flex items-center gap-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 border border-blue-100 text-blue-700">
                 <Sparkles className="h-4 w-4" />
               </div>
               <div>
-                <h2 className="text-xs font-bold tracking-wider uppercase text-white">
+                <h2 className="text-xs font-bold tracking-wider uppercase text-slate-800">
                   Navegación Admin
                 </h2>
-                <p className="text-[10px] text-slate-400">SIGD SUIZA v6.5</p>
+                <p className="text-[10px] text-slate-500">SIGD SUIZA v6.5</p>
               </div>
             </div>
           )}
@@ -121,7 +121,7 @@ export default function AdminSidebar({
           <button
             type="button"
             onClick={toggleColapsado}
-            className={`hidden xl:inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white hover:border-cyan-500/40 transition cursor-pointer ${
+            className={`hidden lg:inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-blue-800 hover:border-blue-300 transition cursor-pointer ${
               colapsado ? "mx-auto" : "ml-auto"
             }`}
             aria-label={colapsado ? "Expandir menú lateral" : "Colapsar menú lateral"}
@@ -138,7 +138,7 @@ export default function AdminSidebar({
           <button
             type="button"
             onClick={onCloseMobile}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white xl:hidden transition"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-blue-800 lg:hidden transition"
             aria-label="Cerrar navegación"
           >
             <X className="h-4 w-4" />
@@ -158,8 +158,8 @@ export default function AdminSidebar({
                   onClick={() => handleNavClick(item.ruta)}
                   className={`group relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-all duration-200 cursor-pointer ${
                     esActiva
-                      ? "bg-gradient-to-r from-blue-600/25 via-cyan-500/15 to-transparent text-white border-l-4 border-cyan-400 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]"
-                      : "text-slate-400 hover:bg-slate-900/60 hover:text-cyan-200"
+                      ? "bg-blue-50 text-blue-800 border-l-4 border-blue-700 shadow-sm"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-blue-800"
                   }`}
                   aria-current={esActiva ? "page" : undefined}
                   title={colapsado ? item.titulo : undefined}
@@ -167,8 +167,8 @@ export default function AdminSidebar({
                   <Icono
                     className={`h-4 w-4 shrink-0 transition-colors ${
                       esActiva
-                        ? "text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]"
-                        : "text-slate-500 group-hover:text-cyan-300"
+                        ? "text-blue-700"
+                        : "text-slate-400 group-hover:text-blue-700"
                     }`}
                     aria-hidden="true"
                   />
@@ -178,7 +178,7 @@ export default function AdminSidebar({
                       <span className="truncate text-xs sm:text-sm font-semibold tracking-wide">
                         {item.titulo}
                       </span>
-                      <span className="hidden truncate text-[10px] text-slate-500 group-hover:text-slate-400 2xl:block">
+                      <span className="truncate text-[11px] text-slate-500 group-hover:text-slate-600">
                         {item.descripcion}
                       </span>
                     </div>
@@ -186,7 +186,7 @@ export default function AdminSidebar({
 
                   {/* Active indicator dot if collapsed */}
                   {colapsado && esActiva && (
-                    <span className="absolute right-2 h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(6,182,212,0.8)]" />
+                    <span className="absolute right-2 h-1.5 w-1.5 rounded-full bg-blue-700" />
                   )}
                 </button>
               </li>
@@ -197,9 +197,9 @@ export default function AdminSidebar({
 
       {/* Footer in Sidebar */}
       {!colapsado && (
-        <div className="border-t border-slate-800/80 p-3">
-          <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-2.5">
-            <p className="text-[11px] font-bold text-slate-300">
+        <div className="border-t border-slate-200 p-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <p className="text-[11px] font-bold text-slate-700">
               Instituto Suiza
             </p>
             <p className="text-[10px] text-slate-500">
@@ -215,8 +215,8 @@ export default function AdminSidebar({
     <>
       {/* Desktop Sidebar */}
       <aside
-        className={`hidden xl:flex flex-col shrink-0 border-r border-slate-800/80 bg-slate-950/70 backdrop-blur-2xl transition-all duration-300 ease-in-out ${
-          colapsado ? "w-16" : "w-64"
+        className={`hidden lg:flex flex-col shrink-0 border-r border-slate-200 bg-white transition-all duration-300 ease-in-out ${
+          colapsado ? "w-20" : "w-72"
         }`}
         aria-label="Navegación lateral de administración"
       >
@@ -226,11 +226,11 @@ export default function AdminSidebar({
       {/* Mobile Drawer Overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-50 flex xl:hidden bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex lg:hidden bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
           onClick={onCloseMobile}
         >
           <div
-            className="relative flex w-64 max-w-[82vw] flex-col border-r border-cyan-500/30 bg-slate-950 shadow-2xl animate-in slide-in-from-left duration-200"
+            className="relative flex w-72 max-w-[80vw] flex-col border-r border-slate-200 bg-white shadow-2xl animate-in slide-in-from-left duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {sidebarContent}

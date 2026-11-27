@@ -38,7 +38,8 @@ export function useExpedienteTimeline(expedienteId: string | undefined) {
           : obtenerTimelineApi(expedienteId)
         : Promise.resolve([]),
     enabled: Boolean(expedienteId),
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchInterval: 15_000,
     select: (eventos) =>
       [...eventos].sort(
         (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),

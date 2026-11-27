@@ -105,14 +105,14 @@ describe('ServicioCcdRutaDoc', () => {
     expect(arbol[0].tipo).toBe('SERIE');
     expect(arbol[0].hijos.map((n) => n.tipo)).toEqual(['SUBSERIE', 'SUBSERIE']);
   });
-  it('usa por defecto el seed RutaDoc con jerarquía y orden estables', async () => {
+  it('usa por defecto las series CCD de la bandeja con orden estable', async () => {
     const servicio = new ServicioCcdRutaDoc();
     const primera = await servicio.obtenerArbol();
     const segunda = await servicio.obtenerArbol();
     expect(primera).toEqual(segunda);
     expect(primera).toEqual(catalogoCcdInicialRutaDoc);
-    expect(primera[0]).toMatchObject({ tipo: 'SERIE', codigo: 'DEMO-01', nombre: 'Serie de ejemplo (no oficial)' });
-    expect(primera[0].hijos[0]).toMatchObject({ tipo: 'SUBSERIE', codigo: 'DEMO-01.01', nombre: 'Subserie de ejemplo (no oficial)' });
+    expect(primera.map((serie) => serie.codigo)).toEqual(['CCD-DG-RES', 'CCD-SA-ACTA', 'CCD-SA-TIT']);
+    expect(primera.every((serie) => serie.tipo === 'SERIE' && serie.hijos.length === 0)).toBe(true);
   });
   it('permite sustituir el catálogo predeterminado a través del port', async () => {
     const alternativa = [{ id: 'institucional', codigo: 'A', nombre: 'Catálogo alternativo', tipo: 'SERIE' as const, hijos: [] }];

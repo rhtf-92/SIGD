@@ -2,6 +2,7 @@ export interface MetadataDocumento {
   checksumSha256: string | null;
   nombre?: string | null;
   tipo?: string | null;
+  urlOriginal?: string | null;
 }
 
 export interface DocumentoMetadataPort {
@@ -17,10 +18,11 @@ export interface FolioExpediente {
   cantidadFolios: number;
   rango: string;
   checksumSha256: string | null;
+  urlOriginal: string | null;
 }
 
 export interface RepositorioFoliacionRutaDoc {
   existeExpediente(idExpediente: string): Promise<boolean>;
   listar(idExpediente: string): Promise<readonly Omit<FolioExpediente,
-    'nombre' | 'tipo' | 'rango' | 'checksumSha256'>[]>;
+    'nombre' | 'tipo' | 'rango' | 'checksumSha256' | 'urlOriginal'>[]>;
 }
