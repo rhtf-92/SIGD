@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -53,17 +54,26 @@ const cargoMuestra: CargoOficialTramite = {
   urlSeguimiento: "https://sigd.iestpsuiza.edu.pe/tramite?cut=EXP-2026-000155",
 };
 
+function renderVentanilla() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <VentanillaPresencialPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-05)", () => {
   beforeEach(() => {
     vi.spyOn(apiClient, "post").mockResolvedValue(mockRespuestaVentanilla as any);
   });
 
   it("renderiza el formulario de ventanilla presencial con campos obligatorios y conmutador de persona", () => {
-    render(
-      <MemoryRouter>
-        <VentanillaPresencialPage />
-      </MemoryRouter>,
-    );
+    renderVentanilla();
 
     expect(
       screen.getByRole("heading", { name: /Ventanilla Presencial de Atención al Ciudadano/i }),
@@ -80,11 +90,7 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
   it("muestra requisitos, tarifas y datos del procedimiento TUPA seleccionado", async () => {
     const user = userEvent.setup();
 
-    render(
-      <MemoryRouter>
-        <VentanillaPresencialPage />
-      </MemoryRouter>,
-    );
+    renderVentanilla();
 
     await user.selectOptions(screen.getByLabelText(/Procedimiento TUPA 2026/i), "01");
 
@@ -113,11 +119,7 @@ describe("Suite de Pruebas de Ventanilla Presencial y Ticket Cargo CUT (ENT-M02-
   it("completa el flujo de registro en ventanilla y despliega el modal de cargo con CUT generado", async () => {
     const user = userEvent.setup();
 
-    render(
-      <MemoryRouter>
-        <VentanillaPresencialPage />
-      </MemoryRouter>,
-    );
+    renderVentanilla();
 
     await user.type(screen.getByLabelText(/Número de Documento \*/i), "74561238");
     await user.type(screen.getByLabelText(/Apellidos y Nombres \*/i), "Sergio Serruche");

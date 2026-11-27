@@ -48,6 +48,7 @@ interface DatosPersonaRegistro {
 
 export interface RegistroResult {
   idPersona: string;
+  casillaId: string;
   mensaje: 'Registro exitoso';
 }
 
@@ -165,7 +166,7 @@ export class RegistroCiudadanoService {
 
       await cliente.query('COMMIT');
       transaccionAbierta = false;
-      return { idPersona: personaId, mensaje: 'Registro exitoso' };
+      return { idPersona: personaId, casillaId: usuarioId, mensaje: 'Registro exitoso' };
     } catch (error) {
       if (transaccionAbierta) await cliente.query('ROLLBACK');
       if (esViolacionUnicidad(error)) {

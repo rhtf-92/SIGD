@@ -82,6 +82,7 @@ describe('RegistroCiudadanoService', () => {
       new RegistroCiudadanoService(pool, ubigeo).registrarCiudadano(datos, null),
     ).resolves.toEqual({
       idPersona: 'persona-1',
+      casillaId: 'usuario-1',
       mensaje: 'Registro exitoso',
     });
 

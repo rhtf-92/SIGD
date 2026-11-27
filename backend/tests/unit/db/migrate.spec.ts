@@ -45,7 +45,7 @@ describe('compatibilidad de checksum de migraciones', () => {
     ).toBe(false);
   });
 
-  it('conserva byte a byte el contenido de las migraciones del tablero ejecutivo', () => {
+  it('calcula los checksums canónicos de migraciones independientemente de los finales de línea', () => {
     const checksums: Record<string, string> = {
       '14_sigd_reportes_mgd_compatible.sql':
         '178b2c8b537daa71905ae490fd30e1b09e746d0ab134f0b284a3cada7903f719',
@@ -54,7 +54,9 @@ describe('compatibilidad de checksum de migraciones', () => {
     };
 
     for (const [archivo, esperado] of Object.entries(checksums)) {
-      const contenido = fs.readFileSync(path.resolve('migraciones', archivo), 'utf8');
+      const contenido = fs
+        .readFileSync(path.resolve('migraciones', archivo), 'utf8')
+        .replace(/\r\n/g, '\n');
       expect(crypto.createHash('sha256').update(contenido).digest('hex')).toBe(esperado);
     }
   });

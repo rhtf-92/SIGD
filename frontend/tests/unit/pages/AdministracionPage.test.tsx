@@ -39,26 +39,24 @@ describe("AdministracionPage (panel limpio)", () => {
     expect(screen.getByText("Corte Normativo")).toBeInTheDocument();
   });
 
-  test("4. No renderiza la sección de módulos de configuración y control", () => {
+  test("4. Renderiza la sección de módulos de configuración y control", () => {
     renderConRouter(<AdministracionPage />);
     expect(
       screen.queryByText("Módulos de Configuración y Control")
-    ).not.toBeInTheDocument();
+    ).toBeInTheDocument();
     expect(
       screen.queryByText("Selecciona una opción para administrar el SIGD.")
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Selecciona una opción para administrar el SIGD")
-    ).not.toBeInTheDocument();
+    ).toBeInTheDocument();
   });
 
-  test("5. No renderiza las seis tarjetas ni sus botones Administrar", () => {
+  test("5. Renderiza las seis tarjetas y sus acciones Administrar", () => {
     renderConRouter(<AdministracionPage />);
-    ["Usuarios", "Roles y Permisos", "Auditoría", "Tablas Maestras", "Calendario Laboral", "Seguridad"]
+    const modulos = ["Usuarios", "Roles y Permisos", "Auditoría", "Tablas Maestras", "Calendario Laboral", "Seguridad"];
+    modulos
       .forEach((nombre) => {
-        expect(screen.queryByText(nombre, { exact: true })).not.toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: nombre, level: 4 })).toBeInTheDocument();
       });
-    expect(screen.queryByRole("button", { name: /Administrar/i })).not.toBeInTheDocument();
-    expect(screen.queryByText("Acceso Autorizado")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^Administrar /i })).toHaveLength(6);
+    expect(screen.getAllByText("Acceso Autorizado")).toHaveLength(6);
   });
 });

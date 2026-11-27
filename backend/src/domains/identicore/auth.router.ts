@@ -230,6 +230,7 @@ export function crearRouterAuth(pool: Pool): Router {
 
     res.status(200).json({
       id: usuario.id_usuario,
+      idPersona: usuario.id_persona,
       usuario: usuario.usuario,
       username: usuario.usuario,
       nombreCompleto: usuario.nombre_completo,

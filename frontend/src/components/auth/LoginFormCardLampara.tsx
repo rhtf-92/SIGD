@@ -14,19 +14,14 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   User, Lock, Eye, EyeOff, LogIn, ExternalLink,
-  AlertCircle, HelpCircle, X, ShieldAlert, ShieldCheck, Volume2, VolumeX,
+  AlertCircle, HelpCircle, X, ShieldAlert, Volume2, VolumeX,
 } from "lucide-react";
-import { permisosIniciales } from "../../hooks/useRbacConfig";
 import { useAuthStore } from "../../stores/authStore";
-import {
-  autenticarCredenciales,
-  sincronizarRolPorIdentificador,
-  type RolCanonicoId,
-} from "../../services/authService";
-import { obtenerRutaInicialPorRol } from "../../utils/rutasPorRol";
+import { autenticarCredenciales } from "../../services/authService";
+import { obtenerRutaSolicitada } from "../../utils/rutasPorRol";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TIPOS
@@ -308,6 +303,7 @@ export default function LoginFormCardLampara({
   minimal = false,
 }: LoginFormCardLamparaProps): React.JSX.Element {
   const navigate = useNavigate();
+  const location = useLocation();
 
   /* ── Estados del formulario ── */
   const [identificador, setIdentificador] = useState<string>(() => {
@@ -318,10 +314,8 @@ export default function LoginFormCardLampara({
     try { return Boolean(window.localStorage.getItem(CLAVE_REMEMBER)); } catch { return false; }
   });
   const [showPassword, setShowPassword]   = useState(false);
-  const [rol, setRol]                     = useState("SUPER_ADMIN");
   const [isSubmitting, setIsSubmitting]   = useState(false);
   const [errorMessage, setErrorMessage]   = useState<string | null>(null);
-  const [sugerenciaRol, setSugerenciaRol] = useState<RolCanonicoId | null>(null);
   const [showForgotModal, setShowForgotModal] = useState(false);
 
   /* ── Estados de la lámpara ── */
@@ -382,26 +376,23 @@ export default function LoginFormCardLampara({
     setTimeout(() => setIsKnobPulsing(false), 350);
   }, [temaIndex, playClick, playHum]);
 
-  /* ── Cambio identificador (detecta rol) ── */
+  /* ── Cambio de identificador ── */
   const handleIdentificadorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setIdentificador(val);
-    if (errorMessage) { setErrorMessage(null); setSugerenciaRol(null); }
-    const rolDetectado = sincronizarRolPorIdentificador(val);
-    if (rolDetectado) setRol(rolDetectado);
+    if (errorMessage) setErrorMessage(null);
   };
 
   /* ── Submit ── */
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage(null);
-    setSugerenciaRol(null);
     const trimmed = identificador.trim();
     if (!trimmed) { setErrorMessage("Por favor, ingrese su usuario, DNI o correo institucional."); return; }
     if (!password) { setErrorMessage("Por favor, ingrese su contraseña de acceso."); return; }
     setIsSubmitting(true);
     try {
-      const authResult = await autenticarCredenciales({ identificador: trimmed, password, rolSeleccionado: rol });
+      const authResult = await autenticarCredenciales({ identificador: trimmed, password });
       if (!authResult.exito) {
         window.localStorage.removeItem(CLAVE_TOKEN);
         window.localStorage.removeItem("token");
@@ -409,26 +400,29 @@ export default function LoginFormCardLampara({
         window.localStorage.removeItem(CLAVE_PERMISOS);
         window.localStorage.removeItem("sigd_usuario_nombre");
         window.localStorage.removeItem("sigd_usuario_correo");
+        window.localStorage.removeItem("sigd_refresh");
+        window.localStorage.removeItem("sigd_refresh_token");
         useAuthStore.setState({ accessToken: null, refreshToken: null, usuario: null, isAuthenticated: false });
         setErrorMessage(authResult.mensaje);
-        if (authResult.sugerenciaRol) setSugerenciaRol(authResult.sugerenciaRol);
         return;
       }
       if (remember) window.localStorage.setItem(CLAVE_REMEMBER, trimmed);
       else          window.localStorage.removeItem(CLAVE_REMEMBER);
-      window.localStorage.setItem(CLAVE_TOKEN,    authResult.token);
-      window.localStorage.setItem("token",        authResult.token);
-      window.localStorage.setItem(CLAVE_ROL,      authResult.usuario.rol);
-      window.localStorage.setItem(CLAVE_PERMISOS, JSON.stringify(permisosIniciales));
-      window.localStorage.setItem("sigd_usuario_nombre",  authResult.usuario.nombreCompleto);
-      window.localStorage.setItem("sigd_usuario_correo",  authResult.usuario.correo);
-      useAuthStore.setState({
-        accessToken:  authResult.token,
-        refreshToken: `sigd-refresh-${Date.now()}`,
-        usuario: { id: authResult.usuario.id, nombreCompleto: authResult.usuario.nombreCompleto, correo: authResult.usuario.correo, rol: authResult.usuario.rol },
-        isAuthenticated: true,
-      });
-      navigate(obtenerRutaInicialPorRol(authResult.usuario.rol), { replace: true });
+      useAuthStore.getState().setSession(
+        authResult.token,
+        {
+          id: authResult.usuario.id,
+          nombreCompleto: authResult.usuario.nombreCompleto,
+          correo: authResult.usuario.correo,
+          rol: authResult.usuario.rol,
+          areaId: authResult.usuario.areaId,
+        },
+        authResult.refreshToken,
+      );
+      navigate(
+        obtenerRutaSolicitada(location.state, location.search) ?? authResult.destino,
+        { replace: true },
+      );
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Ocurrió un error al verificar sus credenciales. Intente nuevamente.");
     } finally {
@@ -587,26 +581,13 @@ export default function LoginFormCardLampara({
                 <span style={{ fontSize: "0.75rem", color: "#fca5a5", lineHeight: 1.5, flex: 1 }}>{errorMessage}</span>
                 <button
                   type="button"
-                  onClick={() => { setErrorMessage(null); setSugerenciaRol(null); }}
+                  onClick={() => setErrorMessage(null)}
                   style={{ background: "none", border: "none", color: "#f87171", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 2px" }}
                   aria-label="Cerrar mensaje de error"
                 >
                   ×
                 </button>
               </div>
-              {sugerenciaRol && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid rgba(239,68,68,0.3)", paddingTop: 8, marginTop: 4 }}>
-                  <span style={{ fontSize: 11, color: "#fca5a5" }}>¿Cambiar al rol autorizado?</span>
-                  <button
-                    type="button"
-                    onClick={() => { setRol(sugerenciaRol); setSugerenciaRol(null); setErrorMessage(null); }}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#dc2626", border: "none", borderRadius: 8, color: "#fff", fontWeight: 600, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}
-                  >
-                    <ShieldCheck size={14} aria-hidden="true" />
-                    <span>Ajustar a {sugerenciaRol}</span>
-                  </button>
-                </div>
-              )}
             </div>
           )}
 
@@ -660,7 +641,7 @@ export default function LoginFormCardLampara({
                   name="password"
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => { setPassword(e.target.value); if (errorMessage) { setErrorMessage(null); setSugerenciaRol(null); } }}
+                  onChange={(e) => { setPassword(e.target.value); if (errorMessage) setErrorMessage(null); }}
                   placeholder="••••••••"
                   autoComplete="current-password"
                   required
@@ -1001,26 +982,13 @@ export default function LoginFormCardLampara({
                 <span style={{ fontSize: "0.75rem", color: "#fca5a5", lineHeight: 1.5, flex: 1 }}>{errorMessage}</span>
                 <button
                   type="button"
-                  onClick={() => { setErrorMessage(null); setSugerenciaRol(null); }}
+                  onClick={() => setErrorMessage(null)}
                   style={{ background: "none", border: "none", color: "#f87171", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 2px" }}
                   aria-label="Cerrar mensaje de error"
                 >
                   ×
                 </button>
               </div>
-              {sugerenciaRol && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid rgba(239,68,68,0.3)", paddingTop: 8, marginTop: 4 }}>
-                  <span style={{ fontSize: 11, color: "#fca5a5" }}>¿Cambiar al rol autorizado?</span>
-                  <button
-                    type="button"
-                    onClick={() => { setRol(sugerenciaRol); setSugerenciaRol(null); setErrorMessage(null); }}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#dc2626", border: "none", borderRadius: 8, color: "#fff", fontWeight: 600, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}
-                  >
-                    <ShieldCheck size={14} aria-hidden="true" />
-                    <span>Ajustar a {sugerenciaRol}</span>
-                  </button>
-                </div>
-              )}
             </div>
           )}
 
@@ -1074,7 +1042,7 @@ export default function LoginFormCardLampara({
                   name="password"
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => { setPassword(e.target.value); if (errorMessage) { setErrorMessage(null); setSugerenciaRol(null); } }}
+                  onChange={(e) => { setPassword(e.target.value); if (errorMessage) setErrorMessage(null); }}
                   placeholder="••••••••"
                   autoComplete="current-password"
                   required

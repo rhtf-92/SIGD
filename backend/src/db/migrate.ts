@@ -97,6 +97,10 @@ function directorioMigraciones(): string {
   return rutaDev;
 }
 
+function normalizarSaltosDeLinea(contenido: string): string {
+  return contenido.replace(/\r\n/g, '\n');
+}
+
 async function esperarCandado(cliente: PoolClient, lockId: number, timeoutMs: number): Promise<void> {
   const limite = Date.now() + timeoutMs;
   let intentos = 0;
@@ -149,7 +153,9 @@ export async function ejecutarMigraciones(pool: Pool, opciones: { timeoutLockMs?
       .sort();
 
     for (const archivo of archivos) {
-      const contenido = fs.readFileSync(path.join(directorio, archivo), 'utf-8');
+      const contenido = normalizarSaltosDeLinea(
+        fs.readFileSync(path.join(directorio, archivo), 'utf-8'),
+      );
       const checksum = crypto.createHash('sha256').update(contenido).digest('hex');
 
       const existentes = await cliente.query<RegistroMigracion>(
@@ -171,7 +177,14 @@ export async function ejecutarMigraciones(pool: Pool, opciones: { timeoutLockMs?
             : '';
           const checksumCorrectivo =
             reemplazo && archivos.includes(reemplazo)
-              ? crypto.createHash('sha256').update(fs.readFileSync(rutaCorrectiva, 'utf-8')).digest('hex')
+              ? crypto
+                  .createHash('sha256')
+                  .update(
+                    normalizarSaltosDeLinea(
+                      fs.readFileSync(rutaCorrectiva, 'utf-8'),
+                    ),
+                  )
+                  .digest('hex')
               : null;
 
           if (

@@ -29,6 +29,12 @@ describe('serializeError (matriz sección 6 del entregable 01)', () => {
     expect(serializado).toMatchObject({ status: 409, code: 'DUPLICATE_KEY' });
   });
 
+  it('mapea violación de check PostgreSQL 23514 a 422 CHECK_VIOLATION', () => {
+    const pgError = Object.assign(new Error('check violation'), { code: '23514' });
+    const serializado = serializeError(pgError);
+    expect(serializado).toMatchObject({ status: 422, code: 'CHECK_VIOLATION' });
+  });
+
   it('mapea cualquier otro error a 500 INTERNAL_ERROR genérico', () => {
     const serializado = serializeError(new Error('detalle interno sensible'));
     expect(serializado).toMatchObject({

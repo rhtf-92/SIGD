@@ -1,6 +1,7 @@
 ﻿import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { ValidationError } from '../../shared/domain/errors/index.js';
+import { obtenerConfiguracionS3 } from '../../config/s3.config.js';
 import { CutService } from './cut.service.js';
 import { calcularHorarioCorte, type ResultadoHorarioCorte } from './horarioCorte.util.js';
 import type { RadicacionVirtualInput } from './tramites.schemas.js';
@@ -39,20 +40,19 @@ export interface ResultadoRadicacion {
 
 interface FilaExpediente {
   expediente_id: string;
-  cut: string;
-  fecha_envio_real: Date;
-  fecha_radicacion_legal: Date;
-  fuera_de_horario: boolean;
 }
 
 interface FilaTramiteTupa {
-  id_tipo_tramite_tupa: string;
-  activo: boolean;
+  tipo_tramite_id: string;
+  vigente: boolean;
 }
 
 interface FilaPersona {
-  id: string;
-  estado: boolean;
+  id_persona: string;
+}
+
+interface FilaTipoDocumental {
+  tipo_documental_id: string;
 }
 
 /** Origen del calendario de feriados. Inyectable para poder testear sin BD. */
@@ -85,7 +85,7 @@ export class RadicacionVirtualService {
 
       const expediente = await this.insertarExpediente(cliente, datos, cut, horario);
       await this.insertarAdjuntos(cliente, expediente.expediente_id, datos);
-      const cargo = await this.emitirCargoDigital(cliente, expediente.expediente_id, datos, now);
+      const cargo = this.emitirCargoDigital(expediente.expediente_id, datos, now);
 
       await cliente.query('COMMIT');
       transaccionAbierta = false;
@@ -94,8 +94,8 @@ export class RadicacionVirtualService {
         expedienteId: expediente.expediente_id,
         cut,
         anio,
-        fechaEnvioReal: expediente.fecha_envio_real.toISOString(),
-        fechaRadicacionLegal: expediente.fecha_radicacion_legal.toISOString(),
+        fechaEnvioReal: horario.envioReal.toISOString(),
+        fechaRadicacionLegal: horario.radicacionLegal.toISOString(),
         fueraDeHorario: horario.requiereProyeccion,
         mensajeLegal: redactarMensajeLegal(horario),
         totalFolios: datos.totalFolios,
@@ -119,9 +119,9 @@ export class RadicacionVirtualService {
 
   private async verificarTipoTramite(cliente: PoolClient, idTipoTramiteTupa: string): Promise<void> {
     const resultado = await cliente.query<FilaTramiteTupa>(
-      `SELECT id_tipo_tramite_tupa, activo
+      `SELECT tipo_tramite_id, vigente
          FROM sigd_doc.tipo_tramite_tupa
-        WHERE id_tipo_tramite_tupa = $1`,
+        WHERE tipo_tramite_id = $1`,
       [idTipoTramiteTupa],
     );
     const tipo = resultado.rows[0];
@@ -132,7 +132,7 @@ export class RadicacionVirtualService {
         ],
       });
     }
-    if (!tipo.activo) {
+    if (!tipo.vigente) {
       throw new ValidationError({
         invalidParams: [
           { name: 'idTipoTramiteTupa', reason: 'TIPO_TRAMITE_INACTIVO: el tramite ya no admite nuevas radicaciones.' },
@@ -141,26 +141,36 @@ export class RadicacionVirtualService {
     }
   }
 
-  private async verificarAdministrado(cliente: PoolClient, idPersona: number): Promise<void> {
+  private async verificarAdministrado(cliente: PoolClient, idPersona: string): Promise<void> {
     const resultado = await cliente.query<FilaPersona>(
-      'SELECT id::text AS id, estado FROM sigd_auth.persona WHERE id = $1',
+      'SELECT id_persona::text AS id_persona FROM sigd_auth.persona WHERE id_persona = $1',
       [idPersona],
     );
-    const persona = resultado.rows[0];
-    if (!persona) {
+    if (!resultado.rows[0]) {
       throw new ValidationError({
         invalidParams: [
-          { name: 'idPersona', reason: 'ADMINISTRADO_NO_REGISTRADO: el UUID no corresponde a una persona del padron.' },
+          { name: 'idPersona', reason: 'ADMINISTRADO_NO_REGISTRADO: el UUID no corresponde a una persona del padrón.' },
         ],
       });
     }
-    if (!persona.estado) {
+  }
+
+  private async obtenerTipoDocumental(cliente: PoolClient): Promise<string> {
+    const resultado = await cliente.query<FilaTipoDocumental>(
+      `SELECT tipo_documental_id::text AS tipo_documental_id
+         FROM sigd_doc.tipo_documento
+        WHERE codigo = 'SOLICITUD' AND vigente = TRUE
+        LIMIT 1`,
+    );
+    const tipoDocumentalId = resultado.rows[0]?.tipo_documental_id;
+    if (!tipoDocumentalId) {
       throw new ValidationError({
         invalidParams: [
-          { name: 'idPersona', reason: 'ADMINISTRADO_INACTIVO: la persona esta desactivada y no puede radicar.' },
+          { name: 'documentos', reason: 'TIPO_DOCUMENTAL_NO_CONFIGURADO: falta el tipo documental SOLICITUD en el catálogo.' },
         ],
       });
     }
+    return tipoDocumentalId;
   }
 
   private async insertarExpediente(
@@ -169,31 +179,38 @@ export class RadicacionVirtualService {
     cut: string,
     horario: ResultadoHorarioCorte,
   ): Promise<FilaExpediente> {
-    const resultado = await cliente.query<FilaExpediente>(
-      `INSERT INTO sigd_tra.expediente
-         (cut, id_persona, id_tipo_tramite_tupa, nombre_solicitante,
-          correo_notificacion, asunto, canal_recepcion,
-          estado_tramite, total_folios, fecha_envio_real, fecha_radicacion_legal,
-          fuera_de_horario)
-       VALUES ($1, $2, $3, $4, $5, $6, 'MESA_VIRTUAL', 'REGISTRADO', $7, $8, $9, $10)
-       RETURNING expediente_id, cut, fecha_envio_real, fecha_radicacion_legal, fuera_de_horario`,
-      [
-        cut,
-        datos.idPersona,
-        datos.idTipoTramiteTupa,
-        datos.nombreSolicitante,
-        datos.correo,
-        datos.asunto,
-        datos.totalFolios,
-        horario.envioReal,
-        horario.radicacionLegal,
-        horario.requiereProyeccion,
-      ],
+    const documento = await cliente.query<FilaExpediente>(
+      `INSERT INTO sigd_doc.expediente
+         (tipo_tramite_id, codigo_expediente, asunto, solicitante_id, estado, fecha_registro, fecha_limite)
+       VALUES ($1, $2, $3, $4, 'REGISTRADO', $5, NULL)
+       RETURNING expediente_id::text AS expediente_id`,
+      [datos.idTipoTramiteTupa, cut, datos.asunto, datos.idPersona, horario.envioReal],
     );
-    const expediente = resultado.rows[0];
+    const expediente = documento.rows[0];
     if (!expediente) {
-      throw new Error('La insercion del expediente no devolvio fila.');
+      throw new Error('La inserción del expediente documental no devolvió fila.');
     }
+
+    const tipoDocumentalId = await this.obtenerTipoDocumental(cliente);
+    const registro = await cliente.query<FilaExpediente>(
+      `INSERT INTO sigd_tra.expediente
+         (codigo_expediente, numero, dni_solicitante, tipo_documental_id, solicitante_id, estado, fecha_radicacion)
+       VALUES ($1, $1, NULL, $2, $3, 'REGISTRADO', $4)
+       RETURNING expediente_id::text AS expediente_id`,
+      [cut, tipoDocumentalId, datos.idPersona, horario.radicacionLegal],
+    );
+    const expedienteTramiteId = registro.rows[0]?.expediente_id;
+    if (!expedienteTramiteId) {
+      throw new Error('La inserción del expediente de trámite no devolvió fila.');
+    }
+
+    await cliente.query(
+      `INSERT INTO sigd_tra.tramite
+         (expediente_id, codigo_tramite, asunto, estado)
+       VALUES ($1, $2, $3, 'REGISTRADO')`,
+      [expedienteTramiteId, cut, datos.asunto],
+    );
+
     return expediente;
   }
 
@@ -202,29 +219,39 @@ export class RadicacionVirtualService {
     expedienteId: string,
     datos: RadicacionVirtualInput,
   ): Promise<void> {
+    const tipoDocumentalId = await this.obtenerTipoDocumental(cliente);
+    const bucket = obtenerConfiguracionS3().bucket;
     for (const documento of datos.documentos) {
+      if (!documento.storagePath) {
+        throw new ValidationError({
+          invalidParams: [
+            { name: 'documentos', reason: `ARCHIVO_SIN_OBJETO_ALMACENADO: ${documento.nombreArchivo} no tiene una ruta de almacenamiento real.` },
+          ],
+        });
+      }
       await cliente.query(
-        `INSERT INTO sigd_tra.documento_adjunto
-           (expediente_id, nombre_archivo, content_type, tamano_bytes, hash_sha256, storage_path)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO sigd_doc.documento_adjunto
+           (expediente_id, tipo_documental_id, nombre_archivo, s3_bucket, s3_key, sha256, tamano_bytes, mime_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           expedienteId,
+          tipoDocumentalId,
           documento.nombreArchivo,
-          documento.contentType,
-          documento.tamanoBytes,
+          bucket,
+          documento.storagePath,
           documento.hashSha256.toLowerCase(),
-          documento.storagePath ?? null,
+          documento.tamanoBytes,
+          documento.contentType,
         ],
       );
     }
   }
 
-  private async emitirCargoDigital(
-    cliente: PoolClient,
+  private emitirCargoDigital(
     expedienteId: string,
     datos: RadicacionVirtualInput,
     now: Date,
-  ): Promise<ResultadoRadicacion['cargoDigital']> {
+  ): ResultadoRadicacion['cargoDigital'] {
     const codigo = `CARGO-${randomUUID().slice(0, 8).toUpperCase()}`;
     const contenido = JSON.stringify({
       codigo,
@@ -234,13 +261,6 @@ export class RadicacionVirtualService {
     });
     const hashSha256 = createHash('sha256').update(contenido).digest('hex');
     const qrContenido = `SIGD://cargo/${codigo}?h=${hashSha256.slice(0, 16)}`;
-
-    await cliente.query(
-      `INSERT INTO sigd_tra.cargo_digital
-         (expediente_id, codigo_cargo, hash_sha256, qr_contenido, emitido_en)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [expedienteId, codigo, hashSha256, qrContenido, now],
-    );
 
     return { codigo, hashSha256, qrContenido };
   }

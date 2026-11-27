@@ -1,8 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router-dom";
-import { describe, test, expect, beforeEach, vi } from "vitest";
-import LoginPage from "../../../src/pages/LoginPage";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const mockNavigate = vi.fn();
 
@@ -13,6 +12,46 @@ vi.mock("react-router-dom", async () => {
     useNavigate: () => mockNavigate,
   };
 });
+
+vi.mock("../../../src/api/client", () => ({
+  apiClient: { post: vi.fn() },
+}));
+
+import { apiClient } from "../../../src/api/client";
+import LoginPage from "../../../src/pages/LoginPage";
+import { useAuthStore } from "../../../src/stores/authStore";
+import { ApiHttpError, type ApiProblemDetails } from "../../../src/types/api";
+
+const post = vi.mocked(apiClient.post);
+
+function respuestaLogin(rol: string, nombreCompleto: string) {
+  return {
+    data: {
+      accessToken: "access-token-real",
+      refreshToken: "refresh-token-real",
+      usuario: {
+        id: "00000000-0000-0000-0000-000000000011",
+        nombreCompleto,
+        correo: "admin.demo@iestpsuiza.edu.pe",
+        rol,
+      },
+    },
+  };
+}
+
+function problema(status: number, code: string, detail: string) {
+  return new ApiHttpError({
+    type: "https://sigd.iestpsuiza.edu.pe/errors/security",
+    title: "Error",
+    status,
+    detail,
+    instance: "/api/v1/auth/login",
+    code,
+    category: "Security",
+    correlationId: "corr-test",
+    retryable: false,
+  } satisfies ApiProblemDetails);
+}
 
 const renderLoginPage = () =>
   render(
@@ -26,24 +65,30 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
     vi.clearAllMocks();
     window.localStorage.clear();
     window.history.pushState({}, "", "/login");
+    useAuthStore.setState({
+      accessToken: null,
+      refreshToken: null,
+      usuario: null,
+      isAuthenticated: false,
+    });
   });
 
-  describe("1. Diseño de acceso", () => {
-    test("Renderiza accesos de navegación y el badge de portal", () => {
+  describe("1. Navegación y branding institucional", () => {
+    test("Renderiza el enlace de retorno y el distintivo del portal", () => {
       renderLoginPage();
 
       expect(screen.getByRole("link", { name: /Volver al portal público/i })).toHaveAttribute("href", "/");
       expect(screen.getByText("Portal Oficial v1.0")).toBeInTheDocument();
     });
 
-    test("Renderiza la marca institucional junto al formulario", () => {
+    test("Renderiza el título y el subtítulo institucional", () => {
       renderLoginPage();
 
       expect(screen.getByRole("heading", { name: "SIGD" })).toBeInTheDocument();
       expect(screen.getByText("Sistema Integral de Gestión Documentaria")).toBeInTheDocument();
     });
 
-    test("Muestra pestañas para iniciar sesión o registrarse externamente", () => {
+    test("Renderiza las pestañas de acceso y registro externo", () => {
       renderLoginPage();
 
       expect(screen.getByRole("tab", { name: /Iniciar Sesión/i })).toHaveAttribute("aria-selected", "true");
@@ -51,36 +96,20 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
     });
   });
 
-  describe("2. Formulario de acceso", () => {
-    test("Ofrece navegación al registro externo", () => {
-      renderLoginPage();
-
-      expect(
-        screen.getByRole("tab", { name: /Registro Externo/i }),
-      ).toHaveAttribute("href", "/registro");
-    });
-
+  describe("2. Columna Derecha — Formulario de Login", () => {
     test("Renderiza encabezado del formulario y campos requeridos con iconos", () => {
       renderLoginPage();
 
-      // Encabezado
       expect(screen.getByRole("heading", { name: "Iniciar Sesión" })).toBeInTheDocument();
       expect(
         screen.getByText(/Ingrese sus credenciales institucionales para acceder a su casilla/i)
       ).toBeInTheDocument();
-
-      // Campo de Usuario / DNI / Correo
       expect(screen.getByLabelText(/Usuario, DNI o Correo Institucional/i)).toBeInTheDocument();
-
-      // Campo de Contraseña
       expect(screen.getByLabelText(/^Contraseña$/i)).toBeInTheDocument();
-
-      // Checkbox y enlace de olvido
       expect(screen.getByLabelText(/Recordar sesión/i)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /¿Olvidó su clave\?/i })).toBeInTheDocument();
-
-      // Botón principal
       expect(screen.getByRole("button", { name: /Ingresar/i })).toBeInTheDocument();
+      expect(screen.queryByLabelText(/Perfil \/ Rol Institucional/i)).not.toBeInTheDocument();
     });
 
     test("Permite alternar interactivamente la visibilidad de la contraseña", async () => {
@@ -90,15 +119,10 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
       const inputPassword = screen.getByLabelText(/^Contraseña$/i) as HTMLInputElement;
       const toggleBtn = screen.getByRole("button", { name: /Mostrar contraseña/i });
 
-      // Estado inicial es password
       expect(inputPassword.type).toBe("password");
-
-      // Clic para mostrar contraseña
       await user.click(toggleBtn);
       expect(inputPassword.type).toBe("text");
       expect(screen.getByRole("button", { name: /Ocultar contraseña/i })).toBeInTheDocument();
-
-      // Clic para volver a ocultar
       await user.click(screen.getByRole("button", { name: /Ocultar contraseña/i }));
       expect(inputPassword.type).toBe("password");
     });
@@ -107,29 +131,24 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
       renderLoginPage();
       const user = userEvent.setup();
 
-      const btnIngresar = screen.getByRole("button", { name: /Ingresar/i });
-      await user.click(btnIngresar);
+      await user.click(screen.getByRole("button", { name: /Ingresar/i }));
 
       expect(
         screen.getByText(/Por favor, ingrese su usuario, DNI o correo institucional/i)
       ).toBeInTheDocument();
       expect(mockNavigate).not.toHaveBeenCalled();
+      expect(post).not.toHaveBeenCalled();
     });
 
     test("Muestra modal de asistencia al hacer clic en '¿Olvidó su clave?' y permite cerrarlo", async () => {
       renderLoginPage();
       const user = userEvent.setup();
 
-      const forgotBtn = screen.getByRole("button", { name: /¿Olvidó su clave\?/i });
-      await user.click(forgotBtn);
+      await user.click(screen.getByRole("button", { name: /¿Olvidó su clave\?/i }));
 
       expect(screen.getByRole("heading", { name: /Restablecimiento de Credenciales/i })).toBeInTheDocument();
       expect(screen.getByText(/Oficina de Tecnologías de la Información/i)).toBeInTheDocument();
-
-      // Cerrar modal
-      const closeBtn = screen.getByRole("button", { name: /Entendido/i });
-      await user.click(closeBtn);
-
+      await user.click(screen.getByRole("button", { name: /Entendido/i }));
       expect(screen.queryByRole("heading", { name: /Restablecimiento de Credenciales/i })).not.toBeInTheDocument();
     });
 
@@ -139,7 +158,6 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
       const linkMesa = screen.getByRole("link", {
         name: /Presentar solicitud en Mesa de Partes Virtual/i,
       });
-      expect(linkMesa).toBeInTheDocument();
       expect(linkMesa).toHaveAttribute("href", "/tramite/mesa-partes-virtual");
     });
   });
@@ -149,7 +167,6 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
       renderLoginPage();
 
       const anioActual = new Date().getFullYear();
-
       expect(screen.getByText(/Atención: Lun - Vie 08:00 a 16:30 hrs/i)).toBeInTheDocument();
       expect(screen.getByText("soporte.sigd@iestpsuiza.edu.pe")).toBeInTheDocument();
       expect(
@@ -158,90 +175,121 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
     });
   });
 
-  describe("4. Flujo de Autenticación y Persistencia", () => {
-    test("Autentica credenciales, persiste sesión demo y redirige", async () => {
+  describe("4. Flujo de Autenticación Real", () => {
+    test("Autentica contra la API, persiste la sesión y redirige según el rol del backend", async () => {
+      post.mockResolvedValueOnce(
+        respuestaLogin("SUPER_ADMIN", "Ing. Super Administrador") as never
+      );
       renderLoginPage();
       const user = userEvent.setup();
 
-      const userInput = screen.getByLabelText(/Usuario, DNI o Correo Institucional/i);
-      const passInput = screen.getByLabelText(/^Contraseña$/i);
-      const rememberCheckbox = screen.getByLabelText(/Recordar sesión/i);
-      const btnIngresar = screen.getByRole("button", { name: /Ingresar/i });
-
-      await user.type(userInput, "70123456");
-      await user.type(passInput, "ClaveSegura2026");
-      await user.click(rememberCheckbox);
-
-      await user.click(btnIngresar);
+      await user.type(
+        screen.getByLabelText(/Usuario, DNI o Correo Institucional/i),
+        "admin.demo"
+      );
+      await user.type(screen.getByLabelText(/^Contraseña$/i), "ClaveSegura2026");
+      await user.click(screen.getByLabelText(/Recordar sesión/i));
+      await user.click(screen.getByRole("button", { name: /Ingresar/i }));
 
       await waitFor(() => {
-        expect(window.localStorage.getItem("sigd_token")).toBeTruthy();
+        expect(post).toHaveBeenCalledWith("/api/v1/auth/login", {
+          identificador: "admin.demo",
+          password: "ClaveSegura2026",
+        });
+        expect(window.localStorage.getItem("sigd_token")).toBe("access-token-real");
         expect(window.localStorage.getItem("sigd_rol")).toBe("SUPER_ADMIN");
-        expect(window.localStorage.getItem("sigd_remembered_user")).toBe("70123456");
+        expect(window.localStorage.getItem("sigd_remembered_user")).toBe("admin.demo");
         expect(mockNavigate).toHaveBeenCalledWith("/administracion", { replace: true });
       });
     });
 
-    test("Detecta otro rol canónico (DOCENTE) y redirige a su destino", async () => {
+    test("Redirige al destino canónico del rol devuelto por el backend", async () => {
+      post.mockResolvedValueOnce(
+        respuestaLogin("DOCENTE", "Lic. Docente / Coordinador") as never
+      );
       renderLoginPage();
       const user = userEvent.setup();
 
-      const userInput = screen.getByLabelText(/Usuario, DNI o Correo Institucional/i);
-      const passInput = screen.getByLabelText(/^Contraseña$/i);
-      const btnIngresar = screen.getByRole("button", { name: /Ingresar/i });
-
-      await user.type(userInput, "docente@iestpsuiza.edu.pe");
-      await user.type(passInput, "Docente2026!");
-
-      await user.click(btnIngresar);
+      await user.type(
+        screen.getByLabelText(/Usuario, DNI o Correo Institucional/i),
+        "docente@iestpsuiza.edu.pe"
+      );
+      await user.type(screen.getByLabelText(/^Contraseña$/i), "Docente2026!");
+      await user.click(screen.getByRole("button", { name: /Ingresar/i }));
 
       await waitFor(() => {
         expect(window.localStorage.getItem("sigd_rol")).toBe("DOCENTE");
         expect(mockNavigate).toHaveBeenCalledWith("/expedientes", { replace: true });
       });
     });
+
+    test("Prioriza la ruta protegida solicitada después de autenticar", async () => {
+      window.history.pushState({}, "", "/login?from=%2Fexpedientes%2F123%3Ftab%3Dopen");
+      post.mockResolvedValueOnce(
+        respuestaLogin("SUPER_ADMIN", "Ing. Super Administrador") as never
+      );
+      renderLoginPage();
+      const user = userEvent.setup();
+
+      await user.type(
+        screen.getByLabelText(/Usuario, DNI o Correo Institucional/i),
+        "admin.demo"
+      );
+      await user.type(screen.getByLabelText(/^Contraseña$/i), "ClaveSegura2026");
+      await user.click(screen.getByRole("button", { name: /Ingresar/i }));
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith(
+          "/expedientes/123?tab=open",
+          { replace: true },
+        );
+      });
+    });
   });
 
-  describe("5. Seguridad, Bloqueo de Acceso Indebido y Validación de Roles RBAC", () => {
-    test("Deniega acceso con alerta visual si el usuario o DNI no existe en el sistema", async () => {
+  describe("5. Seguridad y Bloqueo de Acceso Indebido", () => {
+    test("Muestra alerta si el backend rechaza credenciales (401)", async () => {
+      post.mockRejectedValueOnce(
+        problema(401, "UNAUTHORIZED", "Credenciales inválidas. Verifique su usuario o contraseña.")
+      );
       renderLoginPage();
       const user = userEvent.setup();
 
-      const userInput = screen.getByLabelText(/Usuario, DNI o Correo Institucional/i);
-      const passInput = screen.getByLabelText(/^Contraseña$/i);
-      const btnIngresar = screen.getByRole("button", { name: /Ingresar/i });
-
-      await user.type(userInput, "99998888");
-      await user.type(passInput, "ClaveCualquiera123");
-      await user.click(btnIngresar);
+      await user.type(
+        screen.getByLabelText(/Usuario, DNI o Correo Institucional/i),
+        "99998888"
+      );
+      await user.type(screen.getByLabelText(/^Contraseña$/i), "ClaveCualquiera123");
+      await user.click(screen.getByRole("button", { name: /Ingresar/i }));
 
       await waitFor(() => {
         expect(screen.getByRole("alert")).toBeInTheDocument();
-        expect(screen.getByText(/Usuario o DNI no registrado en el sistema institucional/i)).toBeInTheDocument();
+        expect(screen.getByText(/Credenciales inválidas/i)).toBeInTheDocument();
         expect(window.localStorage.getItem("sigd_token")).toBeNull();
         expect(mockNavigate).not.toHaveBeenCalled();
       });
     });
 
-    test("Deniega acceso con alerta visual si la contraseña es incorrecta", async () => {
+    test("Muestra alerta si la cuenta está deshabilitada (403 ACCOUNT_DISABLED)", async () => {
+      post.mockRejectedValueOnce(
+        problema(403, "ACCOUNT_DISABLED", "Su cuenta institucional se encuentra suspendida.")
+      );
       renderLoginPage();
       const user = userEvent.setup();
 
-      const userInput = screen.getByLabelText(/Usuario, DNI o Correo Institucional/i);
-      const passInput = screen.getByLabelText(/^Contraseña$/i);
-      const btnIngresar = screen.getByRole("button", { name: /Ingresar/i });
-
-      await user.type(userInput, "70123456");
-      await user.type(passInput, "ClaveIncorrecta123");
-      await user.click(btnIngresar);
+      await user.type(
+        screen.getByLabelText(/Usuario, DNI o Correo Institucional/i),
+        "inactivo"
+      );
+      await user.type(screen.getByLabelText(/^Contraseña$/i), "ClaveSegura2026");
+      await user.click(screen.getByRole("button", { name: /Ingresar/i }));
 
       await waitFor(() => {
         expect(screen.getByRole("alert")).toBeInTheDocument();
-        expect(screen.getByText(/Contraseña incorrecta/i)).toBeInTheDocument();
+        expect(screen.getByText(/suspendida/i)).toBeInTheDocument();
         expect(window.localStorage.getItem("sigd_token")).toBeNull();
         expect(mockNavigate).not.toHaveBeenCalled();
       });
     });
-
   });
 });

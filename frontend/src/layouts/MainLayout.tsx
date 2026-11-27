@@ -38,7 +38,7 @@ export default function MainLayout({ children }: MainLayoutProps): React.JSX.Ele
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
-      <div className={`flex flex-1 flex-col min-w-0 ${isAdminArea ? "h-screen min-h-0 overflow-hidden" : ""}`}>
+      <div className={`flex flex-1 flex-col min-w-0 ${isAdministrationPage ? "h-screen min-h-0 overflow-hidden" : ""}`}>
         <TopHeaderBar onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
         <main
           className={`flex-1 p-4 sm:p-6 lg:p-8 ${
@@ -51,7 +51,7 @@ export default function MainLayout({ children }: MainLayoutProps): React.JSX.Ele
         >
           <div className="mx-auto max-w-7xl">{children}</div>
         </main>
-        {!isAdminArea && (
+        {!isAdministrationPage && (
           <footer className="border-t border-slate-200/90 bg-white px-4 py-3.5 text-center text-xs text-slate-500 sm:px-6 lg:px-8 print:hidden">
             <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 sm:flex-row">
               <span>

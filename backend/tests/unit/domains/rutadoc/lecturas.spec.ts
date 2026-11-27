@@ -42,6 +42,7 @@ describe('ServicioTrazabilidadRutaDoc', () => {
     const result = await new ServicioTrazabilidadRutaDoc(repositorio).obtener('5', actor);
     expect(result.actuaciones.map((x) => x.secuencia)).toEqual(['1', '2']);
     expect(result.actuaciones[0]).toMatchObject({ tipoActuacion: 'NORMAL', duracionMs: 1_800_000, duracionMinutos: 30 });
+    expect(result.actuaciones[0].hashTransaccion).toMatch(/^[a-f0-9]{64}$/);
     expect(result.actuaciones[1].duracionMs).toBeNull();
   });
   it('deniega la lectura si el actor autenticado carece de permiso', async () => {

@@ -11,16 +11,10 @@ import {
   HelpCircle,
   X,
   ShieldAlert,
-  ShieldCheck,
 } from "lucide-react";
-import { permisosIniciales } from "../../hooks/useRbacConfig";
 import { useAuthStore } from "../../stores/authStore";
-import {
-  autenticarCredenciales,
-  sincronizarRolPorIdentificador,
-  type RolCanonicoId,
-} from "../../services/authService";
-import { obtenerRutaInicialPorRol } from "../../utils/rutasPorRol";
+import { autenticarCredenciales, destinoPorRol } from "../../services/authService";
+import { obtenerRutaSolicitada } from "../../utils/rutasPorRol";
 
 export interface RolCanonico {
   id: string;
@@ -29,40 +23,17 @@ export interface RolCanonico {
 }
 
 export const ROLES_CANONICOS: RolCanonico[] = [
-  { id: "SUPER_ADMIN", label: "SUPER_ADMIN — Super Administrador", destino: obtenerRutaInicialPorRol("SUPER_ADMIN") },
-  { id: "DIRECTOR", label: "DIRECTOR — Director General", destino: obtenerRutaInicialPorRol("DIRECTOR") },
-  { id: "DOCENTE", label: "DOCENTE — Docente / Coordinador", destino: obtenerRutaInicialPorRol("DOCENTE") },
-  { id: "MESA_PARTES", label: "MESA_PARTES — Mesa de Partes / Ventanilla", destino: obtenerRutaInicialPorRol("MESA_PARTES") },
-  { id: "ESTUDIANTE", label: "ESTUDIANTE — Estudiante / Administrado", destino: obtenerRutaInicialPorRol("ESTUDIANTE") },
+  { id: "SUPER_ADMIN", label: "SUPER_ADMIN — Super Administrador", destino: destinoPorRol("SUPER_ADMIN") },
+  { id: "DIRECTOR", label: "DIRECTOR — Director General", destino: destinoPorRol("DIRECTOR") },
+  { id: "DOCENTE", label: "DOCENTE — Docente / Coordinador", destino: destinoPorRol("DOCENTE") },
+  { id: "MESA_PARTES", label: "MESA_PARTES — Mesa de Partes / Ventanilla", destino: destinoPorRol("MESA_PARTES") },
+  { id: "ESTUDIANTE", label: "ESTUDIANTE — Estudiante / Administrado", destino: destinoPorRol("ESTUDIANTE") },
 ];
 
 const CLAVE_TOKEN = "sigd_token";
 const CLAVE_ROL = "sigd_rol";
 const CLAVE_PERMISOS = "sigd_permisos";
 const CLAVE_REMEMBER_USER = "sigd_remembered_user";
-
-function rutaSolicitada(estado: unknown, busqueda: string): string | null {
-  const desdeEstado = (estado as { from?: unknown } | null)?.from;
-  const desdeQuery = new URLSearchParams(busqueda).get("from");
-  const candidato =
-    typeof desdeEstado === "string"
-      ? desdeEstado
-      : desdeEstado && typeof desdeEstado === "object"
-        ? (() => {
-            const { pathname, search, hash } = desdeEstado as {
-              pathname?: unknown;
-              search?: unknown;
-              hash?: unknown;
-            };
-            return typeof pathname === "string"
-              ? `${pathname}${typeof search === "string" ? search : ""}${typeof hash === "string" ? hash : ""}`
-              : null;
-          })()
-        : desdeQuery;
-  return candidato && candidato.startsWith("/") && !candidato.startsWith("//")
-    ? candidato
-    : null;
-}
 
 export default function LoginFormCard(): React.JSX.Element {
   const navigate = useNavigate();
@@ -93,66 +64,57 @@ export default function LoginFormCard(): React.JSX.Element {
 
   const [showPassword, setShowPassword] = useState<boolean>(false);
 
-  // Rol institucional canónico y estados de interacción
-  const [rol, setRol] = useState<string>("SUPER_ADMIN");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [sugerenciaRol, setSugerenciaRol] = useState<RolCanonicoId | null>(null);
   const [showForgotModal, setShowForgotModal] = useState<boolean>(false);
 
-  // Sincronización proactiva del rol según el identificador ingresado
   const handleIdentificadorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const nuevoValor = e.target.value;
-    setIdentificador(nuevoValor);
-    if (errorMessage) {
-      setErrorMessage(null);
-      setSugerenciaRol(null);
-    }
-    const rolDetectado = sincronizarRolPorIdentificador(nuevoValor);
-    if (rolDetectado) {
-      setRol(rolDetectado);
-    }
+    setIdentificador(e.target.value);
+    if (errorMessage) setErrorMessage(null);
   };
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPassword(e.target.value);
-    if (errorMessage) {
-      setErrorMessage(null);
-      setSugerenciaRol(null);
-    }
+    if (errorMessage) setErrorMessage(null);
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage(null);
-    setSugerenciaRol(null);
 
     const trimmedUser = identificador.trim();
     if (!trimmedUser) {
       setErrorMessage("Por favor, ingrese su usuario, DNI o correo institucional.");
       return;
     }
-
     if (!password) {
       setErrorMessage("Por favor, ingrese su contraseña de acceso.");
       return;
     }
 
     setIsSubmitting(true);
-
     try {
       const authResult = await autenticarCredenciales({
         identificador: trimmedUser,
         password,
-        rolSeleccionado: rol,
       });
 
       if (!authResult.exito) {
-        limpiarSesion();
+        window.localStorage.removeItem(CLAVE_TOKEN);
+        window.localStorage.removeItem("token");
+        window.localStorage.removeItem(CLAVE_ROL);
+        window.localStorage.removeItem(CLAVE_PERMISOS);
+        window.localStorage.removeItem("sigd_usuario_nombre");
+        window.localStorage.removeItem("sigd_usuario_correo");
+        window.localStorage.removeItem("sigd_refresh");
+        window.localStorage.removeItem("sigd_refresh_token");
+        useAuthStore.setState({
+          accessToken: null,
+          refreshToken: null,
+          usuario: null,
+          isAuthenticated: false,
+        });
         setErrorMessage(authResult.mensaje);
-        if (authResult.sugerenciaRol) {
-          setSugerenciaRol(authResult.sugerenciaRol);
-        }
         return;
       }
 
@@ -162,33 +124,27 @@ export default function LoginFormCard(): React.JSX.Element {
         window.localStorage.removeItem(CLAVE_REMEMBER_USER);
       }
 
-      window.localStorage.setItem(CLAVE_TOKEN, authResult.token);
-      window.localStorage.setItem("token", authResult.token);
-      window.localStorage.setItem(CLAVE_ROL, authResult.usuario.rol);
-      window.localStorage.setItem(CLAVE_PERMISOS, JSON.stringify(permisosIniciales));
-      window.localStorage.setItem("sigd_usuario_nombre", authResult.usuario.nombreCompleto);
-      window.localStorage.setItem("sigd_usuario_correo", authResult.usuario.correo);
-
-      useAuthStore.setState({
-        accessToken: authResult.token,
-        refreshToken: `sigd-refresh-${Date.now()}`,
-        usuario: {
+      useAuthStore.getState().setSession(
+        authResult.token,
+        {
           id: authResult.usuario.id,
           nombreCompleto: authResult.usuario.nombreCompleto,
           correo: authResult.usuario.correo,
           rol: authResult.usuario.rol,
+          areaId: authResult.usuario.areaId,
         },
-        isAuthenticated: true,
-      });
+        authResult.refreshToken,
+      );
 
-      // Redirección al panel institucional correspondiente según su rol RBAC
-      navigate(obtenerRutaInicialPorRol(authResult.usuario.rol), { replace: true });
+      navigate(
+        obtenerRutaSolicitada(location.state, location.search) ?? authResult.destino,
+        { replace: true },
+      );
     } catch (err: unknown) {
-      limpiarSesion();
       setErrorMessage(
         err instanceof Error
           ? err.message
-          : "Ocurrió un error inesperado al autenticar sus credenciales.",
+          : "Ocurrió un error al verificar sus credenciales. Intente nuevamente.",
       );
     } finally {
       setIsSubmitting(false);
@@ -223,47 +179,21 @@ export default function LoginFormCard(): React.JSX.Element {
           </p>
         </div>
 
-        {/* Mensaje de error accesible y alerta visual RBAC */}
         {errorMessage && (
           <div
             role="alert"
-            className="mb-5 flex flex-col gap-2 rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-800"
+            className="mb-5 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-800"
           >
-            <div className="flex items-start gap-2.5">
-              <AlertCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" aria-hidden="true" />
-              <div className="flex-1 font-medium leading-relaxed">{errorMessage}</div>
-              <button
-                type="button"
-                onClick={() => {
-                  setErrorMessage(null);
-                  setSugerenciaRol(null);
-                }}
-                className="text-red-500 hover:text-red-800 text-sm font-bold leading-none p-0.5"
-                aria-label="Cerrar mensaje de error"
-              >
-                ×
-              </button>
-            </div>
-
-            {sugerenciaRol && (
-              <div className="mt-1 flex items-center justify-between border-t border-red-200/60 pt-2">
-                <span className="text-[11px] text-red-700">
-                  ¿Desea cambiar el selector al rol autorizado?
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRol(sugerenciaRol);
-                    setSugerenciaRol(null);
-                    setErrorMessage(null);
-                  }}
-                  className="inline-flex items-center gap-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold px-2.5 py-1 text-[11px] transition shadow-xs"
-                >
-                  <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>Ajustar a {sugerenciaRol}</span>
-                </button>
-              </div>
-            )}
+            <AlertCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" aria-hidden="true" />
+            <div className="flex-1 font-medium leading-relaxed">{errorMessage}</div>
+            <button
+              type="button"
+              onClick={() => setErrorMessage(null)}
+              className="text-red-500 hover:text-red-800 text-sm font-bold leading-none p-0.5"
+              aria-label="Cerrar mensaje de error"
+            >
+              ×
+            </button>
           </div>
         )}
 

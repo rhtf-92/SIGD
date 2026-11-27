@@ -39,8 +39,12 @@ describe('endpoints de lectura RutaDoc', () => {
   it('resuelve la ruta CCD estática antes de /expedientes/:id y devuelve el catálogo predeterminado', async () => {
     const response = await request(app({ id: '8', roles: ['SUPER_ADMIN'] })).get('/api/v1/expedientes/clasificador-ccd');
     expect(response.status).toBe(200);
-    expect(response.body.elementos[0]).toMatchObject({ tipo: 'SERIE', codigo: 'DEMO-01' });
-    expect(response.body.elementos[0].hijos[0]).toMatchObject({ tipo: 'SUBSERIE', codigo: 'DEMO-01.01' });
+    expect(response.body.elementos).toMatchObject([
+      { tipo: 'SERIE', codigo: 'CCD-DG-RES' },
+      { tipo: 'SERIE', codigo: 'CCD-SA-ACTA' },
+      { tipo: 'SERIE', codigo: 'CCD-SA-TIT' },
+    ]);
+    expect(response.body.elementos[0].hijos).toEqual([]);
   });
 
   it('sla-status responde con el calendario predeterminado sin requerir un port externo', async () => {

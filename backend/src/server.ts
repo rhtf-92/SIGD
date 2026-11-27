@@ -46,7 +46,9 @@ const outboxWorker = new OutboxWorker(
   {
     backoffBaseMs: Number(process.env.OUTBOX_BACKOFF_BASE_MS ?? 1000),
     backoffTechoMs: Number(process.env.OUTBOX_BACKOFF_TECHO_MS ?? 300_000),
-    intervaloPollMs: Number(process.env.OUTBOX_POLL_MS ?? 5000),
+    intervaloPollMs: Number(
+      process.env.OUTBOX_POLL_MS ?? process.env.OUTBOX_POLL_INTERVAL_MS ?? 5000,
+    ),
   },
 );
 const cicloOutbox = outboxWorker.iniciar();
@@ -58,7 +60,14 @@ const apagar = (senal: string): void => {
   outboxWorker.detener();
   void bridge.detener();
   busSse.cerrarTodos();
-  servidor.close(() => process.exit(0));
+  servidor.close(async () => {
+    try {
+      await pool.end();
+    } catch {
+      // ignore
+    }
+    process.exit(0);
+  });
   setTimeout(() => process.exit(0), 5000).unref?.();
 };
 
@@ -69,34 +78,41 @@ const frontendDir = path.resolve(__dirname, '../../frontend');
 const viteBin = path.resolve(frontendDir, 'node_modules/vite/bin/vite.js');
 
 let viteProc: ReturnType<typeof spawn> | null = null;
-try {
-  viteProc = spawn(process.execPath, [viteBin, '--port', '5173', '--host', '0.0.0.0'], {
-    cwd: frontendDir,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: {
-      ...process.env,
-      VITE_API_BASE_URL: `http://localhost:${port}${API_PREFIX}`,
-      VITE_ENABLE_MOCKS: process.env.VITE_ENABLE_MOCKS ?? 'false',
-    },
-  });
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    const fs = await import('node:fs');
+    if (fs.existsSync(viteBin)) {
+      viteProc = spawn(process.execPath, [viteBin, '--port', '5173', '--host', '0.0.0.0'], {
+        cwd: frontendDir,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          VITE_API_BASE_URL: `http://localhost:${port}${API_PREFIX}`,
+          VITE_ENABLE_MOCKS: process.env.VITE_ENABLE_MOCKS ?? 'false',
+        },
+      });
 
-  viteProc.stdout?.on('data', (data) => {
-    console.log(`[Vite stdout] ${data}`);
-  });
+      viteProc.stdout?.on('data', (data) => {
+        console.log(`[Vite stdout] ${data}`);
+      });
 
-  viteProc.stderr?.on('data', (data) => {
-    console.error(`[Vite stderr] ${data}`);
-  });
+      viteProc.stderr?.on('data', (data) => {
+        console.error(`[Vite stderr] ${data}`);
+      });
 
-  viteProc.on('error', (err) => {
-    console.error('[Frontend Vite] Error al iniciar:', err);
-  });
+      viteProc.on('error', (err) => {
+        console.error('[Frontend Vite] Error al iniciar:', err);
+      });
 
-  viteProc.on('close', (code) => {
-    console.log(`[Frontend Vite] Proceso cerrado con código ${code}`);
-  });
-} catch (e) {
-  console.error('[Frontend Vite] Excepción al lanzar proceso:', e);
+      viteProc.on('close', (code) => {
+        console.log(`[Frontend Vite] Proceso cerrado con código ${code}`);
+      });
+    } else {
+      console.warn('[Frontend Vite] Binario no encontrado, no se iniciará Vite.');
+    }
+  } catch (e) {
+    console.error('[Frontend Vite] Excepción al lanzar proceso:', e);
+  }
 }
 
 process.on('SIGINT', () => {

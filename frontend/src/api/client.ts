@@ -148,7 +148,7 @@ apiClient.interceptors.response.use(
           useAuthStore.getState().logout();
           isRefreshing = false;
         }
-      } else {
+      } else if (!url.includes("/auth/login")) {
         useAuthStore.getState().logout();
       }
     }

@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import { NotFoundError } from '../../shared/domain/errors/index.js';
+import { calcularHorarioCorte } from './horarioCorte.util.js';
 import type { ConsultaPublicaParams } from './tramites.schemas.js';
 
 /**
@@ -59,32 +60,22 @@ export interface DtoConsultaPublica {
 
 interface FilaConsulta {
   cut: string;
-  anio_fiscal: number;
   estado_tramite: string;
   tipo_tramite: string | null;
   asunto: string;
   fecha_envio_real: Date;
   fecha_radicacion_legal: Date;
-  fuera_de_horario: boolean;
   canal_recepcion: string;
   total_folios: number;
-  tipo_documento: string | null;
   numero_documento: string | null;
   nombres: string | null;
-  apellido_paterno: string | null;
-  apellido_materno: string | null;
+  apellidos: string | null;
 }
 
 interface FilaDocumento {
   nombre_archivo: string;
   content_type: string;
   hash_sha256: string;
-}
-
-interface FilaProveido {
-  numero: string;
-  fecha_emision: Date;
-  resumen: string;
 }
 
 /** Ancho de la ventana visible al_redondear. */
@@ -113,23 +104,24 @@ export class ConsultaPublicaService {
         this.leerProveidosPublicos(cliente, params.cut),
       ]);
 
+      const fechaEnvioReal = expediente.fecha_envio_real;
       return {
         cut: expediente.cut,
-        anioFiscal: expediente.anio_fiscal,
+        anioFiscal: Number(expediente.cut.slice(4, 8)),
         estadoTramite: expediente.estado_tramite,
         tipoTramite: expediente.tipo_tramite,
         asunto: expediente.asunto,
-        fechaEnvioReal: expediente.fecha_envio_real.toISOString(),
+        fechaEnvioReal: fechaEnvioReal.toISOString(),
         fechaRadicacionLegal: expediente.fecha_radicacion_legal.toISOString(),
-        fueraDeHorario: expediente.fuera_de_horario,
+        fueraDeHorario: calcularHorarioCorte(fechaEnvioReal).requiereProyeccion,
         canalRecepcion: expediente.canal_recepcion,
         totalFolios: expediente.total_folios,
         administrado: {
           documentoEnmascarado: enmascararDocumento(expediente.numero_documento),
           nombreEnmascarado: enmascararNombre(
             expediente.nombres,
-            expediente.apellido_paterno,
-            expediente.apellido_materno,
+            expediente.apellidos,
+            null,
           ),
         },
         documentos,
@@ -145,30 +137,48 @@ export class ConsultaPublicaService {
 
   private async leerExpediente(cliente: PoolClient, cut: string): Promise<FilaConsulta | undefined> {
     const resultado = await cliente.query<FilaConsulta>(
-      `SELECT e.cut,
-              e.anio_fiscal,
-              e.estado_tramite,
-              tt.denominacion   AS tipo_tramite,
-              e.asunto,
-              e.fecha_envio_real,
-              e.fecha_radicacion_legal,
-              e.fuera_de_horario,
-              e.canal_recepcion,
-              e.total_folios,
-              td.nombre         AS tipo_documento,
-              p.numero_documento,
-              p.nombres,
-              p.apellido_paterno,
-              p.apellido_materno
-         FROM sigd_tra.expediente e
+      `SELECT COALESCE(t.codigo_expediente, d.codigo_expediente) AS cut,
+              COALESCE(t.estado, d.estado, 'REGISTRADO') AS estado_tramite,
+              COALESCE(tt.denominacion, ttv.denominacion) AS tipo_tramite,
+              COALESCE(a.asunto, tr.asunto, d.asunto) AS asunto,
+              COALESCE(a.fecha_ingreso, d.fecha_registro, t.fecha_radicacion) AS fecha_envio_real,
+              COALESCE(t.fecha_radicacion, d.fecha_registro, a.fecha_ingreso) AS fecha_radicacion_legal,
+              COALESCE(
+                a.canal_ingreso,
+                CASE WHEN d.expediente_id IS NOT NULL THEN 'MESA_VIRTUAL' ELSE 'MESA_PRESENCIAL' END
+              ) AS canal_recepcion,
+              COALESCE(f.total_folios, 0)::int AS total_folios,
+              COALESCE(p.id_documento, t.dni_solicitante) AS numero_documento,
+              pn.nombres,
+              pn.apellidos
+         FROM sigd_tra.expediente t
+         FULL JOIN sigd_doc.expediente d
+                ON d.codigo_expediente = t.codigo_expediente
+         LEFT JOIN sigd_tra.tramite tr
+                ON tr.expediente_id = t.expediente_id
          LEFT JOIN sigd_doc.tipo_tramite_tupa tt
-                ON tt.id_tipo_tramite_tupa = e.id_tipo_tramite_tupa
+                ON tt.tipo_tramite_id = d.tipo_tramite_id
+         LEFT JOIN sigd_doc.tipo_tramite_tupa ttv
+                ON ttv.codigo = tr.codigo_tramite
+         LEFT JOIN LATERAL (
+                SELECT asunto, canal_ingreso, fecha_ingreso
+                  FROM sigd_tra.asiento_registro
+                 WHERE expediente_id = t.expediente_id
+                   AND COALESCE(anulado, FALSE) = FALSE
+                 ORDER BY fecha_ingreso DESC
+                 LIMIT 1
+              ) a ON TRUE
+         LEFT JOIN LATERAL (
+                SELECT MAX(folio_fin) AS total_folios
+                  FROM sigd_tra.expediente_documento_folio
+                 WHERE expediente_id = t.expediente_id
+              ) f ON TRUE
          LEFT JOIN sigd_auth.persona p
-                ON p.id = e.id_persona
-         LEFT JOIN sigd_auth.tipos_documento td
-                ON td.id = p.tipo_documento_id
-        WHERE e.cut = $1
-          AND e.estado_tramite <> 'ANULADO'`,
+                ON p.id_persona = COALESCE(t.solicitante_id, d.solicitante_id)
+         LEFT JOIN sigd_auth.persona_natural pn
+                ON pn.id_persona = p.id_persona
+        WHERE COALESCE(t.codigo_expediente, d.codigo_expediente) = $1
+          AND COALESCE(t.estado, d.estado) <> 'ANULADO'`,
       [cut],
     );
     return resultado.rows[0];
@@ -176,35 +186,25 @@ export class ConsultaPublicaService {
 
   private async leerDocumentos(cliente: PoolClient, cut: string): Promise<DtoDocumentoPublico[]> {
     const resultado = await cliente.query<FilaDocumento>(
-      `SELECT da.nombre_archivo, da.content_type, da.hash_sha256
-         FROM sigd_tra.documento_adjunto da
-         JOIN sigd_tra.expediente e ON e.expediente_id = da.expediente_id
-        WHERE e.cut = $1
+      `SELECT da.nombre_archivo, da.mime_type AS content_type, da.sha256 AS hash_sha256
+         FROM sigd_doc.documento_adjunto da
+         JOIN sigd_doc.expediente d ON d.expediente_id = da.expediente_id
+        WHERE d.codigo_expediente = $1
         ORDER BY da.nombre_archivo`,
       [cut],
     );
     return resultado.rows.map((fila) => ({
       nombreArchivo: fila.nombre_archivo,
       contentType: fila.content_type,
-      hashSha256: fila.hash_sha256,
+      hashSha256: fila.hash_sha256.trim(),
     }));
   }
 
-  private async leerProveidosPublicos(cliente: PoolClient, cut: string): Promise<DtoProveidoPublico[]> {
-    const resultado = await cliente.query<FilaProveido>(
-      `SELECT pv.numero, pv.fecha_emision, pv.resumen
-         FROM sigd_tra.proveido pv
-         JOIN sigd_tra.expediente e ON e.expediente_id = pv.expediente_id
-        WHERE e.cut = $1
-          AND pv.es_publico = TRUE
-        ORDER BY pv.fecha_emision DESC, pv.numero DESC`,
-      [cut],
-    );
-    return resultado.rows.map((fila) => ({
-      numero: fila.numero,
-      fechaEmision: aIsoFecha(fila.fecha_emision),
-      resumen: fila.resumen,
-    }));
+  private async leerProveidosPublicos(
+    _cliente: PoolClient,
+    _cut: string,
+  ): Promise<DtoProveidoPublico[]> {
+    return [];
   }
 }
 
@@ -241,7 +241,7 @@ export function enmascararNombre(
 ): string | null {
   const componentes = [nombres, apellidoPaterno, apellidoMaterno]
     .filter((valor): valor is string => Boolean(valor && valor.trim()))
-    .map((valor) => valor.trim().split(/\s+/)[0]);
+    .flatMap((valor) => valor.trim().split(/\s+/));
 
   if (componentes.length === 0) return null;
 
@@ -252,9 +252,4 @@ export function enmascararNombre(
       return `${inicial}${ocultos}`;
     })
     .join(' ');
-}
-
-function aIsoFecha(fecha: Date | string): string {
-  if (fecha instanceof Date) return fecha.toISOString().slice(0, 10);
-  return String(fecha).slice(0, 10);
 }

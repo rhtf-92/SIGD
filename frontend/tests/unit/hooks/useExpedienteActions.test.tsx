@@ -39,7 +39,7 @@ describe("useExpedienteActions", () => {
     expect(obtenerClavesAfectadas).toHaveBeenCalledWith([expediente.id]);
     expect(invalidar).toHaveBeenCalledTimes(claves.length);
     claves.forEach((queryKey) => {
-      expect(invalidar).toHaveBeenCalledWith({ queryKey, exact: true }, { throwOnError: true });
+      expect(invalidar).toHaveBeenCalledWith({ queryKey }, { throwOnError: true });
       expect(cliente.getQueryState(queryKey)?.isInvalidated).toBe(true);
     });
     expect(cliente.getQueryState(ajena)?.isInvalidated).toBe(false);

@@ -4,7 +4,7 @@ import axios from "axios";
 
 import { apiClient } from "../api/client";
 import { env } from "../config/env";
-import type { ApiProblemDetails } from "../types/api";
+import { ApiHttpError, type ApiProblemDetails } from "../types/api";
 import type {
   DocumentoValidacionCvd,
   ErrorValidacionCvd,
@@ -15,6 +15,19 @@ import { normalizarCvd, validarCvd } from "../utils/cvdValidator";
 export const CVD_VALIDO = "CVD-2026-RD-000412-892F";
 export const CVD_ALTERADO = "CVD-2026-RD-000413-ALTE";
 const USAR_MOCKS = env.enableMocks;
+
+interface RespuestaValidadorApi {
+  esValido?: boolean;
+  valido?: boolean;
+  cvd?: string;
+  selloTiempoTsa?: string | null;
+  fecha_sello_tsa?: string | null;
+  documento?: DocumentoValidacionCvd | null;
+  firmante?: string;
+  sha256_firmado?: string;
+  descarga_copia_certificada?: string;
+  mensajeSeguridad?: string;
+}
 
 export class CvdError extends Error implements ErrorValidacionCvd {
   readonly titulo: string;
@@ -32,6 +45,15 @@ export class CvdError extends Error implements ErrorValidacionCvd {
 
 function convertirError(origen: unknown): CvdError {
   if (origen instanceof CvdError) return origen;
+
+  if (origen instanceof ApiHttpError) {
+    const problema = origen.problemDetails;
+    return new CvdError(
+      problema.title,
+      problema.detail,
+      problema.status,
+    );
+  }
 
   if (axios.isAxiosError<ApiProblemDetails>(origen)) {
     const problema = origen.response?.data;
@@ -110,22 +132,9 @@ async function consultarMock(codigoCvd: string): Promise<ValidacionCVDResult> {
   );
 }
 
-interface RespuestaValidacionCvdApi {
-  esValido?: boolean;
-  valido?: boolean;
-  selloTiempoTsa?: string | null;
-  fecha_sello_tsa?: string | null;
-  documento?: DocumentoValidacionCvd | null;
-  firmante?: string;
-  sha256_firmado?: string;
-  descarga_copia_certificada?: string;
-  cvd?: string;
-  mensajeSeguridad?: string;
-}
-
 async function consultarApi(codigoCvd: string): Promise<ValidacionCVDResult> {
   const normalizado = normalizarCvd(codigoCvd);
-  const { data } = await apiClient.get<RespuestaValidacionCvdApi>(
+  const { data } = await apiClient.get<RespuestaValidadorApi>(
     `/api/v1/validador/cvd/${encodeURIComponent(normalizado)}`,
   );
   const esValido = Boolean(data.esValido ?? data.valido);

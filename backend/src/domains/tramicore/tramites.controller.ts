@@ -99,10 +99,24 @@ export function crearRouterTramites(
     const cut = String(req.params.cut).trim().toUpperCase();
 
     const query = `
-      SELECT a.numero_asiento, a.anio_fiscal, a.cut, a.remitente,
-             a.remitente_documento, a.asunto, a.folios, a.fecha_asiento
+      SELECT e.codigo_expediente AS cut,
+             COALESCE(pn.nombre_completo, p.id_documento) AS remitente,
+             p.id_documento AS remitente_documento,
+             a.asunto,
+             COALESCE(f.folios, 0)::int AS folios,
+             a.fecha_ingreso AS fecha_asiento
         FROM sigd_tra.asiento_registro a
-       WHERE a.cut = $1
+        JOIN sigd_tra.expediente e ON e.expediente_id = a.expediente_id
+        LEFT JOIN sigd_auth.persona p ON p.id_persona = a.remitente_id
+        LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = a.remitente_id
+        LEFT JOIN (
+          SELECT expediente_id, MAX(folio_fin) AS folios
+            FROM sigd_tra.expediente_documento_folio
+           GROUP BY expediente_id
+        ) f ON f.expediente_id = a.expediente_id
+       WHERE e.codigo_expediente = $1
+         AND a.canal_ingreso IN ('MESA_PRESENCIAL', 'VENTANILLA_PRESENCIAL')
+       ORDER BY a.fecha_ingreso DESC
        LIMIT 1;
     `;
 

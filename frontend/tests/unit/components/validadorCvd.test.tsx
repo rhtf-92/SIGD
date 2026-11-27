@@ -70,7 +70,9 @@ describe("Validador público CVD — ENT-M04-05 (F_ADRIANO)", () => {
   });
 
   it("4. la máscara guía el tipeo y el extractor rescata el CVD de un texto QR", () => {
-    expect(aplicarMascaraCvd("cvd2026rd000412892f")).toContain("CVD-2026");
+    expect(aplicarMascaraCvd("cvd2026rd000412892f")).toBe("CVD-2026-RD-000412-892F");
+    expect(aplicarMascaraCvd("CVD-2026-RD-000413-ALTE")).toBe("CVD-2026-RD-000413-ALTE");
+    expect(validarCvd("CVD-2026-RD-000413-ALTE").valido).toBe(true);
     expect(
       extraerCvdDeTexto("https://validador.suiza.edu.pe/CVD-2026-RD-000412-892F"),
     ).toBe("CVD-2026-RD-000412-892F");

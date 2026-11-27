@@ -6,6 +6,10 @@ import {
   Sparkles,
   Clock,
   Layers,
+  Database,
+  Calendar,
+  Lock,
+  ArrowRight,
 } from "lucide-react";
 import AdminPageHeader from "../../components/administracion/AdminPageHeader";
 import KpiCard from "../../components/administracion/common/KpiCard";

@@ -297,23 +297,27 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
   it("b) Muestra el indicador de estado correcto para NO_LEIDO, LEIDO y NOTIFICADO", async () => {
     renderConQueryClient(<CasillaElectronicaPage />);
 
-    // Validar los indicadores de estado exactos en sus respectivas tarjetas
-    const tarjetaNoLeida = await screen.findByRole("button", {
-      name: new RegExp(mockNotificacionNoLeida.numeroNotificacion, "i"),
-    });
-    expect(within(tarjetaNoLeida).getByText("No Leído")).toBeInTheDocument();
+    const filaPorNumero = async (numero: string) => {
+      const etiqueta = await screen.findByText(numero);
+      const fila = etiqueta.closest("tr");
+      if (!fila) throw new Error(`No se encontró la fila de ${numero}`);
+      return fila;
+    };
+    const esperarBadgeVisible = (fila: HTMLElement, texto: string) => {
+      const badge = within(fila)
+        .getAllByText(texto)
+        .find((elemento) => !elemento.classList.contains("sr-only"));
+      expect(badge).toBeInTheDocument();
+    };
 
-    const tarjetaLeida = screen.getByRole("button", {
-      name: new RegExp(mockNotificacionLeida.numeroNotificacion, "i"),
-    });
-    expect(within(tarjetaLeida).getByText("Leído")).toBeInTheDocument();
+    const filaNoLeida = await filaPorNumero(mockNotificacionNoLeida.numeroNotificacion);
+    esperarBadgeVisible(filaNoLeida, "No Leído");
 
-    const tarjetaNotificada = screen.getByRole("button", {
-      name: new RegExp(mockNotificacionNotificada.numeroNotificacion, "i"),
-    });
-    expect(
-      within(tarjetaNotificada).getByText("Notificado (Con Acuse)"),
-    ).toBeInTheDocument();
+    const filaLeida = await filaPorNumero(mockNotificacionLeida.numeroNotificacion);
+    esperarBadgeVisible(filaLeida, "Leído");
+
+    const filaNotificada = await filaPorNumero(mockNotificacionNotificada.numeroNotificacion);
+    esperarBadgeVisible(filaNotificada, "Notificado (Con Acuse)");
   });
 
   it("c) El filtro por tipo de notificación reduce el listado mostrado", async () => {

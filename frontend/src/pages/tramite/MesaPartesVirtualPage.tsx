@@ -1,306 +1,374 @@
-import { useCallback, useMemo, useState } from "react";
-
+import { useEffect, useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import FileUploadDropzone from "../../components/common/FileUploadDropzone";
-import HorarioCorteNotice from "../../components/tramite/HorarioCorteNotice";
-import {
-  calculateHorarioCorte,
-  useHorarioCorte,
-} from "../../hooks/useHorarioCorte";
-import type {
-  UploadedFile,
-  UploadStatus,
-} from "../../hooks/usePresignedUpload";
+import { useHorarioCorte } from "../../hooks/useHorarioCorte";
+import { apiClient } from "@/api/client";
+import { useAuthStore } from "@/stores/authStore";
 
-const FERIADOS_CONFIGURADOS: string[] = [];
+interface TramiteTupa {
+  id: string;
+  codigo: string;
+  denominacion: string;
+}
 
-const tarjetaGlass =
-  "rounded-3xl border border-slate-200/90 bg-white/90 p-6 shadow-lg shadow-slate-900/5 backdrop-blur-xl sm:p-7";
-
-const etiquetaPaso =
-  "inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-black tracking-widest text-blue-700 uppercase";
-
-const campoEntrada =
-  "mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25";
-
-const etiquetaCampo =
-  "block text-sm font-semibold text-slate-700";
-
-function formatStatus(status: UploadStatus): string {
-  const labels: Record<UploadStatus, string> = {
-    idle: "Pendiente de archivo",
-    validating: "Validando archivo",
-    hashing: "Calculando SHA-256 local",
-    "requesting-url": "Solicitando URL prefirmada",
-    uploading: "Subiendo a almacenamiento",
-    success: "Carga validada y completada",
-    cancelled: "Carga cancelada",
-    error: "Error de carga",
-  };
-
-  return labels[status];
+async function calcularSha256(file: File): Promise<string> {
+  const bytes = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 export default function MesaPartesVirtualPage() {
-  const [simulationTime, setSimulationTime] = useState("");
-  const [uploaded, setUploaded] = useState<UploadedFile | null>(null);
-  const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
-  const [asunto, setAsunto] = useState("");
-  const [solicitante, setSolicitante] = useState("");
-  const liveHorario = useHorarioCorte(new Date(), FERIADOS_CONFIGURADOS);
-  const horario = useMemo(
-    () =>
-      simulationTime
-        ? calculateHorarioCorte(
-            new Date(simulationTime),
-            FERIADOS_CONFIGURADOS,
-          )
-        : liveHorario,
-    [simulationTime, liveHorario],
-  );
+  const queryClient = useQueryClient();
+  const { isAfterCutoff, requiresProjection, legalDate } = useHorarioCorte();
+  const esCorteSuperado = isAfterCutoff || requiresProjection;
+  const proximoDiaHabil = legalDate;
+  const correoSesion = useAuthStore((state) => state.usuario?.correo ?? "");
 
-  const handleUploadStatus = useCallback((status: UploadStatus) => {
-    setUploadStatus(status);
-    if (status !== "success") {
-      setUploaded(null);
+  const [solicitante, setSolicitante] = useState("");
+  const [asunto, setAsunto] = useState("");
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [estadoCarga, setEstadoCarga] = useState("Pendiente de archivo");
+  const [resultado, setResultado] = useState("Pendiente");
+  const [sha256Hash, setSha256Hash] = useState("---");
+  const [timestampTecnico, setTimestampTecnico] = useState("---");
+  const [timestampLegal, setTimestampLegal] = useState("---");
+  const [idPersona, setIdPersona] = useState("");
+  const [correo, setCorreo] = useState(correoSesion);
+  const [tramites, setTramites] = useState<TramiteTupa[]>([]);
+  const [idTipoTramite, setIdTipoTramite] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const esExitoso = resultado.includes("exitosamente") || estadoCarga.includes("Completado");
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const [perfil, catalogo] = await Promise.all([
+          apiClient.get<{ idPersona?: string; correo?: string }>("/api/v1/auth/me"),
+          apiClient.get<TramiteTupa[]>("/api/v1/tramites/tipos"),
+        ]);
+        setIdPersona(perfil.data.idPersona ?? "");
+        setCorreo(perfil.data.correo ?? correoSesion);
+        setTramites(catalogo.data);
+        if (catalogo.data.length > 0) setIdTipoTramite(catalogo.data[0].id);
+      } catch {
+        setError("Inicie sesión para radicar un trámite con su identidad institucional.");
+      }
+    })();
+  }, [correoSesion]);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      setError("El documento debe ser un archivo PDF.");
+      return;
     }
-  }, []);
+    try {
+      setError(null);
+      setArchivo(file);
+      setSha256Hash(await calcularSha256(file));
+      setEstadoCarga(`Archivo listo: ${file.name}`);
+    } catch {
+      setError("No fue posible calcular el hash SHA-256 del documento.");
+    }
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (!archivo || !idPersona || !idTipoTramite || !correo) {
+      setError("Debe iniciar sesión, escoger un trámite y adjuntar un PDF válido.");
+      return;
+    }
+
+    try {
+      setEstadoCarga("Solicitando URL prefirmada...");
+      setResultado("Procesando radicación...");
+      const { data: presign } = await apiClient.post<{
+        uploadUrl: string;
+        s3Key: string;
+      }>("/api/v1/storage/presigned-url", {
+        nombreArchivo: archivo.name,
+        tamanoBytes: archivo.size,
+        mimeType: "application/pdf",
+        sha256Hash: sha256Hash,
+      });
+
+      setEstadoCarga("Transmitiendo documento...");
+      await apiClient.put(
+        "/api/v1/storage/upload-binario",
+        archivo,
+        {
+          params: { s3Key: presign.s3Key },
+          headers: {
+            "Content-Type": "application/pdf",
+            "X-SHA256": sha256Hash,
+          },
+          timeout: 60_000,
+        },
+      );
+
+      setEstadoCarga("Radicando en el sistema...");
+      const { data } = await apiClient.post<{
+        cut: string;
+        fechaEnvioReal: string;
+        fechaRadicacionLegal: string;
+      }>("/api/v1/tramites/radicacion-virtual", {
+        asunto,
+        idTipoTramiteTupa: idTipoTramite,
+        idPersona,
+        nombreSolicitante: solicitante,
+        correo,
+        totalFolios: 1,
+        documentos: [
+          {
+            nombreArchivo: archivo.name,
+            contentType: "application/pdf",
+            tamanoBytes: archivo.size,
+            hashSha256: sha256Hash,
+            storagePath: presign.s3Key,
+          },
+        ],
+      });
+
+      setEstadoCarga("Completado");
+      setResultado(`Radicado exitosamente con CUT ${data.cut}`);
+      setTimestampTecnico(data.fechaEnvioReal);
+      setTimestampLegal(data.fechaRadicacionLegal);
+      void queryClient.invalidateQueries({ queryKey: ["expedientes"] });
+    } catch (err) {
+      setEstadoCarga("Error en la transferencia");
+      setResultado("Fallido");
+      setError(err instanceof Error ? err.message : "No fue posible radicar el trámite.");
+    }
+  }
 
   return (
-    <main className="min-h-screen bg-transparent px-4 py-8 text-slate-800 sm:px-6">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <header className={tarjetaGlass}>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-black tracking-[0.2em] text-blue-700 uppercase">
-                SIGD · Demostración Módulo 2
+    <main className="min-h-screen w-full bg-gradient-to-br from-sky-200 via-sky-300 to-sky-400 text-slate-800 pb-12 px-4 sm:px-6 lg:px-8">
+      {/* Cabecera de ancho completo */}
+      <header className="border-b border-sky-300/60 bg-sky-100/40 backdrop-blur-md shadow-sm -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-5 mb-8">
+        <div className="max-w-7xl mx-auto">
+          <nav className="mb-2 flex items-center gap-2 text-xs font-medium text-slate-700">
+            <Link to="/" className="hover:text-blue-700">Inicio</Link>
+            <span>/</span>
+            <Link to="/tramite" className="hover:text-blue-700">Trámite Documentario</Link>
+            <span>/</span>
+            <span className="text-slate-900 font-semibold">Mesa de Partes Virtual</span>
+          </nav>
+
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <span className="inline-block rounded bg-blue-100/80 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-blue-900 border border-blue-300 mb-1">
+                SIGD · Módulo 01 Institucional
               </span>
-              <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
-                Mesa de Partes Virtual — SIGD
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                Mesa de Partes Virtual
               </h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
-                Pantalla única para demostrar carga documentaria segura y
-                control de horario legal LPAG.
+              <p className="mt-1 text-sm text-slate-700">
+                Plataforma oficial para la recepción segura de documentos y control de horario legal LPAG.
               </p>
             </div>
-
-            <div className="flex flex-col items-start gap-3 sm:items-end">
-              <Link
-                to="/"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
-              >
-                ← Volver al inicio
-              </Link>
-              <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
-                API DE PRESIGNED URL REQUERIDA
-              </span>
-            </div>
+            <Link
+              to="/"
+              className="rounded-lg bg-white/90 px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-white border border-slate-300 transition"
+            >
+              ← Volver al inicio
+            </Link>
           </div>
-        </header>
+        </div>
+      </header>
 
-        <section className="rounded-2xl border border-blue-200 bg-blue-50/95 p-4 text-sm leading-6 text-blue-900 shadow-sm backdrop-blur">
-          Magic Bytes y SHA-256 se calculan en el navegador. La carga solicita
-          POST /v1/storage/presigned-url al backend y transfiere el PDF
-          directamente a la URL firmada devuelta por el servicio.
-        </section>
-
-        <section className={tarjetaGlass}>
-          <div className="mb-5">
-            <p className={etiquetaPaso}>1 · Datos del trámite</p>
-            <h2 className="mt-3 text-xl font-bold text-slate-900 sm:text-2xl">
-              Identificación de la solicitud
-            </h2>
+      {/* Contenedor principal de ancho fluido */}
+      <div className="max-w-7xl mx-auto space-y-6">
+        {error && (
+          <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-xs font-medium text-red-800">
+            {error}
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className={etiquetaCampo}>
-              Solicitante
-              <input
-                value={solicitante}
-                onChange={(event) => setSolicitante(event.target.value)}
-                placeholder="Nombre del administrado"
-                className={campoEntrada}
-              />
-            </label>
-            <label className={etiquetaCampo}>
-              Asunto
-              <input
-                value={asunto}
-                onChange={(event) => setAsunto(event.target.value)}
-                placeholder="Descripción breve del trámite"
-                className={campoEntrada}
-              />
-            </label>
-          </div>
-        </section>
+        )}
 
-        <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-          <section className={tarjetaGlass}>
-            <div className="mb-5">
-              <p className={etiquetaPaso}>2 · Carga documentaria</p>
-              <h2 className="mt-3 text-xl font-bold text-slate-900 sm:text-2xl">
-                Magic Bytes, SHA-256 y MinIO/S3
-              </h2>
-            </div>
-            <div className="rounded-2xl border border-white/25 bg-white/95 p-4 text-slate-900 shadow-inner">
-              <FileUploadDropzone
-                categoria="EXPEDIENTE_INGRESO"
-                onUploaded={setUploaded}
-                onStatusChange={handleUploadStatus}
-              />
-            </div>
-            <div className="mt-5 grid gap-2 sm:grid-cols-2">
-              <EvidenceItem
-                label="Firma binaria %PDF"
-                complete={uploadStatus === "success"}
-              />
-              <EvidenceItem
-                label="SHA-256 local"
-                complete={Boolean(uploaded?.sha256)}
-              />
-              <EvidenceItem
-                label="URL PUT prefirmada"
-                complete={Boolean(uploaded?.s3Key)}
-              />
-              <EvidenceItem label="AbortController disponible" complete />
-            </div>
-          </section>
-
-          <section className={tarjetaGlass}>
-            <div className="mb-5">
-              <p className={etiquetaPaso}>3 · Control de horario LPAG</p>
-              <h2 className="mt-3 text-xl font-bold text-slate-900 sm:text-2xl">
-                Recepción legal
-              </h2>
-            </div>
-            <label className={etiquetaCampo}>
-              <span className="block">Fecha y hora de simulación</span>
-              <input
-                type="datetime-local"
-                value={simulationTime}
-                onChange={(event) => setSimulationTime(event.target.value)}
-                className={campoEntrada}
-              />
-            </label>
-            <p className="mt-2 text-xs text-slate-600">
-              Zona horaria oficial: <strong>America/Lima</strong> · Corte:
-              <strong> 16:30</strong>
-            </p>
-            {simulationTime && (
-              <button
-                type="button"
-                className="mt-3 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
-                onClick={() => setSimulationTime("")}
-              >
-                Usar hora actual
-              </button>
-            )}
-            <div className="mt-4">
-              <HorarioCorteNotice horario={horario} />
-            </div>
-            <dl className="mt-4 grid gap-2">
-              <SummaryRow
-                label="Condición"
-                value={
-                  horario.requiresProjection
-                    ? "Corte o día inhábil: proyectar"
-                    : "Dentro del horario: mismo día"
-                }
-              />
-              <SummaryRow label="Siguiente día hábil" value={horario.legalDate} />
-              <SummaryRow
-                label="Hora legal"
-                value={horario.legalTimestamp.slice(11)}
-              />
-            </dl>
-          </section>
+        <div className="rounded-xl border border-sky-300/60 bg-white/90 p-4 text-xs font-medium text-slate-700 shadow-sm backdrop-blur-md">
+          <p>
+            <strong className="text-blue-900">Nota técnica:</strong> El hash SHA-256 se calcula sobre el PDF real y la transmisión usa una URL prefirmada del repositorio institucional.
+          </p>
         </div>
 
-        <section className={tarjetaGlass}>
-          <div className="mb-5">
-            <p className={etiquetaPaso}>4 · Resultado de radicación</p>
-            <h2 className="mt-3 text-xl font-bold text-slate-900 sm:text-2xl">
-              Evidencia de la demostración
+        <form onSubmit={handleSubmit} className="grid gap-6 md:grid-cols-2">
+          {/* SECCIÓN 1: DATOS DEL TRÁMITE */}
+          <div className="space-y-4 rounded-2xl border border-sky-300/60 bg-white/90 p-6 shadow-lg backdrop-blur-md md:col-span-2">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-blue-900 border-b border-sky-100 pb-2">
+              1. Datos del Solicitante y Trámite
             </h2>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <SummaryRow label="Estado de carga" value={formatStatus(uploadStatus)} />
-            <SummaryRow
-              label="Resultado"
-              value={uploaded ? "Documento validado y cargado (demo)" : "Pendiente"}
-            />
-            <SummaryRow
-              label="Timestamp técnico"
-              value={horario.technicalTimestamp}
-            />
-            <SummaryRow
-              label="Timestamp legal"
-              value={horario.legalTimestamp}
-            />
-            <SummaryRow label="Solicitante" value={solicitante || "No ingresado"} />
-            <SummaryRow label="Asunto" value={asunto || "No ingresado"} />
-          </div>
-          {uploaded && (
-            <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-              <strong>Documento cargado:</strong> el archivo{" "}
-              <code className="rounded bg-emerald-100 px-1.5 py-0.5 text-[11px]">
-                {uploaded.file.name}
-              </code>{" "}
-              pasó Magic Bytes, generó SHA-256 y obtuvo una clave del
-              almacenamiento{" "}
-              <code className="rounded bg-emerald-100 px-1.5 py-0.5 text-[11px]">
-                {uploaded.s3Key}
-              </code>
-              .
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Solicitante *</label>
+                <input
+                  type="text"
+                  required
+                  value={solicitante}
+                  onChange={(e) => setSolicitante(e.target.value)}
+                  placeholder="Nombres y Apellidos del administrado"
+                  className="w-full rounded-lg border border-slate-300 bg-slate-50/50 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 focus:outline-none transition"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Correo para notificaciones *</label>
+                <input
+                  type="email"
+                  required
+                  readOnly
+                  value={correo}
+                  className="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-700"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Procedimiento TUPA *</label>
+                <select
+                  required
+                  value={idTipoTramite}
+                  onChange={(e) => setIdTipoTramite(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-slate-50/50 px-3 py-2 text-sm text-slate-800"
+                >
+                  {tramites.map((tramite) => (
+                    <option key={tramite.id} value={tramite.id}>
+                      {tramite.codigo} — {tramite.denominacion}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Asunto / Petitorio *</label>
+                <input
+                  type="text"
+                  required
+                  value={asunto}
+                  onChange={(e) => setAsunto(e.target.value)}
+                  placeholder="Descripción detallada del trámite"
+                  className="w-full rounded-lg border border-slate-300 bg-slate-50/50 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 focus:outline-none transition"
+                />
+              </div>
             </div>
-          )}
-        </section>
+          </div>
 
-        <footer className="rounded-2xl border border-slate-200 bg-white/85 p-4 text-xs leading-6 text-slate-600 backdrop-blur">
-          <strong>Evidencia / estado de pruebas:</strong> suite M2 disponible
-          en           <code className="rounded bg-slate-100 px-1.5 py-0.5">tests/unit</code>{" "}
-          y{" "}
-          <code className="rounded bg-slate-100 px-1.5 py-0.5">
-            tests/integration/m2
-          </code>
-          . Ejecuta{" "}
-          <code className="rounded bg-slate-100 px-1.5 py-0.5">npm test</code>{" "}
-          para verificar Magic Bytes, SHA-256, cancelación y casos 16:29, 16:30,
-          posterior y día inhábil.
-        </footer>
+          {/* SECCIÓN 2: CARGA DOCUMENTARIA */}
+          <div className="space-y-4 rounded-2xl border border-sky-300/60 bg-white/90 p-6 shadow-lg backdrop-blur-md">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-blue-900 border-b border-sky-100 pb-2">
+              2. Carga Documentaria (PDF)
+            </h2>
+
+            <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-sky-300 bg-sky-50/40 p-6 text-center cursor-pointer hover:bg-sky-50/80 transition">
+              <span className="text-xs font-semibold text-slate-700">
+                {archivo ? `Archivo seleccionado: ${archivo.name}` : "Haga clic para adjuntar archivo PDF"}
+              </span>
+              <span className="mt-1 text-[11px] text-slate-500">Documento principal firmado digitalmente (Máx. 25 MB)</span>
+              <input type="file" accept=".pdf" onChange={handleFileChange} className="hidden" />
+            </label>
+
+            <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 font-medium">
+              <div className="flex items-center gap-1.5 bg-slate-50/80 p-2 rounded border border-slate-200">Validación MIME real</div>
+              <div className="flex items-center gap-1.5 bg-slate-50/80 p-2 rounded border border-slate-200">Hash SHA-256 real</div>
+              <div className="flex items-center gap-1.5 bg-slate-50/80 p-2 rounded border border-slate-200">URL PUT prefirmada</div>
+              <div className="flex items-center gap-1.5 bg-slate-50/80 p-2 rounded border border-slate-200">Radicación con CUT</div>
+            </div>
+          </div>
+
+          {/* SECCIÓN 3: CONTROL DE HORARIO LPAG */}
+          <div className="space-y-4 rounded-2xl border border-sky-300/60 bg-white/90 p-6 shadow-lg backdrop-blur-md">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-blue-900 border-b border-sky-100 pb-2">
+              3. Control de Horario LPAG
+            </h2>
+            <p className="text-xs text-slate-600">
+              El servidor aplica el horario oficial de America/Lima y proyecta la fecha legal cuando supera la corte de las 16:30.
+            </p>
+
+            {esCorteSuperado && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50/90 p-3 text-xs text-amber-900 shadow-sm">
+                <p className="font-bold">Aviso legal de recepción:</p>
+                <p className="mt-0.5">
+                  Las solicitudes presentadas posterior al horario de corte se consideran ingresadas a las 08:00 hrs del día hábil siguiente (<strong className="font-mono">{proximoDiaHabil}</strong>).
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2 text-xs text-slate-700">
+              <div className="bg-slate-50/80 p-2.5 rounded border border-slate-200">
+                <span className="block font-bold text-[10px] text-slate-400 uppercase">Condición</span>
+                <span className="font-medium">{esCorteSuperado ? "Fuera de jornada" : "Jornada ordinaria"}</span>
+              </div>
+              <div className="bg-slate-50/80 p-2.5 rounded border border-slate-200">
+                <span className="block font-bold text-[10px] text-slate-400 uppercase">Efecto legal</span>
+                <span className="font-mono font-medium">{proximoDiaHabil}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* BOTÓN DE ACCIÓN INSTITUCIONAL */}
+          <div className="md:col-span-2 flex justify-end pt-2">
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-800 transition"
+            >
+              ✓ Iniciar Carga Segura y Registrar Trámite
+            </button>
+          </div>
+        </form>
+
+        {/* SECCIÓN 4: RESULTADO DE RADICACIÓN (TODOS VERDES CUANDO ES EXITOSO) */}
+        <div className="space-y-4 rounded-2xl border border-sky-300/60 bg-white/90 p-6 shadow-lg backdrop-blur-md">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-blue-900 border-b border-sky-100 pb-2">
+            4. Resultado Institucional de Radicación
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 text-xs">
+            {/* Estado de Transmisión */}
+            <div className={`p-3 rounded-lg border transition-colors ${esExitoso ? "bg-emerald-50 border-emerald-300 text-emerald-900 font-medium shadow-sm" : "bg-slate-50/80 border-slate-200 text-slate-800"}`}>
+              <span className={`block font-bold uppercase text-[10px] ${esExitoso ? "text-emerald-700" : "text-slate-400"}`}>Estado de Transmisión</span>
+              <span className="font-semibold">{estadoCarga}</span>
+            </div>
+
+            {/* Resultado de Radicación */}
+            <div className={`p-3 rounded-lg border transition-colors ${esExitoso ? "bg-emerald-50 border-emerald-300 text-emerald-900 font-medium shadow-sm" : "bg-slate-50/80 border-slate-200 text-slate-800"}`}>
+              <span className={`block font-bold uppercase text-[10px] ${esExitoso ? "text-emerald-700" : "text-slate-400"}`}>Resultado de Radicación</span>
+              <span className="font-semibold">{resultado}</span>
+            </div>
+
+            {/* Timestamp Técnico */}
+            <div className={`p-3 rounded-lg border transition-colors ${esExitoso ? "bg-emerald-50 border-emerald-300 text-emerald-900 font-medium shadow-sm" : "bg-slate-50/80 border-slate-200 text-slate-800"}`}>
+              <span className={`block font-bold uppercase text-[10px] ${esExitoso ? "text-emerald-700" : "text-slate-400"}`}>Timestamp Técnico</span>
+              <span className="font-mono text-[11px]">{timestampTecnico}</span>
+            </div>
+
+            {/* Timestamp Legal (LPAG) */}
+            <div className={`p-3 rounded-lg border transition-colors ${esExitoso ? "bg-emerald-50 border-emerald-300 text-emerald-900 font-medium shadow-sm" : "bg-slate-50/80 border-slate-200 text-slate-800"}`}>
+              <span className={`block font-bold uppercase text-[10px] ${esExitoso ? "text-emerald-700" : "text-slate-400"}`}>Timestamp Legal (LPAG)</span>
+              <span className="font-mono text-[11px]">{timestampLegal}</span>
+            </div>
+
+            {/* Solicitante Registrado */}
+            <div className={`p-3 rounded-lg border transition-colors ${esExitoso ? "bg-emerald-50 border-emerald-300 text-emerald-900 font-medium shadow-sm" : "bg-slate-50/80 border-slate-200 text-slate-800"}`}>
+              <span className={`block font-bold uppercase text-[10px] ${esExitoso ? "text-emerald-700" : "text-slate-400"}`}>Solicitante Registrado</span>
+              <span className="font-medium">{solicitante || "---"}</span>
+            </div>
+
+            {/* Asunto Declarado */}
+            <div className={`p-3 rounded-lg border transition-colors ${esExitoso ? "bg-emerald-50 border-emerald-300 text-emerald-900 font-medium shadow-sm" : "bg-slate-50/80 border-slate-200 text-slate-800"}`}>
+              <span className={`block font-bold uppercase text-[10px] ${esExitoso ? "text-emerald-700" : "text-slate-400"}`}>Asunto Declarado</span>
+              <span className="font-medium">{asunto || "---"}</span>
+            </div>
+
+            {/* Hash SHA-256 */}
+            <div className={`sm:col-span-2 p-3 rounded-lg border transition-colors ${esExitoso ? "bg-emerald-50 border-emerald-300 text-emerald-900 font-medium shadow-sm" : "bg-slate-50/80 border-slate-200 text-slate-800"}`}>
+              <span className={`block font-bold uppercase text-[10px] ${esExitoso ? "text-emerald-700" : "text-slate-400"}`}>Hash SHA-256 (Verificación Íntegra)</span>
+              <span className="font-mono text-[11px] break-all">{sha256Hash}</span>
+            </div>
+          </div>
+          <p className="text-[11px] text-slate-600 pt-2 border-t border-sky-100">
+            Validación automatizada del sistema. Suite de pruebas configurada en <code className="bg-sky-100 px-1 py-0.5 rounded text-blue-900 font-mono">tests/unit</code> y <code className="bg-sky-100 px-1 py-0.5 rounded text-blue-900 font-mono">tests/integration/m2</code>.
+          </p>
+        </div>
       </div>
     </main>
-  );
-}
-
-function EvidenceItem({
-  label,
-  complete,
-}: {
-  label: string;
-  complete: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700">
-      <span
-        aria-hidden="true"
-        className={complete ? "text-emerald-600" : "text-slate-400"}
-      >
-        {complete ? "✓" : "○"}
-      </span>
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
-      <dt className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
-        {label}
-      </dt>
-      <dd className="mt-1 break-words text-sm font-semibold text-slate-900">
-        {value}
-      </dd>
-    </div>
   );
 }

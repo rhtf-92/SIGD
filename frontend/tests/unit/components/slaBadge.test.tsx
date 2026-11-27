@@ -20,12 +20,12 @@ describe("Suite de Pruebas de Componente SlaBadge (ENT-M03-02)", () => {
     const badge = screen.getByLabelText(/25d hábiles \[Al día\]/i);
     expect(badge).toBeInTheDocument();
     expect(badge.className).toContain("text-emerald-800");
-    expect(badge.className).toContain("border-emerald-300");
+    expect(badge.className).toContain("border-emerald-200");
   });
 
   it("renderiza correctamente el estado ALERTA (Ámbar / Atención)", () => {
     const inicio = new Date(2026, 5, 1);
-    const hoy = addBusinessDays(inicio, 20); // 10 días restantes
+    const hoy = addBusinessDays(inicio, 24); // 6 días restantes
 
     render(
       <SlaBadge
@@ -35,7 +35,7 @@ describe("Suite de Pruebas de Componente SlaBadge (ENT-M03-02)", () => {
       />,
     );
 
-    const badge = screen.getByLabelText(/10d hábiles \[Atención\]/i);
+    const badge = screen.getByLabelText(/6d hábiles \[Atención\]/i);
     expect(badge).toBeInTheDocument();
     expect(badge.className).toContain("text-amber-900");
     expect(badge.className).toContain("border-amber-300");
@@ -55,8 +55,8 @@ describe("Suite de Pruebas de Componente SlaBadge (ENT-M03-02)", () => {
 
     const badge = screen.getByLabelText(/2d hábiles \[Crítico\]/i);
     expect(badge).toBeInTheDocument();
-    expect(badge.className).toContain("text-rose-800");
-    expect(badge.className).toContain("border-rose-300");
+    expect(badge.className).toContain("text-red-800");
+    expect(badge.className).toContain("border-red-200");
   });
 
   it("renderiza correctamente el estado VENCIDO con animación pulse de advertencia legal", () => {

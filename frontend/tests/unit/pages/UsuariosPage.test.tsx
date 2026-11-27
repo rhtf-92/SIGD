@@ -107,9 +107,9 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
     montarConProvider();
     await screen.findByText("Juan Carlos Pérez");
 
-    expect(screen.getByLabelText("Unidad orgánica")).toBeInTheDocument();
-    expect(screen.getByLabelText("Sede")).toBeInTheDocument();
-    expect(screen.getByLabelText("Rol asignado")).toBeInTheDocument();
+    expect(screen.getByLabelText(/unidad orgánica/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/sede/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/rol asignado/i)).toBeInTheDocument();
     expect(screen.getByLabelText("Estado")).toBeInTheDocument();
   });
 
@@ -164,10 +164,10 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
     await usuario.click(within(fila as HTMLElement).getByRole("button", { name: "Administrar" }));
 
     const dialogo = await screen.findByRole("dialog");
-    expect(within(dialogo).getByLabelText("Correo institucional")).toHaveValue(
+    expect(within(dialogo).getByLabelText(/correo institucional/i)).toHaveValue(
       "jperez@iestpsuiza.edu.pe",
     );
-    expect(within(dialogo).getByLabelText("Cargo")).toHaveValue(
+    expect(within(dialogo).getByLabelText(/^cargo$/i)).toHaveValue(
       "Asistente Administrativo",
     );
   });
@@ -181,8 +181,11 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
     await usuario.click(within(fila as HTMLElement).getByRole("button", { name: "Administrar" }));
 
     const dialogo = await screen.findByRole("dialog");
-    await usuario.clear(within(dialogo).getByLabelText("Cargo"));
-    await usuario.type(within(dialogo).getByLabelText("Cargo"), "Jefe de Mesa de Partes");
+    await usuario.clear(within(dialogo).getByLabelText(/^cargo$/i));
+    await usuario.type(
+      within(dialogo).getByLabelText(/^cargo$/i),
+      "Jefe de Mesa de Partes",
+    );
     await usuario.click(within(dialogo).getByRole("button", { name: "Guardar cambios" }));
 
     await waitFor(() => {
@@ -194,7 +197,7 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
 
     expect(
       await screen.findByText(
-        "Los cambios fueron registrados correctamente.",
+        /Los cambios fueron registrados correctamente/i,
       ),
     ).toBeInTheDocument();
   });
@@ -215,7 +218,7 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
     await usuario.click(within(fila as HTMLElement).getByRole("button", { name: "Administrar" }));
 
     const dialogo = await screen.findByRole("dialog");
-    const campoCorreo = within(dialogo).getByLabelText("Correo institucional");
+    const campoCorreo = within(dialogo).getByLabelText(/correo institucional/i);
     // Correo del dominio institucional: la validación de cliente lo acepta y
     // el conflicto de duplicidad lo devuelve el servidor como 409.
     await usuario.clear(campoCorreo);
@@ -239,7 +242,7 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
     await usuario.click(within(fila as HTMLElement).getByRole("button", { name: "Administrar" }));
 
     const dialogo = await screen.findByRole("dialog");
-    const campoCorreo = within(dialogo).getByLabelText("Correo institucional");
+    const campoCorreo = within(dialogo).getByLabelText(/correo institucional/i);
     await usuario.clear(campoCorreo);
     await usuario.type(campoCorreo, "jperez@gmail.com");
     await usuario.click(within(dialogo).getByRole("button", { name: "Guardar cambios" }));

@@ -139,7 +139,7 @@ export function countBusinessDays(
  * Calcula el estado de semáforo SLA de 30 días hábiles (LPAG Ley 27444) para un expediente.
  *
  * Umbrales cromáticos institucionales:
- * - NORMAL (Verde): <= 15 días hábiles consumidos (>= 15 días hábiles restantes)
+ * - NORMAL (Verde): <= 23 días hábiles consumidos (>= 7 días hábiles restantes)
  * - ALERTA (Ámbar): 24 a 25 días hábiles consumidos (5 a 6 días hábiles restantes)
  * - CRITICO (Rojo): 26 a 30 días hábiles consumidos (0 a 4 días hábiles restantes)
  * - VENCIDO (Rojo parpadeante / alerta): > 30 días hábiles consumidos (<= 0 días hábiles restantes)
