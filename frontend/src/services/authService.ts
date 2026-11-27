@@ -1,5 +1,6 @@
 import { apiClient } from "../api/client";
 import { ApiHttpError } from "../types/api";
+import { obtenerRutaInicialPorRol } from "../utils/rutasPorRol";
 
 export type RolCanonicoId =
   | "SUPER_ADMIN"
@@ -38,14 +39,6 @@ export type AuthResultado =
       mensaje: string;
     };
 
-const DESTINO_POR_ROL: Record<RolCanonicoId, string> = {
-  SUPER_ADMIN: "/",
-  DIRECTOR: "/",
-  DOCENTE: "/flujos/titulacion",
-  MESA_PARTES: "/tramite/ventanilla-presencial",
-  ESTUDIANTE: "/casilla",
-};
-
 const ROLES_CONOCIDOS: RolCanonicoId[] = [
   "SUPER_ADMIN",
   "DIRECTOR",
@@ -72,7 +65,7 @@ function normalizarRol(rol: string): RolCanonicoId {
 }
 
 export function destinoPorRol(rol: string): string {
-  return DESTINO_POR_ROL[normalizarRol(rol)];
+  return obtenerRutaInicialPorRol(normalizarRol(rol));
 }
 
 export async function autenticarCredenciales(params: {
@@ -125,7 +118,7 @@ export async function autenticarCredenciales(params: {
         areaId: data.usuario.areaId,
         activo: true,
       },
-      destino: DESTINO_POR_ROL[rol],
+      destino: obtenerRutaInicialPorRol(rol),
     };
   } catch (error: unknown) {
     if (error instanceof ApiHttpError) {

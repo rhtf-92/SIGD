@@ -64,6 +64,7 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    window.history.pushState({}, "", "/login");
     useAuthStore.setState({
       accessToken: null,
       refreshToken: null,
@@ -72,38 +73,26 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
     });
   });
 
-  describe("1. Columna Izquierda — Branding Institucional", () => {
-    test("Renderiza el logotipo oficial 'S', texto institucional y badge de portal", () => {
+  describe("1. Navegación y branding institucional", () => {
+    test("Renderiza el enlace de retorno y el distintivo del portal", () => {
       renderLoginPage();
 
-      expect(screen.getByLabelText(/Logotipo oficial S del IESTP Suiza/i)).toBeInTheDocument();
-      expect(screen.getByText("S")).toBeInTheDocument();
-      expect(screen.getByText("IESTP SUIZA")).toBeInTheDocument();
-      expect(screen.getByText(/PUCALLPA • UCAYALI/i)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /Volver al portal público/i })).toHaveAttribute("href", "/");
       expect(screen.getByText("Portal Oficial v1.0")).toBeInTheDocument();
     });
 
-    test("Renderiza etiquetas temáticas, título SIGD y subtítulo institucional", () => {
+    test("Renderiza el título y el subtítulo institucional", () => {
       renderLoginPage();
 
-      expect(screen.getByText("Trámite Documentario")).toBeInTheDocument();
-      expect(screen.getByText("Firma Digital Legal")).toBeInTheDocument();
-      expect(screen.getByText("Cero Papel")).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "SIGD" })).toBeInTheDocument();
       expect(screen.getByText("Sistema Integral de Gestión Documentaria")).toBeInTheDocument();
-      expect(
-        screen.getByText(/Plataforma oficial para la administración, tramitación y seguimiento de expedientes/i)
-      ).toBeInTheDocument();
     });
 
-    test("Renderiza distintivo de licenciamiento MINEDU y footer de República del Perú", () => {
+    test("Renderiza las pestañas de acceso y registro externo", () => {
       renderLoginPage();
 
-      expect(screen.getByText("INSTITUCIÓN LICENCIADA POR MINEDU")).toBeInTheDocument();
-      expect(screen.getByText(/Resolución Ministerial N° 409-2019-MINEDU/i)).toBeInTheDocument();
-      expect(screen.getByText('IESTP "Suiza"')).toBeInTheDocument();
-      expect(screen.getByText("Dirección Regional de Educación de Ucayali")).toBeInTheDocument();
-      expect(screen.getByText("REPÚBLICA DEL PERÚ")).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /Iniciar Sesión/i })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("tab", { name: /Registro Externo/i })).toHaveAttribute("href", "/registro");
     });
   });
 
@@ -210,7 +199,7 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
         expect(window.localStorage.getItem("sigd_token")).toBe("access-token-real");
         expect(window.localStorage.getItem("sigd_rol")).toBe("SUPER_ADMIN");
         expect(window.localStorage.getItem("sigd_remembered_user")).toBe("admin.demo");
-        expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true });
+        expect(mockNavigate).toHaveBeenCalledWith("/administracion", { replace: true });
       });
     });
 
@@ -230,7 +219,30 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
 
       await waitFor(() => {
         expect(window.localStorage.getItem("sigd_rol")).toBe("DOCENTE");
-        expect(mockNavigate).toHaveBeenCalledWith("/flujos/titulacion", { replace: true });
+        expect(mockNavigate).toHaveBeenCalledWith("/expedientes", { replace: true });
+      });
+    });
+
+    test("Prioriza la ruta protegida solicitada después de autenticar", async () => {
+      window.history.pushState({}, "", "/login?from=%2Fexpedientes%2F123%3Ftab%3Dopen");
+      post.mockResolvedValueOnce(
+        respuestaLogin("SUPER_ADMIN", "Ing. Super Administrador") as never
+      );
+      renderLoginPage();
+      const user = userEvent.setup();
+
+      await user.type(
+        screen.getByLabelText(/Usuario, DNI o Correo Institucional/i),
+        "admin.demo"
+      );
+      await user.type(screen.getByLabelText(/^Contraseña$/i), "ClaveSegura2026");
+      await user.click(screen.getByRole("button", { name: /Ingresar/i }));
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith(
+          "/expedientes/123?tab=open",
+          { replace: true },
+        );
       });
     });
   });

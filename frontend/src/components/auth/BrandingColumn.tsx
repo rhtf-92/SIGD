@@ -7,6 +7,25 @@ export default function BrandingColumn(): React.JSX.Element {
       aria-label="Información institucional del IESTP Suiza y del sistema SIGD"
       className="relative flex flex-col justify-between overflow-hidden bg-gradient-to-br from-[#0c2340] via-[#0f3261] to-[#1e3a8a] px-6 py-8 sm:px-10 sm:py-12 lg:w-1/2 lg:min-h-screen lg:px-14 lg:py-14 text-white"
     >
+      <video
+        aria-hidden="true"
+        autoPlay
+        className="pointer-events-none absolute inset-0 z-0 h-full w-full object-cover object-center"
+        loop
+        muted
+        playsInline
+        preload="metadata"
+      >
+        <source
+          src="https://iestpsuiza.edu.pe/wp-content/uploads/2023/09/instituto.mp4"
+          type="video/mp4"
+        />
+      </video>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-[1] bg-[#0c2340]/65"
+      />
+
       {/* Patrón geométrico institucional de fondo (efecto filigrana de seguridad sobria) */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.04]"
@@ -27,52 +46,53 @@ export default function BrandingColumn(): React.JSX.Element {
         aria-hidden="true"
       />
 
-      {/* 1. Header de Branding */}
-      <header className="relative z-10 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          {/* Logotipo "S" Institucional */}
-          <div
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-[#0c2340] shadow-md border border-white/20 select-none"
-            aria-label="Logotipo oficial S del IESTP Suiza"
-          >
-            <span className="font-serif text-2xl font-black tracking-tight">S</span>
-          </div>
+      {/* 1. Cabecera y servicios institucionales */}
+      <div className="relative isolate -mx-6 -mt-8 mb-8 overflow-hidden px-6 pb-6 pt-8 sm:-mx-10 sm:-mt-12 sm:mb-10 sm:px-10 sm:pb-7 sm:pt-12 lg:-mx-14 lg:-mt-14 lg:mb-12 lg:px-14 lg:pb-8 lg:pt-14">
+        <div className="relative z-10">
+          <header className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white text-[#0c2340] shadow-md select-none"
+                aria-label="Logotipo oficial S del IESTP Suiza"
+              >
+                <span className="font-serif text-2xl font-black tracking-tight">S</span>
+              </div>
 
-          <div className="flex flex-col">
-            <span className="text-base font-extrabold tracking-wider uppercase text-white font-sans leading-tight">
-              IESTP SUIZA
+              <div className="flex flex-col">
+                <span className="text-base font-extrabold tracking-wider uppercase text-white font-sans leading-tight">
+                  IESTP SUIZA
+                </span>
+                <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-200">
+                  PUCALLPA • UCAYALI
+                </span>
+              </div>
+            </div>
+
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-slate-950/25 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-xs">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
+              <span>Portal Oficial v1.0</span>
+            </div>
+          </header>
+
+          <div className="mt-8 flex flex-wrap items-center gap-2 sm:mt-10">
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-white/25 bg-slate-950/25 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-xs">
+              <FileCheck2 className="h-3.5 w-3.5 text-blue-200" aria-hidden="true" />
+              Trámite Documentario
             </span>
-            <span className="text-[11px] font-semibold tracking-widest uppercase text-slate-300">
-              PUCALLPA • UCAYALI
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-white/25 bg-slate-950/25 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-xs">
+              <Stamp className="h-3.5 w-3.5 text-blue-200" aria-hidden="true" />
+              Firma Digital Legal
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-white/25 bg-slate-950/25 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-xs">
+              <Sparkles className="h-3.5 w-3.5 text-blue-200" aria-hidden="true" />
+              Cero Papel
             </span>
           </div>
         </div>
-
-        {/* Badge Oficial */}
-        <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300 shadow-sm backdrop-blur-xs">
-          <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
-          <span>Portal Oficial v1.0</span>
-        </div>
-      </header>
+      </div>
 
       {/* 2. Contenido Central */}
       <section className="relative z-10 my-10 lg:my-auto max-w-xl space-y-6">
-        {/* Etiquetas de gestión documentaria */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-medium text-slate-200">
-            <FileCheck2 className="h-3.5 w-3.5 text-blue-300" aria-hidden="true" />
-            Trámite Documentario
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-medium text-slate-200">
-            <Stamp className="h-3.5 w-3.5 text-blue-300" aria-hidden="true" />
-            Firma Digital Legal
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-medium text-slate-200">
-            <Sparkles className="h-3.5 w-3.5 text-blue-300" aria-hidden="true" />
-            Cero Papel
-          </span>
-        </div>
-
         {/* Título y Subtítulo */}
         <div className="space-y-2">
           <h1 className="text-5xl font-black tracking-tight text-white sm:text-6xl lg:text-7xl">

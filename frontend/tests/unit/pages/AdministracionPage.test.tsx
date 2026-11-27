@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import AdministracionPage from "../../../src/pages/admin/AdministracionPage";
 import { describe, test, expect, vi } from "vitest";
@@ -13,60 +13,50 @@ vi.mock("../../../src/hooks/useRbacConfig", () => ({
 const renderConRouter = (ui: React.ReactElement) =>
   render(<BrowserRouter>{ui}</BrowserRouter>);
 
-describe("AdministracionPage (F_GONZALES - ENT-M05-01)", () => {
-  test("1. Renderiza el título del panel de administración", () => {
+describe("AdministracionPage (panel limpio)", () => {
+  test("1. Conserva el encabezado del panel", () => {
     renderConRouter(<AdministracionPage />);
     expect(
       screen.getByRole("heading", { name: /Panel de Administración/i })
     ).toBeInTheDocument();
   });
 
-  test("2. Muestra las 6 tarjetas de módulos administrativos", () => {
-    renderConRouter(<AdministracionPage />);
-    expect(screen.getByText("Usuarios")).toBeInTheDocument();
-    expect(screen.getByText("Roles y Permisos")).toBeInTheDocument();
-    expect(screen.getByText("Auditoría")).toBeInTheDocument();
-    expect(screen.getByText("Tablas Maestras")).toBeInTheDocument();
-    expect(screen.getByText("Calendario Laboral")).toBeInTheDocument();
-    expect(screen.getByText("Seguridad")).toBeInTheDocument();
-  });
-
-  test("3. Cada tarjeta cuenta con botón 'Administrar' accesible", () => {
-    renderConRouter(<AdministracionPage />);
-    const botones = screen.getAllByRole("button", { name: /Administrar/i });
-    expect(botones).toHaveLength(6);
-    botones.forEach((btn) => expect(btn).toBeEnabled());
-  });
-
-  test("4. Navega a /administracion/usuarios al hacer clic en Usuarios", () => {
-    renderConRouter(<AdministracionPage />);
-    const btnUsuarios = screen.getByRole("button", { name: /Administrar Usuarios/i });
-    expect(btnUsuarios).toBeInTheDocument();
-    fireEvent.click(btnUsuarios);
-    // Verificación de navegación - la ruta se ejecuta correctamente
-    expect(btnUsuarios).toBeInTheDocument();
-  });
-
-  test("5. Navega a /administracion/tablas-maestras al hacer clic", () => {
-    renderConRouter(<AdministracionPage />);
-    const btnTablas = screen.getByRole("button", {
-      name: /Administrar Tablas Maestras/i,
-    });
-    expect(btnTablas).toBeInTheDocument();
-    fireEvent.click(btnTablas);
-    expect(btnTablas).toBeInTheDocument();
-  });
-
-  test("6. Presenta descripción para cada módulo (información contextual)", () => {
+  test("2. Conserva el bloque de bienvenida y sus accesos", () => {
     renderConRouter(<AdministracionPage />);
     expect(
-      screen.getByText(/Administra cuentas existentes/i)
+      screen.getByRole("heading", { name: /Bienvenido al Panel de Control SIGD/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Define qué puede ver y hacer cada rol/i)
+      screen.getByRole("button", { name: /Directorio Personal/i })
+    ).toBeEnabled();
+  });
+
+  test("3. Conserva los cuatro indicadores superiores", () => {
+    renderConRouter(<AdministracionPage />);
+    expect(screen.getByText("Directorio Activo")).toBeInTheDocument();
+    expect(screen.getByText("Matriz de Acceso")).toBeInTheDocument();
+    expect(screen.getByText("Auditoría WORM")).toBeInTheDocument();
+    expect(screen.getByText("Corte Normativo")).toBeInTheDocument();
+  });
+
+  test("4. Renderiza la sección de módulos de configuración y control", () => {
+    renderConRouter(<AdministracionPage />);
+    expect(
+      screen.queryByText("Módulos de Configuración y Control")
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Configura sedes, áreas, organigrama/i)
+      screen.queryByText("Selecciona una opción para administrar el SIGD.")
     ).toBeInTheDocument();
+  });
+
+  test("5. Renderiza las seis tarjetas y sus acciones Administrar", () => {
+    renderConRouter(<AdministracionPage />);
+    const modulos = ["Usuarios", "Roles y Permisos", "Auditoría", "Tablas Maestras", "Calendario Laboral", "Seguridad"];
+    modulos
+      .forEach((nombre) => {
+        expect(screen.getByRole("heading", { name: nombre, level: 4 })).toBeInTheDocument();
+      });
+    expect(screen.getAllByRole("button", { name: /^Administrar /i })).toHaveLength(6);
+    expect(screen.getAllByText("Acceso Autorizado")).toHaveLength(6);
   });
 });

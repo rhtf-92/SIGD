@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   User,
   Lock,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
 import { autenticarCredenciales, destinoPorRol } from "../../services/authService";
+import { obtenerRutaSolicitada } from "../../utils/rutasPorRol";
 
 export interface RolCanonico {
   id: string;
@@ -22,11 +23,11 @@ export interface RolCanonico {
 }
 
 export const ROLES_CANONICOS: RolCanonico[] = [
-  { id: "SUPER_ADMIN", label: "SUPER_ADMIN — Super Administrador", destino: "/" },
-  { id: "DIRECTOR", label: "DIRECTOR — Director General", destino: "/" },
-  { id: "DOCENTE", label: "DOCENTE — Docente / Coordinador", destino: "/flujos/titulacion" },
-  { id: "MESA_PARTES", label: "MESA_PARTES — Mesa de Partes / Ventanilla", destino: "/tramite/ventanilla-presencial" },
-  { id: "ESTUDIANTE", label: "ESTUDIANTE — Estudiante / Administrado", destino: "/casilla" },
+  { id: "SUPER_ADMIN", label: "SUPER_ADMIN — Super Administrador", destino: destinoPorRol("SUPER_ADMIN") },
+  { id: "DIRECTOR", label: "DIRECTOR — Director General", destino: destinoPorRol("DIRECTOR") },
+  { id: "DOCENTE", label: "DOCENTE — Docente / Coordinador", destino: destinoPorRol("DOCENTE") },
+  { id: "MESA_PARTES", label: "MESA_PARTES — Mesa de Partes / Ventanilla", destino: destinoPorRol("MESA_PARTES") },
+  { id: "ESTUDIANTE", label: "ESTUDIANTE — Estudiante / Administrado", destino: destinoPorRol("ESTUDIANTE") },
 ];
 
 const CLAVE_TOKEN = "sigd_token";
@@ -36,6 +37,7 @@ const CLAVE_REMEMBER_USER = "sigd_remembered_user";
 
 export default function LoginFormCard(): React.JSX.Element {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Estados controlados exigidos con inicializadores perezosos para evitar re-renderizados
   const [identificador, setIdentificador] = useState<string>(() => {
@@ -104,6 +106,8 @@ export default function LoginFormCard(): React.JSX.Element {
         window.localStorage.removeItem(CLAVE_PERMISOS);
         window.localStorage.removeItem("sigd_usuario_nombre");
         window.localStorage.removeItem("sigd_usuario_correo");
+        window.localStorage.removeItem("sigd_refresh");
+        window.localStorage.removeItem("sigd_refresh_token");
         useAuthStore.setState({
           accessToken: null,
           refreshToken: null,
@@ -132,7 +136,10 @@ export default function LoginFormCard(): React.JSX.Element {
         authResult.refreshToken,
       );
 
-      navigate(destinoPorRol(authResult.usuario.rol), { replace: true });
+      navigate(
+        obtenerRutaSolicitada(location.state, location.search) ?? authResult.destino,
+        { replace: true },
+      );
     } catch (err: unknown) {
       setErrorMessage(
         err instanceof Error
@@ -149,10 +156,18 @@ export default function LoginFormCard(): React.JSX.Element {
       {/* Tarjeta institucional blanca con sombra sutil */}
       <section
         aria-labelledby="titulo-login"
-        className="rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-9 shadow-sm"
+        className="relative overflow-hidden rounded-2xl border border-white/90 bg-gradient-to-br from-white via-[#fbfdff] to-[#eff6fc] p-6 shadow-2xl shadow-[#0c2340]/20 ring-1 ring-[#0c2340]/10 backdrop-blur-md sm:p-9"
       >
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-8 top-0 h-1 rounded-b-full bg-gradient-to-r from-blue-700 via-cyan-500 to-teal-400"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-blue-100/60 blur-3xl"
+        />
         {/* Encabezado del Formulario */}
-        <div className="mb-6 space-y-1">
+        <div className="relative mb-6 space-y-1">
           <h2
             id="titulo-login"
             className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0c2340]"
@@ -182,7 +197,7 @@ export default function LoginFormCard(): React.JSX.Element {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} noValidate className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="relative space-y-4">
           {/* Campo: Usuario, DNI o Correo Institucional */}
           <div>
             <label
@@ -313,7 +328,7 @@ export default function LoginFormCard(): React.JSX.Element {
         </div>
 
         {/* Enlace Discreto a la Mesa de Partes Virtual */}
-        <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-3.5 text-center text-xs text-slate-600">
+        <div className="rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50/90 to-cyan-50/70 p-3.5 text-center text-xs text-slate-700 shadow-sm shadow-blue-950/5">
           <p className="leading-relaxed">
             ¿Es ciudadano o no cuenta con usuario interno?
           </p>

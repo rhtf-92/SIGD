@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { apiClient } from "../../../src/api/client";
 import DashboardEjecutivoPage from "../../../src/pages/DashboardEjecutivoPage";
+import AppRouter from "../../../src/routes/AppRouter";
+import { ApiHttpError } from "../../../src/types/api";
 
 vi.mock("@/api/client", () => ({ apiClient: { get: vi.fn() } }));
 
@@ -72,7 +74,10 @@ function respondWithDashboard() {
   }) as never);
 }
 
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  vi.clearAllMocks();
+  window.localStorage.clear();
+});
 
 describe("DashboardEjecutivoPage filtros reactivos", () => {
   it("consulta los tres endpoints con el rango anual que acepta la API", async () => {
@@ -89,6 +94,28 @@ describe("DashboardEjecutivoPage filtros reactivos", () => {
     expect(apiClient.get).toHaveBeenCalledWith("/api/v1/reportes/dashboard/cuellos-botella", {
       params: { periodoDesde: "2026-01", periodoHasta: "2026-12", diasLimite: 5 },
     });
+  });
+
+  it("mantiene la ruta /reportes/dashboard en lugar de redirigir al inicio", async () => {
+    window.localStorage.setItem("sigd_token", "token-de-prueba");
+    window.localStorage.setItem("sigd_rol", "DIRECTOR");
+    respondWithDashboard();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/reportes/dashboard"]}>
+        <QueryClientProvider client={queryClient}>
+          <AppRouter />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Tablero Directivo Ejecutivo" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Bienvenido al Sistema Integral de Gestión Documentaria")).not.toBeInTheDocument();
   });
 
   it("adapta los indicadores oficiales MGD y el resumen de la API", async () => {
@@ -143,7 +170,7 @@ describe("DashboardEjecutivoPage filtros reactivos", () => {
     });
   });
 
-  it("filtra localmente el ranking por unidad sin afirmar que los KPI también se filtraron", async () => {
+  it("envía la unidad orgánica a los tres endpoints y mantiene el selector completo", async () => {
     respondWithDashboard();
     const user = userEvent.setup();
     renderDashboard();
@@ -151,8 +178,25 @@ describe("DashboardEjecutivoPage filtros reactivos", () => {
     await screen.findAllByText("Secretaría Académica");
     await user.selectOptions(screen.getByLabelText(/Unidad orgánica/), "unidad-1");
 
+    await waitFor(() => {
+      expect(apiClient.get).toHaveBeenCalledWith("/api/v1/reportes/dashboard/resumen", {
+        params: { periodoDesde: "2026-01", periodoHasta: "2026-12", unidadOrganicaId: "unidad-1" },
+      });
+      expect(apiClient.get).toHaveBeenCalledWith("/api/v1/reportes/dashboard/tendencias", {
+        params: { anio: 2026, unidadOrganicaId: "unidad-1" },
+      });
+      expect(apiClient.get).toHaveBeenCalledWith("/api/v1/reportes/dashboard/cuellos-botella", {
+        params: {
+          periodoDesde: "2026-01",
+          periodoHasta: "2026-12",
+          diasLimite: 5,
+          unidadOrganicaId: "unidad-1",
+        },
+      });
+    });
+    expect(screen.queryByText(/los indicadores son institucionales/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/se aplica en el servidor/i)).toBeInTheDocument();
     expect(screen.getAllByText("Secretaría Académica")).toHaveLength(2);
-    expect(screen.getByText(/los indicadores son institucionales/i)).toBeInTheDocument();
   });
 
   it("redibuja la serie del gráfico para el mes elegido", async () => {
@@ -187,9 +231,40 @@ describe("DashboardEjecutivoPage filtros reactivos", () => {
     renderDashboard();
 
     const retryButton = await screen.findByRole("button", { name: "Reintentar" }, { timeout: 5000 });
-    expect(screen.getByText(/El servidor de reportes no está disponible en localhost:3000/i)).toBeInTheDocument();
+    expect(screen.getByText(/No se pudo contactar con el servicio de reportes/i)).toBeInTheDocument();
+    expect(screen.queryByText(/localhost:3000/i)).not.toBeInTheDocument();
     await user.click(retryButton);
 
+    expect(await screen.findByText("Expedientes procesados")).toBeInTheDocument();
+  });
+
+  it("identifica el endpoint con error 500 y vuelve a cargar tras Reintentar", async () => {
+    let intentosTendencias = 0;
+    vi.mocked(apiClient.get).mockImplementation(async (url) => {
+      if (url.endsWith("/dashboard/tendencias") && intentosTendencias < 2) {
+        intentosTendencias += 1;
+        throw new ApiHttpError({
+          type: "https://sigd.iestpsuiza.edu.pe/errors/system",
+          title: "Internal Server Error",
+          status: 500,
+          detail: "El servicio del SIGD no pudo procesar la solicitud. Intente nuevamente; si persiste, contacte al administrador.",
+          instance: url,
+          code: "ERR_HTTP_500",
+          category: "System",
+          correlationId: "corr-500-dashboard",
+          retryable: true,
+        });
+      }
+      return { data: responseFor(url) } as never;
+    });
+    const user = userEvent.setup();
+    renderDashboard();
+
+    expect(await screen.findByText(/Consulta afectada: tendencias mensuales/, {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText(/El servicio del SIGD no pudo procesar la solicitud/)).toBeInTheDocument();
+    expect(screen.getByText(/Estado HTTP 500/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Reintentar" }));
     expect(await screen.findByText("Expedientes procesados")).toBeInTheDocument();
   });
 

@@ -118,15 +118,15 @@ describe("authService — autenticación real contra la API", () => {
   });
 
   it("usa destino por defecto para roles no canónicos", () => {
-    expect(destinoPorRol("SUPER_ADMIN")).toBe("/");
-    expect(destinoPorRol("DIRECTOR")).toBe("/");
-    expect(destinoPorRol("DOCENTE")).toBe("/flujos/titulacion");
+    expect(destinoPorRol("SUPER_ADMIN")).toBe("/administracion");
+    expect(destinoPorRol("DIRECTOR")).toBe("/flujo-validez-legal");
+    expect(destinoPorRol("DOCENTE")).toBe("/expedientes");
     expect(destinoPorRol("MESA_PARTES")).toBe("/tramite/ventanilla-presencial");
     expect(destinoPorRol("ESTUDIANTE")).toBe("/casilla");
     expect(destinoPorRol("ROL_DESCONOCIDO")).toBe("/casilla");
-    expect(destinoPorRol("ADMINISTRADOR")).toBe("/");
-    expect(destinoPorRol("SECRETARIO")).toBe("/flujos/titulacion");
-    expect(destinoPorRol("ESPECIALISTA")).toBe("/flujos/titulacion");
+    expect(destinoPorRol("ADMINISTRADOR")).toBe("/administracion");
+    expect(destinoPorRol("SECRETARIO")).toBe("/expedientes");
+    expect(destinoPorRol("ESPECIALISTA")).toBe("/expedientes");
     expect(destinoPorRol("CIUDADANO")).toBe("/casilla");
   });
 });

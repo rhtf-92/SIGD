@@ -303,17 +303,21 @@ describe("Suite de Pruebas de Casilla Electrónica Ciudadana y Acuse Legal", () 
       if (!fila) throw new Error(`No se encontró la fila de ${numero}`);
       return fila;
     };
+    const esperarBadgeVisible = (fila: HTMLElement, texto: string) => {
+      const badge = within(fila)
+        .getAllByText(texto)
+        .find((elemento) => !elemento.classList.contains("sr-only"));
+      expect(badge).toBeInTheDocument();
+    };
 
     const filaNoLeida = await filaPorNumero(mockNotificacionNoLeida.numeroNotificacion);
-    expect(within(filaNoLeida).getByText("No Leído")).toBeInTheDocument();
+    esperarBadgeVisible(filaNoLeida, "No Leído");
 
     const filaLeida = await filaPorNumero(mockNotificacionLeida.numeroNotificacion);
-    expect(within(filaLeida).getByText("Leído")).toBeInTheDocument();
+    esperarBadgeVisible(filaLeida, "Leído");
 
     const filaNotificada = await filaPorNumero(mockNotificacionNotificada.numeroNotificacion);
-    expect(
-      within(filaNotificada).getByText("Notificado (Con Acuse)"),
-    ).toBeInTheDocument();
+    esperarBadgeVisible(filaNotificada, "Notificado (Con Acuse)");
   });
 
   it("c) El filtro por tipo de notificación reduce el listado mostrado", async () => {

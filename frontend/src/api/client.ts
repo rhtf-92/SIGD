@@ -1,7 +1,7 @@
 import { useAuthStore } from "../stores/authStore";
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
 
-import { env } from "../config/env";
+import { apiDestination, env } from "../config/env";
 import {
   type ApiProblemDetails,
   ApiHttpError,
@@ -75,16 +75,51 @@ function procesarCola(error: unknown, token: string | null) {
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error: unknown) => {
+    if (axios.isAxiosError(error) && !error.response) {
+      const timedOut = error.code === "ECONNABORTED" || error.code === "ETIMEDOUT";
+      const code = timedOut ? "ERR_TIMEOUT" : "ERR_NETWORK";
+      const correlationId =
+        (typeof error.config?.headers?.["X-Correlation-ID"] === "string" &&
+          error.config.headers["X-Correlation-ID"]) ||
+        generateCorrelationId();
+
+      // El detalle técnico se registra en consola; la interfaz muestra un mensaje
+      // comprensible y decide qué hacer según `code`, no según texto libre.
+      console.error("[API] Fallo de conexión", {
+        destino: apiDestination,
+        url: error.config?.url,
+        code,
+        correlationId,
+      });
+
+      return Promise.reject(
+        new ApiHttpError({
+          type: "https://sigd.iestpsuiza.edu.pe/errors/system",
+          title: timedOut
+            ? "Tiempo de espera agotado"
+            : "No se pudo conectar con el servidor",
+          status: 0,
+          detail: timedOut
+            ? "El servicio no respondió dentro del tiempo esperado."
+            : "No se pudo establecer conexión con el servicio del SIGD.",
+          instance: error.config?.url ?? "",
+          code,
+          category: "System",
+          correlationId,
+          retryable: true,
+        }),
+      );
+    }
+
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+      const url = originalRequest.url ?? "";
+      const esEndpointDeAutenticacion =
+        url.includes("/auth/login") || url.includes("/auth/refresh") || url.includes("/auth/logout");
 
-      if (
-        !(
-          originalRequest.url?.includes("/auth/refresh") ||
-          originalRequest.url?.includes("/auth/login") ||
-          originalRequest._retry
-        )
-      ) {
+      // Un 401 del propio login significa credenciales inválidas: intentar un
+      // refresh aquí sólo produce un bucle de redirección a /login.
+      if (!esEndpointDeAutenticacion && !originalRequest._retry) {
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             pendingQueue.push({
@@ -113,7 +148,7 @@ apiClient.interceptors.response.use(
           useAuthStore.getState().logout();
           isRefreshing = false;
         }
-      } else {
+      } else if (!url.includes("/auth/login")) {
         useAuthStore.getState().logout();
       }
     }
@@ -144,8 +179,9 @@ apiClient.interceptors.response.use(
       const detail =
         (typeof responseData?.detail === "string" && responseData.detail) ||
         (typeof responseData?.message === "string" && responseData.message) ||
-        error.message ||
-        "Ha ocurrido una incidencia al procesar la solicitud.";
+        (status >= 500
+          ? "El servicio del SIGD no pudo procesar la solicitud. Intente nuevamente; si persiste, contacte al administrador."
+          : error.message || "Ha ocurrido una incidencia al procesar la solicitud.");
 
       const instance =
         (typeof responseData?.instance === "string" && responseData.instance) ||

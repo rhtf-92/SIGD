@@ -1,23 +1,21 @@
 import type { ClasificadorCcdPort, NodoCcd } from './ccd.types.js';
 
-/** Seed mínimo RutaDoc hasta que se publique el CCD institucional canónico. */
-export const catalogoCcdInicialRutaDoc: readonly NodoCcd[] = Object.freeze([
-  Object.freeze({
-    id: 'rutadoc-serie-demo-01',
-    codigo: 'DEMO-01',
-    nombre: 'Serie de ejemplo (no oficial)',
-    tipo: 'SERIE' as const,
-    hijos: Object.freeze([
-      Object.freeze({
-        id: 'rutadoc-subserie-demo-01-01',
-        codigo: 'DEMO-01.01',
-        nombre: 'Subserie de ejemplo (no oficial)',
-        tipo: 'SUBSERIE' as const,
-        hijos: Object.freeze([]),
-      }),
-    ]),
-  }),
+export const SERIES_CCD_RUTADOC = Object.freeze([
+  Object.freeze({ codigo: 'CCD-DG-RES', seccion: 'DIRECCION_GENERAL', nombre: 'Resoluciones Directorales' }),
+  Object.freeze({ codigo: 'CCD-SA-ACTA', seccion: 'SECRETARIA_ACADEMICA', nombre: 'Actas de Evaluación y Certificados' }),
+  Object.freeze({ codigo: 'CCD-SA-TIT', seccion: 'SECRETARIA_ACADEMICA', nombre: 'Expedientes de Titulación Profesional' }),
 ]);
+
+export const catalogoCcdInicialRutaDoc: readonly NodoCcd[] = Object.freeze(
+  SERIES_CCD_RUTADOC.map((serie) => Object.freeze({
+    id: serie.codigo,
+    codigo: serie.codigo,
+    nombre: serie.nombre,
+    tipo: 'SERIE' as const,
+    seccion: serie.seccion,
+    hijos: Object.freeze([]),
+  })),
+);
 
 /** Implementación autónoma sustituible por el port del catálogo institucional. */
 export const clasificadorCcdPredeterminadoRutaDoc: ClasificadorCcdPort = Object.freeze({

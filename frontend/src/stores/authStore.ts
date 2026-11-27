@@ -6,8 +6,9 @@ export interface UsuarioPerfil {
   id: string;
   nombreCompleto: string;
   correo: string;
-  rol: 'SUPER_ADMIN' | 'DIRECTOR' | 'DOCENTE' | 'MESA_PARTES' | 'ESTUDIANTE';
+  rol: 'SUPER_ADMIN' | 'DIRECTOR' | 'DOCENTE' | 'MESA_PARTES' | 'ESTUDIANTE' | 'CIUDADANO';
   areaId?: string;
+  debeCambiarPassword?: boolean;
 }
 
 interface LoginCredentials {
@@ -131,7 +132,10 @@ function createStore() {
       }
       try {
         if (typeof window !== "undefined" && window.location) {
-          window.location.href = "/login";
+          const ruta = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+          window.location.href = ruta.startsWith("/reportes")
+            ? `/login?from=${encodeURIComponent(ruta)}`
+            : "/login";
         }
       } catch {
         // Ignore navigation error in test environments

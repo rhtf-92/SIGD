@@ -34,10 +34,21 @@ const anio = z.coerce.number().int().min(2000).max(2100);
  */
 const diasLimite = z.coerce.number().int().min(0).max(365).default(5);
 
+/**
+ * Unidad orgánica del filtro. Se valida como texto acotado y no como UUID porque
+ * la analítica también debe poder agrupar identificadores históricos y el
+ * centinela `SIN_AREA`; el valor siempre llega a PostgreSQL como parámetro ($n),
+ * nunca concatenado al SQL.
+ */
+const unidadOrganicaId = z.string().trim().min(1).max(160).regex(/^[\w-]+$/, {
+  message: 'La unidad orgánica contiene caracteres no permitidos.',
+});
+
 const filtrosPeriodoShape = z.object({
   periodo: periodo.optional(),
   periodoDesde: periodo.optional(),
   periodoHasta: periodo.optional(),
+  unidadOrganicaId: unidadOrganicaId.optional(),
 });
 
 function validarRangoPeriodo(
@@ -81,6 +92,7 @@ export const filtrosCuellosBotellaSchema = filtrosPeriodoShape
 /** Filtros de la serie mensual de tendencias (#52). */
 export const filtrosTendenciasSchema = z.object({
   anio: anio.optional(),
+  unidadOrganicaId: unidadOrganicaId.optional(),
 }).strict();
 
 export type FiltrosResumen = z.infer<typeof filtrosResumenSchema>;

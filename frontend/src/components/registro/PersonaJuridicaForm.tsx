@@ -10,10 +10,12 @@ import { ConsentimientoLey29733Modal } from "./ConsentimientoLey29733Modal";
 
 interface PersonaJuridicaFormProps {
   onSubmit: (data: Juridical) => void | Promise<void>;
+  onChange?: () => void;
 }
 
 export default function PersonaJuridicaForm({
   onSubmit,
+  onChange,
 }: PersonaJuridicaFormProps) {
   const [isConsentimientoModalOpen, setIsConsentimientoModalOpen] =
     useState(false);
@@ -26,6 +28,8 @@ export default function PersonaJuridicaForm({
     formState: { errors, isSubmitting },
   } = useForm<Juridical>({
     resolver: zodResolver(juridicalSchema),
+    mode: "onChange",
+    reValidateMode: "onChange",
     defaultValues: {
       tipoPersona: "JURIDICA",
       ruc: "",
@@ -83,6 +87,7 @@ export default function PersonaJuridicaForm({
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
+      onChange={onChange}
       className="registration-form space-y-6"
       noValidate
     >

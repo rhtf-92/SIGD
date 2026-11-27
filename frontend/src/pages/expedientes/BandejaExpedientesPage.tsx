@@ -1,182 +1,146 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FolderOpen, Gem, Search } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowDown, FolderOpen, Search } from "lucide-react";
 
 import BandejaTabFilter from "../../components/expedientes/BandejaTabFilter";
 import ExpedienteTable from "../../components/expedientes/ExpedienteTable";
 import CcdTreeSelector from "../../components/expedientes/CcdTreeSelector";
-import { useBandejaExpedientes, useExpedientesBase } from "../../hooks/useBandejaExpedientes";
+import { useBandejaExpedientes } from "../../hooks/useBandejaExpedientes";
+import { apiClient } from "../../api/client";
 import {
   ORDEN_PESTANAS_BANDEJA,
   type EstadoFlujoExpediente,
-  type ExpedienteSGD,
 } from "../../types/expediente";
 import type {
+  EstadoRecurso,
   FondoDocumental,
   RutaCcdSeleccionada,
+  SeccionOrganica,
+  SerieDocumental,
 } from "../../types/ccdArchivistica";
 
-const FONDOS_CCD_INSTITUCIONALES: readonly FondoDocumental[] = [
-  {
-    tipo: "fondo",
-    id: "fondo-iestp",
-    nombre: "IESTP_SUIZA",
-    secciones: [
-      {
-        tipo: "seccion",
-        id: "sec-sa",
-        nombre: "Secretaría Académica",
-        series: [
-          {
-            tipo: "serie",
-            id: "ser-tit",
-            nombre: "Expedientes de Titulación Profesional",
-            codigo: "CCD-SA-TIT",
-          },
-          {
-            tipo: "serie",
-            id: "ser-act",
-            nombre: "Actas de Evaluación y Certificados",
-            codigo: "CCD-SA-ACTA",
-          },
-        ],
-      },
-      {
-        tipo: "seccion",
-        id: "sec-dg",
-        nombre: "Dirección General",
-        series: [
-          {
-            tipo: "serie",
-            id: "ser-res",
-            nombre: "Resoluciones Directorales",
-            codigo: "CCD-DG-RES",
-          },
-        ],
-      },
-    ],
-  },
-];
+const ETIQUETAS_SECCION: Record<string, string> = {
+  SECRETARIA_ACADEMICA: "Secretaría Académica",
+  DIRECCION_GENERAL: "Dirección General",
+};
 
-function calcularConteosPorEstado(
-  expedientes: ExpedienteSGD[] | undefined,
-): Record<EstadoFlujoExpediente, number> {
-  const conteos = ORDEN_PESTANAS_BANDEJA.reduce(
-    (acc, estado) => ({ ...acc, [estado]: 0 }),
-    {} as Record<EstadoFlujoExpediente, number>,
-  );
-
-  if (!expedientes) {
-    return conteos;
-  }
-
-  for (const expediente of expedientes) {
-    conteos[expediente.estadoFlujo] += 1;
-  }
-
-  return conteos;
+interface NodoCcdApi {
+  id: string;
+  codigo: string;
+  nombre: string;
+  tipo: "SERIE" | "SUBSERIE";
+  seccion?: string;
+  hijos: NodoCcdApi[];
 }
 
 export default function BandejaExpedientesPage() {
   const navigate = useNavigate();
+  const ccdQuery = useQuery({
+    queryKey: ["expedientes", "clasificador-ccd"],
+    queryFn: async () => (await apiClient.get<{ elementos: NodoCcdApi[] }>(
+      "/api/v1/expedientes/clasificador-ccd",
+    )).data.elementos,
+    staleTime: 5 * 60_000,
+  });
   const [estadoActivo, setEstadoActivo] = useState<EstadoFlujoExpediente>("PENDIENTE");
   const [busqueda, setBusqueda] = useState("");
   const [filtroCcd, setFiltroCcd] = useState<RutaCcdSeleccionada | null>(null);
   const [mostrarFiltroCcd, setMostrarFiltroCcd] = useState(false);
-  const [ahora, setAhora] = useState(() => Date.now());
+  const {
+    data: datosBandeja,
+    indicadores,
+    isLoading,
+    isError,
+    errorIndicadores,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } =
+    useBandejaExpedientes({ estado: estadoActivo, busqueda, codigoSerie: filtroCcd?.serie.codigo });
 
-  useEffect(() => {
-    const interval = window.setInterval(() => setAhora(Date.now()), 60_000);
-    return () => window.clearInterval(interval);
-  }, []);
+  const expedientesVisibles = datosBandeja?.expedientes ?? [];
 
-  const { data: expedientesBase } = useExpedientesBase();
-  const { data: expedientesFiltradosApi, isLoading, isError } =
-    useBandejaExpedientes({ estado: estadoActivo, busqueda });
-
-  // Filtrado compuesto local por serie CCD seleccionada
-  const expedientesVisibles = useMemo(() => {
-    if (!expedientesFiltradosApi) return [];
-    if (!filtroCcd) return expedientesFiltradosApi;
-
-    return expedientesFiltradosApi.filter(
-      (exp) =>
-        exp.clasificacionCCD.codigoSerie === filtroCcd.serie.codigo ||
-        exp.clasificacionCCD.serieDocumental.toLowerCase().includes(filtroCcd.serie.nombre.toLowerCase()),
-    );
-  }, [expedientesFiltradosApi, filtroCcd]);
-
-  const conteos = useMemo(
-    () => calcularConteosPorEstado(expedientesBase),
-    [expedientesBase],
+  const conteos = datosBandeja?.conteos ?? ORDEN_PESTANAS_BANDEJA.reduce(
+    (resultado, estado) => ({ ...resultado, [estado]: 0 }),
+    {} as Record<EstadoFlujoExpediente, number>,
   );
 
-  const volumenActivo = expedientesBase?.length ?? 0;
-  const urgentes =
-    expedientesBase?.filter(
-      (exp) => exp.prioridad === "URGENTE" || exp.prioridad === "MUY_URGENTE",
-    ).length ?? 0;
-  const proximosAVencer =
-    expedientesBase?.filter((exp) => {
-      const diasRestantes = Math.ceil(
-        (new Date(exp.fechaLimiteAtencion).getTime() - ahora) /
-          (1000 * 60 * 60 * 24),
-      );
-      return diasRestantes >= 0 && diasRestantes <= 2;
-    }).length ?? 0;
+  const volumenActivo = indicadores?.volumenActivo ?? 0;
+  const seccionesPorCodigo = (ccdQuery.data ?? []).reduce<Record<string, SerieDocumental[]>>(
+    (secciones, nodo) => {
+      if (nodo.tipo !== "SERIE" || !nodo.seccion) return secciones;
+      const lista = secciones[nodo.seccion] ?? [];
+      lista.push({ tipo: "serie", id: nodo.id, codigo: nodo.codigo, nombre: nodo.nombre });
+      secciones[nodo.seccion] = lista;
+      return secciones;
+    },
+    {},
+  );
+  const fondosCcd: readonly FondoDocumental[] = [{
+    tipo: "fondo",
+    id: "IESTP_SUIZA",
+    nombre: "IESTP_SUIZA",
+    secciones: Object.entries(seccionesPorCodigo).map(([codigo, series]): SeccionOrganica => ({
+      tipo: "seccion",
+      id: codigo,
+      nombre: ETIQUETAS_SECCION[codigo] ?? codigo,
+      series,
+    })),
+  }];
+  const recursoCcd: EstadoRecurso<readonly FondoDocumental[]> = ccdQuery.isLoading
+    ? { estado: "cargando" }
+    : ccdQuery.isError
+      ? { estado: "error", mensaje: "No se pudo cargar el catálogo de series CCD." }
+      : { estado: "listo", datos: fondosCcd };
 
   return (
-    <main className="relative isolate min-h-screen overflow-hidden bg-[#06131b] text-slate-100">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-[-1] bg-[radial-gradient(rgba(34,211,238,0.08)_1px,transparent_1px),repeating-linear-gradient(135deg,rgba(255,255,255,0.012)_0_1px,transparent_1px_4px)] [background-size:24px_24px,auto]"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-[-1] bg-[radial-gradient(ellipse_at_8%_14%,rgba(8,145,178,0.18),transparent_32%),radial-gradient(ellipse_at_90%_20%,rgba(217,70,239,0.12),transparent_30%),radial-gradient(ellipse_at_50%_100%,rgba(245,158,11,0.11),transparent_38%)]"
-      />
-      <header className="border-b border-cyan-300/15 bg-[#07131e]/85 shadow-[0_8px_32px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+    <main className="bandeja-expedientes-page min-h-screen text-slate-800">
+      <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-5">
           <button
             type="button"
             onClick={() => navigate("/")}
-            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-cyan-300/30 bg-slate-900/70 px-4 py-2 text-sm font-semibold text-cyan-100 shadow-sm transition hover:border-amber-300/70 hover:bg-amber-400/10 hover:text-amber-100"
+            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
           >
             ← Volver al inicio
           </button>
 
-          <p className="text-sm font-bold text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">SIGD · IESTP "Suiza"</p>
-          <h1 className="text-2xl font-bold text-fuchsia-300 drop-shadow-[0_0_14px_rgba(232,121,249,0.38)]">Bandeja de Trabajo Diario</h1>
-          <p className="mt-1 text-sm text-slate-300">
-            Gestión operativa de expedientes, semáforo SLA de 30 días LPAG y taxonomía archivística CCD.
+          <p className="text-sm font-bold text-blue-800">SIGD SUIZA · Módulo de Expedientes</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Bandeja de Expedientes</h1>
+          <p className="mt-1 text-sm text-slate-600">
+            Administración, seguimiento, recepción y gestión de documentos institucionales.
           </p>
         </div>
       </header>
 
       <section
-        className="bandeja-neon-shell relative mx-auto my-8 max-w-7xl rounded-3xl px-6 py-8 shadow-[0_24px_70px_rgba(0,0,0,0.48)] backdrop-blur-2xl sm:px-8"
+        className="relative mx-auto my-8 max-w-7xl rounded-2xl border border-slate-200 bg-white px-4 py-6 shadow-sm sm:px-8 sm:py-8"
       >
         {/* Panel de KPIs */}
-        <div className="mb-6 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-cyan-300/55 bg-gradient-to-br from-cyan-950/75 via-slate-950/75 to-blue-950/70 p-5 text-center shadow-[0_0_28px_rgba(6,182,212,0.18),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md">
-            <p className="text-3xl font-bold text-cyan-300 drop-shadow-[0_0_12px_rgba(34,211,238,0.75)]">{volumenActivo}</p>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-cyan-100/80">
-              Volumen Activo
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+            <p className="text-3xl font-bold tabular-nums text-slate-900">{volumenActivo}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Expedientes registrados
             </p>
           </div>
-          <div className="rounded-2xl border border-amber-300/65 bg-gradient-to-br from-amber-950/80 via-orange-950/60 to-slate-950/75 p-5 text-center shadow-[0_0_30px_rgba(245,158,11,0.2),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md">
-            <p className="text-3xl font-bold text-amber-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.75)]">{urgentes}</p>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-amber-100/85">
-              Trámites Urgentes
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-center">
+            <p className="text-3xl font-bold tabular-nums text-blue-800">{conteos.PENDIENTE}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Pendientes
             </p>
           </div>
-          <div className="rounded-2xl border border-rose-400/50 bg-gradient-to-br from-rose-950/75 via-red-950/55 to-slate-950/75 p-5 text-center shadow-[0_0_28px_rgba(244,63,94,0.16),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-md">
-            <div className="flex items-center justify-center gap-2">
-              <Gem aria-hidden="true" className="h-4 w-4 animate-pulse text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.85)]" />
-              <p className="text-3xl font-bold text-red-500 drop-shadow-[0_0_12px_rgba(239,68,68,0.6)]">{proximosAVencer}</p>
-            </div>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-rose-100/80">
-              Próximos a Vencer (LPAG)
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-center">
+            <p className="text-3xl font-bold tabular-nums text-slate-900">{conteos.EN_PROCESO}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              En trámite
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-center">
+            <p className="text-3xl font-bold tabular-nums text-slate-900">{conteos.ARCHIVADO}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Finalizados
             </p>
           </div>
         </div>
@@ -184,13 +148,13 @@ export default function BandejaExpedientesPage() {
         {/* Barra de Búsqueda y Filtro CCD */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div className="relative max-w-md flex-1">
-            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-amber-300 drop-shadow-[0_0_7px_rgba(251,191,36,0.6)]" />
+            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar por CUT, solicitante o asunto…"
-              className="w-full rounded-xl border border-cyan-400/35 bg-slate-950/65 py-2 pl-10 pr-4 text-sm text-amber-100 shadow-[0_0_18px_rgba(6,182,212,0.08)] backdrop-blur-md placeholder:text-slate-500 focus:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-400/25"
+              className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/20"
             />
           </div>
 
@@ -198,20 +162,20 @@ export default function BandejaExpedientesPage() {
             <button
               type="button"
               onClick={() => setMostrarFiltroCcd(!mostrarFiltroCcd)}
-              className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold shadow-sm backdrop-blur-md transition hover:shadow-[0_0_16px_rgba(245,158,11,0.18)] ${
+              className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${
                 filtroCcd
-                  ? "border-amber-300 bg-amber-950/75 text-amber-200 shadow-[0_0_18px_rgba(245,158,11,0.2)]"
-                    : "border-amber-300/45 bg-slate-950/65 text-amber-100 hover:border-amber-300 hover:bg-amber-400/10"
+                  ? "border-blue-700 bg-blue-50 text-blue-800"
+                  : "border-slate-300 bg-white text-slate-700 hover:border-blue-400 hover:bg-blue-50"
               }`}
             >
-              <FolderOpen className="h-3.5 w-3.5 text-amber-600 drop-shadow-[0_0_5px_rgba(245,158,11,0.65)]" />
+              <FolderOpen className="h-3.5 w-3.5 text-blue-700" />
               Taxonomía CCD {filtroCcd ? `(${filtroCcd.serie.codigo})` : ""}
             </button>
             {filtroCcd && (
               <button
                 type="button"
                 onClick={() => setFiltroCcd(null)}
-                className="text-xs text-rose-300 hover:text-rose-200 hover:underline"
+                className="text-xs font-medium text-blue-700 hover:text-blue-900 hover:underline"
               >
                 Limpiar filtro CCD
               </button>
@@ -221,21 +185,21 @@ export default function BandejaExpedientesPage() {
 
         {/* Panel Desplegable de Árbol CCD (ENT-M03-04) */}
         {mostrarFiltroCcd && (
-          <div className="mb-6 rounded-2xl border border-amber-300/30 bg-slate-950/60 p-5 shadow-[0_12px_32px_rgba(0,0,0,0.3)] backdrop-blur-xl">
-            <div className="mb-3 flex items-center justify-between border-b border-amber-300/20 pb-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-100">
+          <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-5">
+            <div className="mb-3 flex items-center justify-between border-b border-slate-200 pb-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
                 Seleccionar Serie Documental Archivística (Cuadro CCD)
               </h3>
               <button
                 type="button"
                 onClick={() => setMostrarFiltroCcd(false)}
-                className="text-xs text-slate-400 hover:text-amber-200"
+                className="text-xs font-medium text-slate-500 hover:text-slate-800"
               >
                 ✕ Cerrar
               </button>
             </div>
             <CcdTreeSelector
-              recurso={{ estado: "listo", datos: FONDOS_CCD_INSTITUCIONALES }}
+              recurso={recursoCcd}
               seleccion={filtroCcd}
               onSeleccionar={(ruta) => {
                 setFiltroCcd(ruta);
@@ -256,20 +220,33 @@ export default function BandejaExpedientesPage() {
 
         {/* Tabla Operativa con Semáforo SLA integrado */}
         {isLoading && (
-          <p className="rounded-2xl border border-cyan-400/20 bg-slate-950/65 p-6 text-sm text-cyan-100">Cargando expedientes…</p>
+          <p className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600" role="status">Cargando expedientes…</p>
         )}
-        {isError && (
-          <p className="rounded-2xl border border-rose-400/35 bg-rose-950/50 p-6 text-sm text-rose-200">
-            Ocurrió un error al cargar los expedientes. Intenta nuevamente.
+        {(isError || errorIndicadores) && (
+          <p className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-800" role="alert">
+            No se pudieron actualizar los datos desde el servidor. Intenta nuevamente.
           </p>
         )}
         {!isLoading && !isError && (
-          <ExpedienteTable
-            expedientes={expedientesVisibles}
-            onVerExpediente={(expediente) =>
-              navigate(`/expedientes/${expediente.id}`)
-            }
-          />
+          <>
+            <ExpedienteTable
+              expedientes={expedientesVisibles}
+              onVerExpediente={(expediente) => navigate(`/expedientes/${expediente.id}`)}
+            />
+            {hasNextPage && (
+              <div className="mt-4 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => void fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50"
+                >
+                  <ArrowDown aria-hidden="true" className="h-4 w-4" />
+                  {isFetchingNextPage ? "Cargando…" : "Cargar más expedientes"}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
     </main>

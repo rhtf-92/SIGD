@@ -13,7 +13,7 @@ import { actorProviderDePrueba } from '../../../support/rutadoc-actor-provider.j
 const USUARIO = 'a3401043-807f-41f3-9de8-a042e4b312d4';
 const SOLICITANTE = 'b0000000-0000-4000-8000-000000000080';
 const AREA = 'da7aa251-a027-47f3-8bfd-4cc94df486d1';
-const actor: ActorRutaDoc = { id: USUARIO, roles: ['MESA_PARTES'], puedeVerExpediente: () => true };
+const actor: ActorRutaDoc = { id: USUARIO, roles: ['SUPER_ADMIN'], puedeVerExpediente: () => true };
 const uuidExpediente = (id: number): string => `00000000-0000-4000-8000-${String(id).padStart(12, '0')}`;
 type TransicionTupla = readonly [estadoAnterior: string, evento: string, estadoNuevo: string];
 const destinos: ReadonlyArray<TransicionTupla | null> = [
@@ -53,8 +53,12 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
         expediente_id UUID NOT NULL REFERENCES sigd_tra.expediente (expediente_id),
         id_documento BIGINT NOT NULL, folio_inicio INT NOT NULL,
         folio_fin INT NOT NULL, total_folios INT NOT NULL);
+      CREATE SCHEMA sigd_auth;
+      CREATE TABLE sigd_auth.persona_natural (id_persona UUID PRIMARY KEY, nombre_completo TEXT);
+      CREATE TABLE sigd_auth.persona_juridica (id_persona UUID PRIMARY KEY, razon_social TEXT);
     `);
     await pool.query(readFileSync(path.resolve(process.cwd(), 'migraciones/06_sigd_rut.sql'), 'utf8'));
+    await pool.query(readFileSync(path.resolve(process.cwd(), 'migraciones/14_sigd_rutadoc_clasificacion_ccd.sql'), 'utf8'));
     for (let id = 1; id <= 12; id += 1) {
       const fecha = id >= 11 ? '2026-09-24T10:00:00.000Z' :
         `2026-09-${String(id).padStart(2, '0')}T10:00:00.000Z`;
@@ -78,6 +82,10 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
     }
     await pool.query(`INSERT INTO sigd_tra.expediente_documento_folio VALUES
       ($1, 501, 1, 3, 3), ($1, 502, 4, 5, 2)`, [uuidExpediente(2)]);
+    await pool.query(`INSERT INTO sigd_rut.expediente_clasificacion_ccd
+      (expediente_id, codigo_seccion, codigo_serie, nombre_serie)
+      VALUES ($1, 'SECRETARIA_ACADEMICA', 'CCD-SA-TIT', 'Expedientes de Titulación Profesional')`,
+    [uuidExpediente(2)]);
   });
 
   afterAll(async () => {
@@ -105,6 +113,19 @@ describe('GET RutaDoc en PostgreSQL 18 aislado', () => {
     const respuesta = await request(app()).get('/api/v1/expedientes').query({ pestana: 'PENDIENTES' });
     expect(respuesta.body.contadores).toEqual({ PENDIENTES: 5, EN_TRAMITE: 3, DERIVADOS: 1,
       POR_FIRMAR: 1, ATENDIDOS: 1, ARCHIVADOS: 1 });
+  });
+
+  it('filtra expediente y contadores por una serie CCD persistida', async () => {
+    const respuesta = await request(app()).get('/api/v1/expedientes').query({
+      pestana: 'TODOS', estadosActuales: 'RECEPCIONADO', codigoSerie: 'CCD-SA-TIT',
+    });
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente))
+      .toEqual([uuidExpediente(2)]);
+    expect(respuesta.body.contadores.PENDIENTES).toBe(1);
+    expect(respuesta.body.elementos[0]).toMatchObject({
+      codigoSerie: 'CCD-SA-TIT', nombreSerie: 'Expedientes de Titulación Profesional',
+    });
   });
 
   it('mantiene contadores exactos con altas, bajas y movimientos externos sin cache eventual', async () => {
@@ -199,21 +220,21 @@ await pool.query(`INSERT INTO sigd_tra.tramite (expediente_id, asunto, estado)
   });
 
   it('filtra por término literal, sin ejecutar fragmentos SQL del usuario', async () => {
-    const normal = await request(app()).get('/api/v1/expedientes').query({ pestana: 'PENDIENTES', terminoBusqueda: 'beca' });
+    const normal = await request(app()).get('/api/v1/expedientes').query({ pestana: 'TODOS', estadosActuales: 'RECEPCIONADO', terminoBusqueda: 'beca' });
     expect(normal.status).toBe(200);
     expect(normal.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente)).toEqual([uuidExpediente(2)]);
     const inyeccion = await request(app()).get('/api/v1/expedientes')
-      .query({ pestana: 'PENDIENTES', terminoBusqueda: "' OR 1=1 --" });
+      .query({ pestana: 'TODOS', estadosActuales: 'RECEPCIONADO', terminoBusqueda: "' OR 1=1 --" });
     expect(inyeccion.status).toBe(200);
     expect(inyeccion.body.elementos).toEqual([]);
   });
 
   it('filtra por área y fecha de radicación', async () => {
-    const area = await request(app()).get('/api/v1/expedientes').query({ pestana: 'PENDIENTES', areaId: AREA });
+    const area = await request(app()).get('/api/v1/expedientes').query({ pestana: 'TODOS', estadosActuales: 'RECEPCIONADO', areaId: AREA });
     expect(area.status).toBe(200);
     expect(area.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente)).toEqual([uuidExpediente(2)]);
     const fecha = await request(app()).get('/api/v1/expedientes').query({
-      pestana: 'PENDIENTES', fechaDesde: '2026-09-02', fechaHasta: '2026-09-02',
+      pestana: 'TODOS', estadosActuales: 'RECEPCIONADO', fechaDesde: '2026-09-02', fechaHasta: '2026-09-02',
     });
     expect(fecha.status).toBe(200);
     expect(fecha.body.elementos.map((fila: { idExpediente: string }) => fila.idExpediente)).toEqual([uuidExpediente(2)]);

@@ -159,7 +159,7 @@ describe('T-BE-RD-07: Atención Resolutiva', () => {
     vi.clearAllMocks();
   });
 
-  function setupMockQueriesAtencion(estado = 'EN_FIRMA', area = 'area-origen-1') {
+  function setupMockQueriesAtencion(estado = 'EN_FIRMA', area = 'area-origen-1', conCuentaActiva = false) {
     mockQuery.mockReset();
     mockQuery.mockResolvedValueOnce({
       rowCount: 1,
@@ -170,6 +170,12 @@ describe('T-BE-RD-07: Atención Resolutiva', () => {
       rows: [{ estado_nuevo: estado, area_actual_id: area }],
     });
     mockQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ id_movimiento: 'mov-atencion-1' }] });
+    mockQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{
+      usuario_id: conCuentaActiva ? 'b3401043-807f-41f3-9de8-a042e4b312d4' : null,
+      correo: conCuentaActiva ? 'ciudadano@iestpsuiza.edu.pe' : null,
+      cut: 'EXP-2026-000001',
+      asunto: 'Solicitud de prueba',
+    }] });
   }
 
   it('1. Debe rechazar la atención si el usuario no está autenticado', async () => {
@@ -190,8 +196,8 @@ describe('T-BE-RD-07: Atención Resolutiva', () => {
     const dto: AtenderExpedienteDTO = { resultado_resumen: 'Resolución Aprobada' };
     await atenderExpediente(mockCliente, mockExpedienteId, dto);
 
-    // Bloqueo, estado actual e INSERT.
-    expect(mockQuery).toHaveBeenCalledTimes(3);
+    // Bloqueo, estado actual, movimiento y resolución del titular de Casilla.
+    expect(mockQuery).toHaveBeenCalledTimes(4);
 
     const queries = mockQuery.mock.calls.map((call) => call[0].toString().toUpperCase());
     expect(queries.some((q) => q.includes('INSERT INTO SIGD_RUT.MOVIMIENTO_TRAMITE'))).toBe(true);
@@ -215,6 +221,24 @@ describe('T-BE-RD-07: Atención Resolutiva', () => {
     await expect(atenderExpediente(mockCliente, mockExpedienteId, dto))
       .rejects.toThrow(ForbiddenError);
     expect(mockQuery).toHaveBeenCalledTimes(2);
+  });
+
+  it('2.2. Encola la respuesta en la Casilla del titular cuando tiene cuenta activa', async () => {
+    vi.mocked(getRequestContext).mockReturnValueOnce(contexto());
+    setupMockQueriesAtencion('EN_FIRMA', 'area-origen-1', true);
+
+    const resultado = await atenderExpediente(mockCliente, mockExpedienteId, {
+      resultado_resumen: 'Resolución aprobada',
+    });
+
+    expect(resultado.notificadoCasilla).toBe(true);
+    expect(insertarEvento).toHaveBeenCalledWith(mockCliente, expect.objectContaining({
+      tipo_evento: 'casilla_notificacion',
+      payload: expect.objectContaining({
+        usuario_id: 'b3401043-807f-41f3-9de8-a042e4b312d4',
+        cut: 'EXP-2026-000001',
+      }),
+    }));
   });
 
   it('3. Cumplimiento WORM: Ningún query debe contener sentencias UPDATE o DELETE', async () => {

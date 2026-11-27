@@ -5,6 +5,7 @@ export interface NodoCcd {
   codigo: string;
   nombre: string;
   tipo: TipoNodoCcd;
+  seccion?: string;
   hijos: readonly NodoCcd[];
 }
 

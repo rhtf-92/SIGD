@@ -7,6 +7,10 @@ vi.mock("../../../src/api/client", () => ({
   apiClient: { get: vi.fn() },
 }));
 
+vi.mock("../../../src/config/env", () => ({
+  env: { enableMocks: false },
+}));
+
 import { apiClient } from "../../../src/api/client";
 import { useExpedienteTimeline } from "../../../src/hooks/useExpedienteTimeline";
 

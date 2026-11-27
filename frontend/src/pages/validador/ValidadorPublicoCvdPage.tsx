@@ -4,7 +4,7 @@
  * Máscara guiada CVD-YYYY-RD-XXXXXX-XXXX, escaneo QR con cámara web,
  * carga de PDF y dictamen formal CvdIntegrityReport (D.S. N° 070-2013-PCM).
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import CvdIntegrityReport from "../../components/cvd/CvdIntegrityReport";
@@ -34,15 +34,15 @@ export default function ValidadorPublicoCvdPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const escaneoRef = useRef<number | null>(null);
 
-  const detenerCamara = () => {
+  const detenerCamara = useCallback(() => {
     if (escaneoRef.current) cancelAnimationFrame(escaneoRef.current);
     escaneoRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setCamaraActiva(false);
-  };
+  }, []);
 
-  useEffect(() => () => detenerCamara(), []);
+  useEffect(() => () => detenerCamara(), [detenerCamara]);
 
   const verificarCodigo = (valor?: string) => {
     const crudo = (valor ?? codigo).trim().toUpperCase();
@@ -151,7 +151,7 @@ export default function ValidadorPublicoCvdPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
+    <main className="min-h-screen bg-transparent text-slate-900">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-4xl px-6 py-5">
           <Link

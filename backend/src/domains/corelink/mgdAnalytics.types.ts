@@ -88,6 +88,8 @@ export interface ResumenKpisMgd {
   contadores: ContadoresMgd;
   /** Instante del último refresco de la vista materializada consultada. */
   actualizadoEn: string | null;
+  /** Unidad orgánica aplicada en la consulta; `null` significa consolidado. */
+  unidadOrganicaId: string | null;
 }
 
 /** Punto mensual de la serie de tendencias (#52). */

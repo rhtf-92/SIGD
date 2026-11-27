@@ -10,10 +10,12 @@ import { ConsentimientoLey29733Modal } from "./ConsentimientoLey29733Modal";
 
 interface PersonaNaturalFormProps {
   onSubmit: (data: Natural) => void | Promise<void>;
+  onChange?: () => void;
 }
 
 export default function PersonaNaturalForm({
   onSubmit,
+  onChange,
 }: PersonaNaturalFormProps) {
   const [isConsentimientoModalOpen, setIsConsentimientoModalOpen] =
     useState(false);
@@ -26,6 +28,8 @@ export default function PersonaNaturalForm({
     formState: { errors, isSubmitting },
   } = useForm<Natural>({
     resolver: zodResolver(naturalSchema),
+    mode: "onChange",
+    reValidateMode: "onChange",
     defaultValues: {
       tipoPersona: "NATURAL",
       nombres: "",
@@ -78,6 +82,7 @@ export default function PersonaNaturalForm({
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
+      onChange={onChange}
       className="registration-form space-y-6"
       noValidate
     >

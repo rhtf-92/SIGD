@@ -18,7 +18,8 @@ export class ServicioFoliacionRutaDoc {
       const metadata = await this.metadata.obtenerMetadataDocumento(folio.idDocumento);
       return { ...folio, nombre: metadata.nombre ?? null, tipo: metadata.tipo ?? null,
         rango: `F. ${String(folio.folioInicio).padStart(4, '0')} a F. ${String(folio.folioFin).padStart(4, '0')}`,
-        checksumSha256: metadata.checksumSha256 ?? null };
+        checksumSha256: metadata.checksumSha256 ?? null,
+        urlOriginal: metadata.urlOriginal ?? null };
     }));
   }
 }

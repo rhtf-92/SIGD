@@ -58,6 +58,7 @@ describe("ConsultaPublicaPage", () => {
     );
     expect(get).toHaveBeenCalledWith(
       "/api/v1/tramites/consulta-publica/EXP-2026-000006",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(screen.getByText("EXP-2026-000006")).toBeInTheDocument();
     expect(screen.getByText("Certificado de estudios")).toBeInTheDocument();

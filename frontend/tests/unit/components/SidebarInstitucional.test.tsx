@@ -115,4 +115,29 @@ describe("SidebarInstitucional — Menú Lateral Persistente SIGD", () => {
     expect(useAuthStore.getState().accessToken).toBeNull();
     expect(mockNavigate).toHaveBeenCalledWith("/login", { replace: true });
   });
+
+  test.each([
+    ["DIRECTOR", /Flujo y Firma Digital/i, /Panel de Administración/i],
+    ["DOCENTE", /Bandeja de Expedientes/i, /Mesa de Partes Virtual/i],
+    ["MESA_PARTES", /Mesa de Partes Virtual/i, /Casilla Electrónica/i],
+    ["ESTUDIANTE", /Casilla Electrónica/i, /Bandeja de Expedientes/i],
+  ])("muestra solo módulos asignados al rol %s", (rol, moduloVisible, moduloOculto) => {
+    useAuthStore.setState({
+      accessToken: "mock-token",
+      usuario: {
+        id: "usuario-rol",
+        nombreCompleto: "Usuario de prueba",
+        correo: "usuario@iestpsuiza.edu.pe",
+        rol: rol as "DIRECTOR" | "DOCENTE" | "MESA_PARTES" | "ESTUDIANTE",
+      },
+      isAuthenticated: true,
+    });
+    window.localStorage.setItem("sigd_token", "mock-token");
+    window.localStorage.setItem("sigd_rol", rol);
+
+    renderSidebar();
+
+    expect(screen.getByRole("link", { name: moduloVisible })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: moduloOculto })).not.toBeInTheDocument();
+  });
 });

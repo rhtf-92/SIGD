@@ -94,15 +94,15 @@ describe("Suite de Pruebas Unitarias de SLA y Días Hábiles LPAG Ley 27444 (ENT
       expect(sla.mensajeExplicativo).toContain("En plazo ordinario");
     });
 
-    it("estado ALERTA: expediente con 20 días hábiles transcurridos (quedan 10)", () => {
+    it("estado ALERTA: expediente con 24 días hábiles transcurridos (quedan 6)", () => {
       const inicio = new Date(2026, 5, 1);
-      const hoy = addBusinessDays(inicio, 20);
+      const hoy = addBusinessDays(inicio, 24);
 
       const sla = calculateSlaStatus(inicio, hoy, 30);
       expect(sla.estado).toBe("ALERTA");
       expect(sla.estaVencido).toBe(false);
-      expect(sla.diasHabilesConsumidos).toBe(20);
-      expect(sla.diasHabilesRestantes).toBe(10);
+      expect(sla.diasHabilesConsumidos).toBe(24);
+      expect(sla.diasHabilesRestantes).toBe(6);
       expect(sla.mensajeExplicativo).toContain("Atención preventiva");
     });
 

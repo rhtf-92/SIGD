@@ -14,48 +14,48 @@ interface KpiCardProps {
 
 const COLOR_STYLES = {
   blue: {
-    border: "border-blue-500/30 hover:border-blue-400/50",
-    glow: "shadow-[0_0_20px_rgba(37,99,235,0.1)]",
-    iconBg: "bg-blue-500/15 border-blue-400/30 text-blue-400",
-    valueText: "text-blue-100",
+    border: "border-blue-100 hover:border-blue-300",
+    glow: "shadow-sm hover:shadow-md",
+    iconBg: "bg-blue-50 border-blue-100 text-blue-700",
+    valueText: "text-blue-800",
   },
   cyan: {
-    border: "border-cyan-500/30 hover:border-cyan-400/50",
-    glow: "shadow-[0_0_20px_rgba(6,182,212,0.1)]",
-    iconBg: "bg-cyan-500/15 border-cyan-400/30 text-cyan-400",
-    valueText: "text-cyan-100",
+    border: "border-cyan-100 hover:border-cyan-300",
+    glow: "shadow-sm hover:shadow-md",
+    iconBg: "bg-cyan-50 border-cyan-100 text-cyan-700",
+    valueText: "text-cyan-800",
   },
   gold: {
-    border: "border-amber-500/30 hover:border-amber-400/50",
-    glow: "shadow-[0_0_20px_rgba(245,158,11,0.1)]",
-    iconBg: "bg-amber-500/15 border-amber-400/30 text-amber-400",
-    valueText: "text-amber-100",
+    border: "border-amber-100 hover:border-amber-300",
+    glow: "shadow-sm hover:shadow-md",
+    iconBg: "bg-amber-50 border-amber-100 text-amber-700",
+    valueText: "text-amber-800",
   },
   emerald: {
-    border: "border-emerald-500/30 hover:border-emerald-400/50",
-    glow: "shadow-[0_0_20px_rgba(16,185,129,0.1)]",
-    iconBg: "bg-emerald-500/15 border-emerald-400/30 text-emerald-400",
-    valueText: "text-emerald-100",
+    border: "border-emerald-100 hover:border-emerald-300",
+    glow: "shadow-sm hover:shadow-md",
+    iconBg: "bg-emerald-50 border-emerald-100 text-emerald-700",
+    valueText: "text-emerald-800",
   },
   purple: {
-    border: "border-purple-500/30 hover:border-purple-400/50",
-    glow: "shadow-[0_0_20px_rgba(168,85,247,0.1)]",
-    iconBg: "bg-purple-500/15 border-purple-400/30 text-purple-400",
-    valueText: "text-purple-100",
+    border: "border-purple-100 hover:border-purple-300",
+    glow: "shadow-sm hover:shadow-md",
+    iconBg: "bg-purple-50 border-purple-100 text-purple-700",
+    valueText: "text-purple-800",
   },
   rose: {
-    border: "border-rose-500/30 hover:border-rose-400/50",
-    glow: "shadow-[0_0_20px_rgba(244,63,94,0.1)]",
-    iconBg: "bg-rose-500/15 border-rose-400/30 text-rose-400",
-    valueText: "text-rose-100",
+    border: "border-rose-100 hover:border-rose-300",
+    glow: "shadow-sm hover:shadow-md",
+    iconBg: "bg-rose-50 border-rose-100 text-rose-700",
+    valueText: "text-rose-800",
   },
 };
 
 const BADGE_STYLES = {
-  positive: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-  warning: "bg-amber-500/15 text-amber-300 border-amber-500/30",
-  neutral: "bg-slate-700/30 text-slate-300 border-slate-600/30",
-  danger: "bg-rose-500/15 text-rose-300 border-rose-500/30",
+  positive: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  warning: "bg-amber-50 text-amber-700 border-amber-200",
+  neutral: "bg-slate-100 text-slate-600 border-slate-200",
+  danger: "bg-rose-50 text-rose-700 border-rose-200",
 };
 
 export default function KpiCard({
@@ -70,20 +70,20 @@ export default function KpiCard({
 
   return (
     <article
-      className={`relative overflow-hidden rounded-2xl bg-slate-900/60 p-5 backdrop-blur-xl border ${styles.border} ${styles.glow} transition-all duration-300 hover:-translate-y-0.5 hover:bg-slate-900/80`}
+      className={`relative overflow-hidden rounded-2xl border bg-white p-5 ${styles.border} ${styles.glow} transition-all duration-300 hover:-translate-y-0.5`}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-semibold tracking-wider uppercase text-slate-400">
+          <p className="truncate text-xs font-semibold tracking-wider uppercase text-slate-500">
             {title}
           </p>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${styles.valueText}`}>
+            <span className={`text-lg sm:text-xl font-extrabold tracking-tight ${styles.valueText}`}>
               {value}
             </span>
             {badge && (
               <span
-                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-semibold ${
                   BADGE_STYLES[badge.variant ?? "neutral"]
                 }`}
               >
@@ -92,14 +92,14 @@ export default function KpiCard({
             )}
           </div>
           {subtitle && (
-            <p className="mt-1.5 truncate text-xs text-slate-400">{subtitle}</p>
+            <p className="mt-1.5 truncate text-xs text-slate-500">{subtitle}</p>
           )}
         </div>
 
         <div
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border backdrop-blur-md ${styles.iconBg} shadow-inner`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border backdrop-blur-md ${styles.iconBg} shadow-inner`}
         >
-          <Icon className="h-6 w-6 drop-shadow-[0_0_8px_currentColor]" />
+          <Icon className="h-6 w-6" />
         </div>
       </div>
     </article>

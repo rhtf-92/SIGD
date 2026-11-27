@@ -167,7 +167,7 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
     expect(within(dialogo).getByLabelText(/correo institucional/i)).toHaveValue(
       "jperez@iestpsuiza.edu.pe",
     );
-    expect(within(dialogo).getByLabelText(/cargo institucional/i)).toHaveValue(
+    expect(within(dialogo).getByLabelText(/^cargo$/i)).toHaveValue(
       "Asistente Administrativo",
     );
   });
@@ -181,9 +181,9 @@ describe("UsuariosPage — ENT-M05-02 / T-FE-ADM-04 (filtrado y edición de usua
     await usuario.click(within(fila as HTMLElement).getByRole("button", { name: "Administrar" }));
 
     const dialogo = await screen.findByRole("dialog");
-    await usuario.clear(within(dialogo).getByLabelText(/cargo institucional/i));
+    await usuario.clear(within(dialogo).getByLabelText(/^cargo$/i));
     await usuario.type(
-      within(dialogo).getByLabelText(/cargo institucional/i),
+      within(dialogo).getByLabelText(/^cargo$/i),
       "Jefe de Mesa de Partes",
     );
     await usuario.click(within(dialogo).getByRole("button", { name: "Guardar cambios" }));

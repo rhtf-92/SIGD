@@ -21,7 +21,7 @@ interface RespuestaValidadorApi {
   valido?: boolean;
   cvd?: string;
   selloTiempoTsa?: string | null;
-  fecha_sello_tsa?: string;
+  fecha_sello_tsa?: string | null;
   documento?: DocumentoValidacionCvd | null;
   firmante?: string;
   sha256_firmado?: string;

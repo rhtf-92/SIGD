@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="30" y1="24" x2="610" y2="350" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DBEAFE"/>
+      <stop offset="1" stop-color="#EFF6FF"/>
+    </linearGradient>
+    <linearGradient id="shirt" x1="260" y1="220" x2="408" y2="352" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#bg)" d="M0 0h640v360H0z"/>
+  <circle cx="522" cy="72" r="34" fill="#BFDBFE"/>
+  <path d="M0 286c80-33 150-21 221 3 97 33 187 35 419-17v88H0v-74Z" fill="#BFDBFE"/>
+  <path d="M64 65h162v137H64z" fill="#fff" fill-opacity=".72"/>
+  <path d="M78 80h134v107H78z" fill="#BAE6FD"/>
+  <path d="M145 80v107M78 133h134" stroke="#fff" stroke-width="7"/>
+  <path d="M64 203h162" stroke="#64748B" stroke-linecap="round" stroke-width="8"/>
+  <path d="M254 173c0-36 29-65 65-65s65 29 65 65v23H254v-23Z" fill="#7C4A2D"/>
+  <path d="M267 153c10-35 76-43 102-8-20-4-39-15-51-26-8 17-28 29-51 34Z" fill="#5B341F"/>
+  <path d="M264 172c0-30 24-54 54-54s54 24 54 54v22H264v-22Z" fill="#F2C6A8"/>
+  <path d="M255 207c8-20 27-32 48-32h31c22 0 42 13 49 34l22 91H232l23-93Z" fill="url(#shirt)"/>
+  <path d="M303 179h29l-14 29-15-29Z" fill="#fff"/>
+  <path d="m318 207 14 24-14 48-14-48 14-24Z" fill="#DBEAFE"/>
+  <rect x="390" y="188" width="146" height="104" rx="12" fill="#fff" stroke="#CBD5E1" stroke-width="4" transform="rotate(-7 390 188)"/>
+  <path d="m414 223 15-2m-13 21 35-5m-32 24 29-4" stroke="#94A3B8" stroke-linecap="round" stroke-width="6"/>
+  <circle cx="428" cy="213" r="9" fill="#22C55E"/>
+  <path d="m424 213 3 3 6-7" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"/>
+</svg>

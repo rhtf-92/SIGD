@@ -9,11 +9,10 @@ interface FilaBandeja {
   fecha_radicacion: Date;
   estado_actual: EstadoRutaDoc;
   area_actual_id: string | null;
-}
-
-interface FilaBandejaConContadores {
-  elementos: Array<Omit<FilaBandeja, 'fecha_radicacion'> & { fecha_radicacion: string }>;
-  contadores: ContadoresRutaDoc;
+  solicitante_nombre: string | null;
+  total_folios: number;
+  codigo_serie: string | null;
+  nombre_serie: string | null;
 }
 
 interface FilaDetalle extends FilaBandeja {
@@ -42,26 +41,35 @@ export interface RepositorioRutaDoc {
 const BASE = `
   FROM sigd_tra.expediente e
   JOIN sigd_tra.tramite t ON t.expediente_id = e.expediente_id
+  LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = e.solicitante_id
+  LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = e.solicitante_id
+  LEFT JOIN sigd_rut.expediente_clasificacion_ccd ccd ON ccd.expediente_id = e.expediente_id
   LEFT JOIN sigd_rut.estado_actual_expediente ultimo
     ON ultimo.expediente_id = e.expediente_id`;
 
 const FILTROS = `
-  WHERE ($1::text IS NULL OR position(lower($1::text) in lower(e.codigo_expediente || ' ' || t.asunto)) > 0)
-    AND ($2::uuid IS NULL OR ultimo.area_actual_id = $2::uuid)
+  WHERE ($1::text IS NULL OR position(lower($1::text) in lower(e.codigo_expediente || ' ' || t.asunto || ' ' || COALESCE(pn.nombre_completo, pj.razon_social, ''))) > 0)
+    AND ($2::uuid IS NULL OR COALESCE(ultimo.area_actual_id, e.area_destino_id) = $2::uuid)
     AND ($3::date IS NULL OR e.fecha_radicacion >= ($3::date::timestamp AT TIME ZONE 'UTC'))
-    AND ($4::date IS NULL OR e.fecha_radicacion < (($4::date + 1)::timestamp AT TIME ZONE 'UTC'))`;
+    AND ($4::date IS NULL OR e.fecha_radicacion < (($4::date + 1)::timestamp AT TIME ZONE 'UTC'))
+    AND ($5::text IS NULL OR ccd.codigo_serie = $5::text)`;
 
 export const SQL_LISTAR_RUTADOC = `
-  SELECT e.expediente_id::text AS id_expediente, e.codigo_expediente AS cut, t.asunto,
+    SELECT e.expediente_id::text AS id_expediente, e.codigo_expediente AS cut, t.asunto,
          e.fecha_radicacion AS fecha_radicacion,
          COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
-         ultimo.area_actual_id
+      COALESCE(ultimo.area_actual_id, e.area_destino_id)::text AS area_actual_id,
+      COALESCE(pn.nombre_completo, pj.razon_social) AS solicitante_nombre,
+      COALESCE((SELECT sum(f.folio_fin - f.folio_inicio + 1)::integer
+        FROM sigd_tra.expediente_documento_folio f
+            WHERE f.expediente_id = e.expediente_id), 0)::integer AS total_folios,
+      ccd.codigo_serie, ccd.nombre_serie
   ${BASE} ${FILTROS}
-    AND COALESCE(ultimo.estado_nuevo, 'REGISTRADO') = ANY($5::text[])
-    AND ($6::timestamptz IS NULL OR
-         (e.fecha_radicacion, e.expediente_id) < ($6::timestamptz, $7::uuid))
+    AND COALESCE(ultimo.estado_nuevo, 'REGISTRADO') = ANY($6::text[])
+    AND ($7::timestamptz IS NULL OR
+         (e.fecha_radicacion, e.expediente_id) < ($7::timestamptz, $8::uuid))
   ORDER BY e.fecha_radicacion DESC, e.expediente_id DESC
-  LIMIT $8`;
+  LIMIT $9`;
 
 const COLUMNAS_CONTEO = `
   count(*) FILTER (WHERE ultimo.estado_nuevo IS NULL OR ultimo.estado_nuevo = 'REGISTRADO')::integer AS "REGISTRADO",
@@ -81,43 +89,29 @@ export const SQL_CONTADORES_RUTADOC = `SELECT ${COLUMNAS_CONTEO} ${BASE} ${FILTR
 export const SQL_CONTADORES_SIN_TERMINO_RUTADOC = `
   SELECT ${COLUMNAS_CONTEO}
   FROM sigd_tra.expediente e
+  LEFT JOIN sigd_rut.expediente_clasificacion_ccd ccd ON ccd.expediente_id = e.expediente_id
   LEFT JOIN sigd_rut.estado_actual_expediente ultimo ON ultimo.expediente_id = e.expediente_id
   WHERE $1::text IS NULL
-    AND ($2::uuid IS NULL OR ultimo.area_actual_id = $2::uuid)
+    AND ($2::uuid IS NULL OR COALESCE(ultimo.area_actual_id, e.area_destino_id) = $2::uuid)
     AND ($3::date IS NULL OR e.fecha_radicacion >= ($3::date::timestamp AT TIME ZONE 'UTC'))
-    AND ($4::date IS NULL OR e.fecha_radicacion < (($4::date + 1)::timestamp AT TIME ZONE 'UTC'))`;
+    AND ($4::date IS NULL OR e.fecha_radicacion < (($4::date + 1)::timestamp AT TIME ZONE 'UTC'))
+    AND ($5::text IS NULL OR ccd.codigo_serie = $5::text)`;
 
-/** Seis contadores exactos mantenidos por triggers transaccionales en ambos
- * lados del contrato expediente/proyección. La lectura no toca las tablas base.
- */
 export const SQL_CONTADORES_LOCALES_RUTADOC = `
   SELECT pestana, cantidad::integer AS total
   FROM sigd_rut.contador_pestana_local`;
 
-/** Una sentencia da snapshot único a la página y a las seis filas transaccionales. */
 export const SQL_BANDEJA_LOCAL_RUTADOC = `
-  WITH elementos AS MATERIALIZED (${SQL_LISTAR_RUTADOC})
+  WITH elementos AS MATERIALIZED (${SQL_LISTAR_RUTADOC}),
+  conteos AS (${SQL_CONTADORES_SIN_TERMINO_RUTADOC})
   SELECT COALESCE((SELECT jsonb_agg(to_jsonb(p) ORDER BY p.fecha_radicacion DESC,
                         p.id_expediente DESC) FROM elementos p), '[]'::jsonb) AS elementos,
-         CASE WHEN EXISTS (
-           SELECT 1 FROM pg_catalog.pg_trigger
-            WHERE tgrelid = to_regclass('sigd_tra.expediente')
-              AND tgname = 'tr_rutadoc_contador_expediente'
-              AND tgenabled IN ('O', 'A')
-         ) AND EXISTS (
-           SELECT 1 FROM pg_catalog.pg_trigger
-            WHERE tgrelid = to_regclass('sigd_rut.estado_actual_expediente')
-              AND tgname = 'tr_contador_pestana_local'
-              AND tgenabled IN ('O', 'A')
-         ) THEN (SELECT jsonb_object_agg(pestana, cantidad::integer)
-                   FROM sigd_rut.contador_pestana_local)
-           ELSE (SELECT jsonb_build_object(
-             'PENDIENTES', q."REGISTRADO" + q."RECEPCIONADO" + q."EN_CALIFICACION",
-             'EN_TRAMITE', q."EN_REVISION" + q."OBSERVADO" + q."SUBSANADO",
-             'DERIVADOS', q."DERIVADO", 'POR_FIRMAR', q."EN_FIRMA",
-             'ATENDIDOS', q."RESUELTO", 'ARCHIVADOS', q."ARCHIVADO")
-             FROM (${SQL_CONTADORES_SIN_TERMINO_RUTADOC}) q)
-         END AS contadores`;
+         (SELECT jsonb_build_object(
+           'PENDIENTES', q."REGISTRADO" + q."RECEPCIONADO" + q."EN_CALIFICACION",
+           'EN_TRAMITE', q."EN_REVISION" + q."OBSERVADO" + q."SUBSANADO",
+           'DERIVADOS', q."DERIVADO", 'POR_FIRMAR', q."EN_FIRMA",
+           'ATENDIDOS', q."RESUELTO", 'ARCHIVADOS', q."ARCHIVADO")
+          FROM conteos q) AS contadores`;
 
 function mapearResumen(fila: FilaBandeja): ExpedienteResumen {
   return {
@@ -127,6 +121,10 @@ function mapearResumen(fila: FilaBandeja): ExpedienteResumen {
     fechaRadicacion: new Date(fila.fecha_radicacion).toISOString(),
     estadoActual: fila.estado_actual,
     areaActualId: fila.area_actual_id,
+    solicitanteNombre: fila.solicitante_nombre,
+    totalFolios: Number(fila.total_folios ?? 0),
+    codigoSerie: fila.codigo_serie,
+    nombreSerie: fila.nombre_serie,
   };
 }
 
@@ -135,18 +133,9 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
 
   async listar(filtros: FiltrosRutaDoc, estados: readonly EstadoRutaDoc[], posicion: PosicionCursor | null) {
     const comunes = [filtros.terminoBusqueda ?? null, filtros.areaId ?? null,
-      filtros.fechaDesde ?? null, filtros.fechaHasta ?? null];
+      filtros.fechaDesde ?? null, filtros.fechaHasta ?? null, filtros.codigoSerie ?? null];
     const parametros = [...comunes, [...estados], posicion?.fechaRadicacion ?? null,
       posicion?.idExpediente ?? null, filtros.limite + 1];
-    const sinFiltros = !filtros.terminoBusqueda && !filtros.areaId &&
-      !filtros.fechaDesde && !filtros.fechaHasta;
-    if (sinFiltros) {
-      const consulta = await this.pool.query<FilaBandejaConContadores>(SQL_BANDEJA_LOCAL_RUTADOC, parametros);
-      const fila = consulta.rows[0];
-      return { elementos: fila.elementos.map((elemento) => mapearResumen({
-        ...elemento, fecha_radicacion: new Date(elemento.fecha_radicacion),
-      })), porEstado: {}, porPestana: fila.contadores };
-    }
     const cliente = await this.pool.connect();
     try {
       await cliente.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
@@ -171,7 +160,12 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
       SELECT e.expediente_id::text AS id_expediente, e.codigo_expediente AS cut, t.asunto,
              e.fecha_radicacion AS fecha_radicacion,
              COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
-             ultimo.area_actual_id,
+             COALESCE(ultimo.area_actual_id, e.area_destino_id)::text AS area_actual_id,
+              COALESCE(pn.nombre_completo, pj.razon_social) AS solicitante_nombre,
+              COALESCE((SELECT sum(f.folio_fin - f.folio_inicio + 1)::integer
+                FROM sigd_tra.expediente_documento_folio f
+               WHERE f.expediente_id = e.expediente_id), 0)::integer AS total_folios,
+               ccd.codigo_serie, ccd.nombre_serie,
              e.solicitante_id::text AS solicitante_id,
              ultimo.id_movimiento::text, ultimo.evento, ultimo.fecha_hora,
              ultimo.usuario_operador_id::text

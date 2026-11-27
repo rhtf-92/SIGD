@@ -43,6 +43,7 @@ export function crearRouterReportes(
   router.get('/reportes/dashboard-ejecutivo', controlador.resumen);
   router.get('/reportes/tiempos-atencion', controlador.tiemposAtencion);
   router.get('/reportes/vistas-materializadas/refresh', controlador.refrescar);
+  router.post('/reportes/vistas-materializadas/refresh', controlador.refrescar);
 
   return router;
 }

@@ -1,5 +1,68 @@
 @import "tailwindcss";
 
+.bandeja-expedientes-page {
+  background-image:
+    linear-gradient(rgba(248, 250, 252, 0.68), rgba(248, 250, 252, 0.78)),
+    url("/bandeja-tech-background.png");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+.bandeja-expedientes-page > section {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(203, 213, 225, 0.9);
+  backdrop-filter: blur(3px);
+}
+
+.validador-cvd-background {
+  background-color: #f8fafc;
+  background-image:
+    linear-gradient(rgba(248, 250, 252, 0.68), rgba(248, 250, 252, 0.78)),
+    url("/bandeja-tech-background.png");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+.mesa-partes-layout {
+  background-color: #f8fafc;
+  background-image:
+    linear-gradient(rgba(248, 250, 252, 0.68), rgba(248, 250, 252, 0.78)),
+    url("/bandeja-tech-background.png");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+.centro-control-documental-page {
+  background-image:
+    linear-gradient(rgba(248, 250, 252, 0.68), rgba(248, 250, 252, 0.78)),
+    url("/bandeja-tech-background.png");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+.centro-control-documental-page > section {
+  background: transparent;
+}
+
+.admin-layout-sigd {
+  background-color: #f8fafc;
+  background-image:
+    linear-gradient(rgba(248, 250, 252, 0.68), rgba(248, 250, 252, 0.78)),
+    url("/bandeja-tech-background.png");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
 @keyframes sigd-dashboard-enter {
   from {
     opacity: 0;
@@ -99,46 +162,71 @@
   animation-delay: 135ms;
 }
 
+.registration-form label {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.registration-form label span,
+.registration-form button[type="button"] {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.registration-form input:not([type="checkbox"]),
+.registration-form select,
+.registration-form textarea {
+  min-height: 3rem;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.registration-form p.text-xs {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
 .registration-form > :nth-child(5) {
   animation-delay: 180ms;
 }
 
 .registration-form label:not(.flex) {
-  color: #1e3a8a;
+  color: #334155;
   font-weight: 600;
 }
 
 .registration-form input:not([type="checkbox"]),
 .registration-form select {
   min-height: 44px;
-  border-color: #c4b5fd;
+  border-color: #cbd5e1;
   border-radius: 0.65rem;
-  background-color: #f5f3ff;
-  color: #1e40af;
+  background-color: #fff;
+  color: #0f172a;
   transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
 
 .registration-form input:not([type="checkbox"])::placeholder {
-  color: #6481b8;
+  color: #94a3b8;
   opacity: 1;
 }
 
 .registration-form label.flex,
 .registration-form label.flex span {
-  color: #1e3a8a;
+  color: #334155;
 }
 
 .registration-form input:not([type="checkbox"]):hover,
 .registration-form select:not(:disabled):hover {
-  border-color: #a78bfa;
-  background-color: #ede9fe;
+  border-color: #93c5fd;
+  background-color: #fff;
 }
 
 .registration-form input:not([type="checkbox"]):focus,
 .registration-form select:focus {
-  border-color: #7c3aed;
-  background-color: #faf5ff;
-  box-shadow: 0 0 0 3px rgb(124 58 237 / 18%);
+  border-color: #2563eb;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 14%);
 }
 
 .registration-form input[type="checkbox"] {
@@ -161,9 +249,9 @@
 }
 
 .registration-location {
-  border-color: #c4b5fd;
-  background: linear-gradient(135deg, #f5f3ff 0%, #faf5ff 58%, #f3e8ff 100%);
-  box-shadow: 0 8px 24px rgb(109 40 217 / 8%);
+  border-color: #bfdbfe;
+  background: linear-gradient(135deg, #fff 0%, #f8fbff 58%, #eff6ff 100%);
+  box-shadow: 0 8px 24px rgb(37 99 235 / 7%);
 }
 
 .registration-location h3 {
@@ -175,8 +263,8 @@
 }
 
 .registration-location > div:first-child > span {
-  border: 1px solid #c4b5fd;
-  background-color: #ede9fe;
+  border: 1px solid #bfdbfe;
+  background-color: #eff6ff;
   color: #1d4ed8;
 }
 
@@ -207,5 +295,45 @@
   .registration-panel-enter,
   .registration-form > * {
     animation: none;
+  }
+}
+
+/* ============================================================
+   LÁMPARA INTERACTIVA — Keyframes
+   Usados por LoginFormCardLampara
+============================================================ */
+
+@keyframes lampRopeSwing {
+  0%   { transform: rotate(0deg); }
+  20%  { transform: rotate(18deg); }
+  45%  { transform: rotate(-10deg); }
+  65%  { transform: rotate(6deg); }
+  80%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes lampKnobPulse {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(0.80); }
+  70%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+@keyframes lampCardEnter {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes lampLampEnter {
+  from { opacity: 0; transform: translateY(-16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [style*="lampRopeSwing"],
+  [style*="lampKnobPulse"],
+  [style*="lampCardEnter"],
+  [style*="lampLampEnter"] {
+    animation: none !important;
   }
 }

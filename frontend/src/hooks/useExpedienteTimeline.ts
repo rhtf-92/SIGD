@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { apiClient } from "../api/client";
+import { env } from "../config/env";
 import { BITACORA_FIXTURE } from "../data/expedientesFixtures";
 import type {
   BitacoraEventoExpediente,
@@ -9,7 +10,7 @@ import type {
 
 const RETARDO_MOCK_MS = 300;
 
-const usarMocks = import.meta.env.VITE_ENABLE_MOCKS === "true";
+const usarMocks = env.enableMocks;
 
 interface ActuacionApi {
   movimientoId?: string;
@@ -112,7 +113,8 @@ export function useExpedienteTimeline(expedienteId: string | undefined) {
           : obtenerTimelineApi(expedienteId)
         : Promise.resolve([]),
     enabled: Boolean(expedienteId),
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchInterval: 15_000,
     select: (eventos) =>
       [...eventos].sort(
         (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),

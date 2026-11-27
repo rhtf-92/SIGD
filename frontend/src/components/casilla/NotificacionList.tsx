@@ -545,6 +545,11 @@ export default function NotificationList({
                     >
                       Ver detalle
                       <span aria-hidden="true">→</span>
+                      <span className="sr-only">
+                        {notif.estado === "NO_LEIDO" && "No Leído"}
+                        {notif.estado === "LEIDO" && "Leído"}
+                        {notif.estado === "NOTIFICADO" && "Notificado (Con Acuse)"}
+                      </span>
                     </button>
                   </td>
                 </tr>

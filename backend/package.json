@@ -24,6 +24,7 @@
     "worker:outbox": "tsx src/audit/worker/outbox-worker.ts",
     "migrate": "tsx src/db/migrate-cli.ts",
     "seed:demo-director": "tsx tools/seed-demo-director.ts",
+    "diagnostico:reportes": "tsx src/db/diagnostico-reportes.ts",
     "smoke:conmutation": "tsx tests/smoke_conmutation_test.ts"
   },
   "dependencies": {
