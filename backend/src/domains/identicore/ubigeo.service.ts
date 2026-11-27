@@ -34,6 +34,48 @@ const esquemaCatalogo = z.array(z.object({
   }
 });
 
+const CATALOGO_UCAYALI: ProvinciaUcayali[] = [
+  {
+    codigo: '2501',
+    nombre: 'CORONEL PORTILLO',
+    distritos: [
+      { codigo: '250101', nombre: 'CALLERIA' },
+      { codigo: '250102', nombre: 'CAMPOVERDE' },
+      { codigo: '250103', nombre: 'IPARIA' },
+      { codigo: '250104', nombre: 'MASISEA' },
+      { codigo: '250105', nombre: 'YARINACOCHA' },
+      { codigo: '250106', nombre: 'NUEVA REQUENA' },
+      { codigo: '250107', nombre: 'MANANTAY' },
+    ],
+  },
+  {
+    codigo: '2502',
+    nombre: 'ATALAYA',
+    distritos: [
+      { codigo: '250201', nombre: 'RAIMONDI' },
+      { codigo: '250202', nombre: 'SEPAHUA' },
+      { codigo: '250203', nombre: 'TAHUANIA' },
+      { codigo: '250204', nombre: 'YURUA' },
+    ],
+  },
+  {
+    codigo: '2503',
+    nombre: 'PADRE ABAD',
+    distritos: [
+      { codigo: '250301', nombre: 'PADRE ABAD' },
+      { codigo: '250302', nombre: 'IRAZOLA' },
+      { codigo: '250303', nombre: 'CURIMANA' },
+      { codigo: '250304', nombre: 'NESHUYA' },
+      { codigo: '250305', nombre: 'ALEXANDER VON HUMBOLDT' },
+    ],
+  },
+  {
+    codigo: '2504',
+    nombre: 'PURUS',
+    distritos: [{ codigo: '250401', nombre: 'PURUS' }],
+  },
+];
+
 export class UbigeoService {
   private cacheLocal: { venceEn: number; datos: ProvinciaUcayali[] } | null = null;
 
@@ -74,38 +116,44 @@ export class UbigeoService {
       }
     }
 
-    const resultado = await this.pool.query<{
-      provincia_codigo: string;
-      provincia_nombre: string;
-      distrito_codigo: string | null;
-      distrito_nombre: string | null;
-    }>(
-      `SELECT p.codigo AS provincia_codigo,
-              p.nombre AS provincia_nombre,
-              d.codigo AS distrito_codigo,
-              d.nombre AS distrito_nombre
-         FROM sigd_auth.provincia_ubigeo p
-         LEFT JOIN sigd_auth.distrito_ubigeo d ON d.provincia_codigo = p.codigo
-        WHERE p.codigo LIKE '25%'
-        ORDER BY p.codigo, d.codigo`,
-    );
     const provincias = new Map<string, ProvinciaUcayali>();
-    for (const fila of resultado.rows) {
-      let provincia = provincias.get(fila.provincia_codigo);
-      if (!provincia) {
-        provincia = {
-          codigo: fila.provincia_codigo,
-          nombre: fila.provincia_nombre,
-          distritos: [],
-        };
-        provincias.set(fila.provincia_codigo, provincia);
+    try {
+      const resultado = await this.pool.query<{
+        provincia_codigo: string;
+        provincia_nombre: string;
+        distrito_codigo: string | null;
+        distrito_nombre: string | null;
+      }>(
+        `SELECT p.codigo AS provincia_codigo,
+                p.nombre AS provincia_nombre,
+                d.codigo AS distrito_codigo,
+                d.nombre AS distrito_nombre
+           FROM sigd_auth.provincia_ubigeo p
+           LEFT JOIN sigd_auth.distrito_ubigeo d ON d.provincia_codigo = p.codigo
+          WHERE p.codigo LIKE '25%'
+          ORDER BY p.codigo, d.codigo`,
+      );
+      for (const fila of resultado.rows) {
+        let provincia = provincias.get(fila.provincia_codigo);
+        if (!provincia) {
+          provincia = {
+            codigo: fila.provincia_codigo,
+            nombre: fila.provincia_nombre,
+            distritos: [],
+          };
+          provincias.set(fila.provincia_codigo, provincia);
+        }
+        if (fila.distrito_codigo && fila.distrito_nombre) {
+          provincia.distritos.push({ codigo: fila.distrito_codigo, nombre: fila.distrito_nombre });
+        }
       }
-      if (fila.distrito_codigo && fila.distrito_nombre) {
-        provincia.distritos.push({ codigo: fila.distrito_codigo, nombre: fila.distrito_nombre });
-      }
+    } catch {
+      return this.guardarEnCache(structuredClone(CATALOGO_UCAYALI));
     }
 
-    const datos = esquemaCatalogo.parse([...provincias.values()]);
+    const datos = esquemaCatalogo.parse(
+      provincias.size > 0 ? [...provincias.values()] : structuredClone(CATALOGO_UCAYALI),
+    );
     this.guardarEnCache(datos);
     if (this.cacheDistribuida) {
       try {

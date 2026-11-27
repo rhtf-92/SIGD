@@ -20,7 +20,7 @@ import {
   validarCvd,
 } from "../../utils/cvdValidator";
 
-const PATRON_CVD = /CVD-\d{2,4}-[A-Z]{2,6}-\d{4,6}-[A-F0-9]{4}/;
+const PATRON_CVD = /CVD-\d{2,4}-[A-Z]{2,6}-\d{4,6}-[A-Z0-9]{4}/;
 
 export default function ValidadorPublicoCvdPage() {
   const [codigo, setCodigo] = useState("");
@@ -42,7 +42,7 @@ export default function ValidadorPublicoCvdPage() {
     setCamaraActiva(false);
   };
 
-  useEffect(() => () => detenerCamara(), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => detenerCamara(), []);
 
   const verificarCodigo = (valor?: string) => {
     const crudo = (valor ?? codigo).trim().toUpperCase();
@@ -58,6 +58,12 @@ export default function ValidadorPublicoCvdPage() {
     setMensaje(null);
     setCodigo(chequeo.normalizado);
     verificar(chequeo.normalizado);
+  };
+
+  const seleccionarEjemplo = (ejemplo: string) => {
+    const enmascarado = aplicarMascaraCvd(ejemplo);
+    setCodigo(enmascarado);
+    verificarCodigo(enmascarado);
   };
 
   const manejarArchivoPdf = (archivo: File) => {
@@ -216,10 +222,7 @@ export default function ValidadorPublicoCvdPage() {
               <button
                 key={ejemplo}
                 type="button"
-                onClick={() => {
-                  setCodigo(ejemplo);
-                  verificarCodigo(ejemplo);
-                }}
+                onClick={() => seleccionarEjemplo(ejemplo)}
                 className="rounded-full border border-slate-300 px-3 py-1 font-mono text-xs text-slate-600 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700"
               >
                 {ejemplo}

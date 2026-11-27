@@ -73,9 +73,24 @@ describe('App Routing & Health Verification', () => {
     expect(Array.isArray(res.body)).toBe(true);
   });
 
-  it('POST /api/v1/storage/presigned-url responde con error de validacion si faltan datos', async () => {
+  it('POST /api/v1/storage/presigned-url exige autenticación', async () => {
     const res = await request(app).post('/api/v1/storage/presigned-url').send({});
-    expect([400, 422]).toContain(res.status);
+    expect(res.status).toBe(401);
+  });
+
+  it('PUT /api/v1/storage/upload-binario exige autenticación', async () => {
+    const res = await request(app).put('/api/v1/storage/upload-binario').send(Buffer.from('%PDF-1.0'));
+    expect(res.status).toBe(401);
+  });
+
+  it('OPTIONS /api/v1/storage/upload-binario permite X-SHA256 desde el frontend', async () => {
+    const res = await request(app)
+      .options('/api/v1/storage/upload-binario')
+      .set('Origin', 'http://localhost:5173')
+      .set('Access-Control-Request-Method', 'PUT')
+      .set('Access-Control-Request-Headers', 'authorization,content-type,x-sha256,x-correlation-id');
+    expect(res.status).toBe(204);
+    expect(String(res.headers['access-control-allow-headers']).toLowerCase()).toContain('x-sha256');
   });
 
   it('GET /api/v1/firmas/cola-firmantes responde protegiendo acceso sin autenticacion', async () => {

@@ -6,7 +6,7 @@
  */
 
 export const CVD_PATTERN =
-  /^CVD-(19|20)\d{2}-[A-Z]{2,6}-\d{6}-[A-F0-9]{4}$/;
+  /^CVD-(19|20)\d{2}-[A-Z]{2,6}-\d{6}-[A-Z0-9]{4}$/;
 
 export const CVD_INPUT_MASK_HINT = "CVD-YYYY-RD-XXXXXX-XXXX";
 
@@ -27,31 +27,22 @@ export function normalizarCvd(raw: string): string {
  */
 export function aplicarMascaraCvd(raw: string): string {
   const limpio = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  // Quita el prefijo CVD si el usuario lo tecleó para reconstruirlo
   const sinPrefijo = limpio.startsWith("CVD") ? limpio.slice(3) : limpio;
-  const anio = sinPrefijo.slice(0, 4).replace(/[^0-9]/g, "");
-  let resto = sinPrefijo.slice(4).replace(/[^A-Z0-9]/g, "");
-  const tipo = resto.replace(/[^A-Z]/g, "").slice(0, 6);
-  resto = resto.slice(tipo.length);
-  const correlativo = resto.replace(/[^0-9]/g, "").slice(0, 6);
-  resto = resto.slice(correlativo.length);
-  const sufijo = resto.replace(/[^A-F0-9]/g, "").slice(0, 4);
+  const coincidencia = sinPrefijo.match(/^(\d{0,4})([A-Z]{0,6})(\d{0,6})([A-Z0-9]{0,4})/);
+  if (!coincidencia) return "CVD";
 
-  let out = "CVD";
-  if (anio) out += `-${anio}`;
-  else if (sinPrefijo.length > 0) out += "-";
-  if (tipo) out += `-${tipo}`;
-  else if (sinPrefijo.length > 4) out += "-";
-  if (correlativo) out += `-${correlativo}`;
-  if (sufijo) out += `-${sufijo}`;
-  return out.slice(0, 24);
+  const [, anio = "", tipo = "", correlativo = "", sufijo = ""] = coincidencia;
+  return ["CVD", anio, tipo, correlativo, sufijo]
+    .filter(Boolean)
+    .join("-")
+    .slice(0, 24);
 }
 
 /** Extrae el primer CVD embebido en un texto (útil para QR escaneado o PDF). */
 export function extraerCvdDeTexto(texto: string): string | null {
   const match = texto
     .toUpperCase()
-    .match(/CVD-(?:19|20)\d{2}-[A-Z]{2,6}-\d{6}-[A-F0-9]{4}/);
+    .match(/CVD-(?:19|20)\d{2}-[A-Z]{2,6}-\d{6}-[A-Z0-9]{4}/);
   return match ? match[0] : null;
 }
 

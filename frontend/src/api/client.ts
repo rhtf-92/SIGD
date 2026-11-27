@@ -78,7 +78,13 @@ apiClient.interceptors.response.use(
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-      if (!(originalRequest.url?.includes("/auth/refresh") || originalRequest._retry)) {
+      if (
+        !(
+          originalRequest.url?.includes("/auth/refresh") ||
+          originalRequest.url?.includes("/auth/login") ||
+          originalRequest._retry
+        )
+      ) {
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             pendingQueue.push({

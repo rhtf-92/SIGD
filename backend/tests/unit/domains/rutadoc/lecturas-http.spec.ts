@@ -58,7 +58,7 @@ describe('endpoints de lectura RutaDoc', () => {
     const sinActor = await request(app(null)).post(path).set('x-usuario-id', 'no-verificado').send(body);
     expect(sinActor.status).toBe(401);
 
-    const conActor = await request(app({ id: '7', roles: ['SUPER_ADMIN'] })).post(path).send(body);
+    const conActor = await request(app({ id: '77777777-7777-4777-8777-777777777777', roles: ['SUPER_ADMIN'] })).post(path).send(body);
     // La ruta autenticó al actor y consultó el expediente; la base de prueba indica que no existe.
     expect(conActor.status).toBe(404);
   });

@@ -1,12 +1,30 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useHorarioCorte } from "../../hooks/useHorarioCorte";
 import { apiClient } from "@/api/client";
+import { useAuthStore } from "@/stores/authStore";
+
+interface TramiteTupa {
+  id: string;
+  codigo: string;
+  denominacion: string;
+}
+
+async function calcularSha256(file: File): Promise<string> {
+  const bytes = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 export default function MesaPartesVirtualPage() {
+  const queryClient = useQueryClient();
   const { isAfterCutoff, requiresProjection, legalDate } = useHorarioCorte();
   const esCorteSuperado = isAfterCutoff || requiresProjection;
   const proximoDiaHabil = legalDate;
+  const correoSesion = useAuthStore((state) => state.usuario?.correo ?? "");
 
   const [solicitante, setSolicitante] = useState("");
   const [asunto, setAsunto] = useState("");
@@ -16,39 +34,116 @@ export default function MesaPartesVirtualPage() {
   const [sha256Hash, setSha256Hash] = useState("---");
   const [timestampTecnico, setTimestampTecnico] = useState("---");
   const [timestampLegal, setTimestampLegal] = useState("---");
+  const [idPersona, setIdPersona] = useState("");
+  const [correo, setCorreo] = useState(correoSesion);
+  const [tramites, setTramites] = useState<TramiteTupa[]>([]);
+  const [idTipoTramite, setIdTipoTramite] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const esExitoso = resultado.includes("exitosamente") || estadoCarga.includes("Completado");
 
+  useEffect(() => {
+    void (async () => {
+      try {
+        const [perfil, catalogo] = await Promise.all([
+          apiClient.get<{ idPersona?: string; correo?: string }>("/api/v1/auth/me"),
+          apiClient.get<TramiteTupa[]>("/api/v1/tramites/tipos"),
+        ]);
+        setIdPersona(perfil.data.idPersona ?? "");
+        setCorreo(perfil.data.correo ?? correoSesion);
+        setTramites(catalogo.data);
+        if (catalogo.data.length > 0) setIdTipoTramite(catalogo.data[0].id);
+      } catch {
+        setError("Inicie sesión para radicar un trámite con su identidad institucional.");
+      }
+    })();
+  }, [correoSesion]);
+
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      setError("El documento debe ser un archivo PDF.");
+      return;
+    }
+    try {
+      setError(null);
       setArchivo(file);
-      setEstadoCarga(`Archivo cargado: ${file.name}`);
-      const fechaActual = new Date().toISOString();
-      setTimestampTecnico(fechaActual);
-      setTimestampLegal(esCorteSuperado ? `${proximoDiaHabil}T08:00:00-05:00` : fechaActual);
-      
-      // Simulación de cálculo SHA-256 local exacto
-      setSha256Hash("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+      setSha256Hash(await calcularSha256(file));
+      setEstadoCarga(`Archivo listo: ${file.name}`);
+    } catch {
+      setError("No fue posible calcular el hash SHA-256 del documento.");
     }
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!archivo) {
-      alert("Por favor seleccione un archivo PDF.");
+    setError(null);
+
+    if (!archivo || !idPersona || !idTipoTramite || !correo) {
+      setError("Debe iniciar sesión, escoger un trámite y adjuntar un PDF válido.");
       return;
     }
-    setEstadoCarga("Enviando vía presigned-url a MinIO/S3...");
-    setResultado("Procesando radicación...");
+
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      setEstadoCarga("Completado (MinIO S3 OK)");
-      setResultado("Radicado exitosamente con CUT generado");
+      setEstadoCarga("Solicitando URL prefirmada...");
+      setResultado("Procesando radicación...");
+      const { data: presign } = await apiClient.post<{
+        uploadUrl: string;
+        s3Key: string;
+      }>("/api/v1/storage/presigned-url", {
+        nombreArchivo: archivo.name,
+        tamanoBytes: archivo.size,
+        mimeType: "application/pdf",
+        sha256Hash: sha256Hash,
+      });
+
+      setEstadoCarga("Transmitiendo documento...");
+      await apiClient.put(
+        "/api/v1/storage/upload-binario",
+        archivo,
+        {
+          params: { s3Key: presign.s3Key },
+          headers: {
+            "Content-Type": "application/pdf",
+            "X-SHA256": sha256Hash,
+          },
+          timeout: 60_000,
+        },
+      );
+
+      setEstadoCarga("Radicando en el sistema...");
+      const { data } = await apiClient.post<{
+        cut: string;
+        fechaEnvioReal: string;
+        fechaRadicacionLegal: string;
+      }>("/api/v1/tramites/radicacion-virtual", {
+        asunto,
+        idTipoTramiteTupa: idTipoTramite,
+        idPersona,
+        nombreSolicitante: solicitante,
+        correo,
+        totalFolios: 1,
+        documentos: [
+          {
+            nombreArchivo: archivo.name,
+            contentType: "application/pdf",
+            tamanoBytes: archivo.size,
+            hashSha256: sha256Hash,
+            storagePath: presign.s3Key,
+          },
+        ],
+      });
+
+      setEstadoCarga("Completado");
+      setResultado(`Radicado exitosamente con CUT ${data.cut}`);
+      setTimestampTecnico(data.fechaEnvioReal);
+      setTimestampLegal(data.fechaRadicacionLegal);
+      void queryClient.invalidateQueries({ queryKey: ["expedientes"] });
     } catch (err) {
-      console.error(err);
       setEstadoCarga("Error en la transferencia");
       setResultado("Fallido");
+      setError(err instanceof Error ? err.message : "No fue posible radicar el trámite.");
     }
   }
 
@@ -89,9 +184,15 @@ export default function MesaPartesVirtualPage() {
 
       {/* Contenedor principal de ancho fluido */}
       <div className="max-w-7xl mx-auto space-y-6">
+        {error && (
+          <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-xs font-medium text-red-800">
+            {error}
+          </div>
+        )}
+
         <div className="rounded-xl border border-sky-300/60 bg-white/90 p-4 text-xs font-medium text-slate-700 shadow-sm backdrop-blur-md">
           <p>
-            <strong className="text-blue-900">Nota técnica:</strong> Los hashes SHA-256 se calculan en el navegador. Las transmisiones se ejecutan mediante URLs prefirmadas seguras hacia el repositorio centralizado en MinIO/S3.
+            <strong className="text-blue-900">Nota técnica:</strong> El hash SHA-256 se calcula sobre el PDF real y la transmisión usa una URL prefirmada del repositorio institucional.
           </p>
         </div>
 
@@ -112,6 +213,31 @@ export default function MesaPartesVirtualPage() {
                   placeholder="Nombres y Apellidos del administrado"
                   className="w-full rounded-lg border border-slate-300 bg-slate-50/50 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 focus:outline-none transition"
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Correo para notificaciones *</label>
+                <input
+                  type="email"
+                  required
+                  readOnly
+                  value={correo}
+                  className="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-700"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Procedimiento TUPA *</label>
+                <select
+                  required
+                  value={idTipoTramite}
+                  onChange={(e) => setIdTipoTramite(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-slate-50/50 px-3 py-2 text-sm text-slate-800"
+                >
+                  {tramites.map((tramite) => (
+                    <option key={tramite.id} value={tramite.id}>
+                      {tramite.codigo} — {tramite.denominacion}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Asunto / Petitorio *</label>
@@ -142,10 +268,10 @@ export default function MesaPartesVirtualPage() {
             </label>
 
             <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 font-medium">
-              <div className="flex items-center gap-1.5 bg-slate-50/80 p-2 rounded border border-slate-200">✓ Validación %PDF</div>
-              <div className="flex items-center gap-1.5 bg-slate-50/80 p-2 rounded border border-slate-200">✓ Cálculo SHA-256</div>
-              <div className="flex items-center gap-1.5 bg-slate-50/80 p-2 rounded border border-slate-200">✓ URL PUT Segura</div>
-              <div className="flex items-center gap-1.5 bg-slate-50/80 p-2 rounded border border-slate-200">✓ AbortController</div>
+              <div className="flex items-center gap-1.5 bg-slate-50/80 p-2 rounded border border-slate-200">Validación MIME real</div>
+              <div className="flex items-center gap-1.5 bg-slate-50/80 p-2 rounded border border-slate-200">Hash SHA-256 real</div>
+              <div className="flex items-center gap-1.5 bg-slate-50/80 p-2 rounded border border-slate-200">URL PUT prefirmada</div>
+              <div className="flex items-center gap-1.5 bg-slate-50/80 p-2 rounded border border-slate-200">Radicación con CUT</div>
             </div>
           </div>
 
@@ -154,14 +280,9 @@ export default function MesaPartesVirtualPage() {
             <h2 className="text-xs font-bold uppercase tracking-wider text-blue-900 border-b border-sky-100 pb-2">
               3. Control de Horario LPAG
             </h2>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Fecha y hora de simulación</label>
-              <input
-                type="datetime-local"
-                className="w-full rounded-lg border border-slate-300 bg-slate-50/50 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 focus:outline-none transition"
-              />
-              <p className="mt-1 text-[11px] text-slate-500">Horario oficial: America/Lima (Corte legal a las 16:30)</p>
-            </div>
+            <p className="text-xs text-slate-600">
+              El servidor aplica el horario oficial de America/Lima y proyecta la fecha legal cuando supera la corte de las 16:30.
+            </p>
 
             {esCorteSuperado && (
               <div className="rounded-lg border border-amber-300 bg-amber-50/90 p-3 text-xs text-amber-900 shadow-sm">

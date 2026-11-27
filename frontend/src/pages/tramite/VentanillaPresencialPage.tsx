@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import CargoDigitalModal from "../../components/tramite/CargoDigitalModal";
 import { PROCEDIMIENTOS_TUPA_2026 } from "../../data/tupaPasco2026";
@@ -7,6 +8,7 @@ import type { CargoOficialTramite } from "../../types/cargoOficial";
 import { apiClient } from "@/api/client";
 
 export default function VentanillaPresencialPage() {
+  const queryClient = useQueryClient();
   const { isAfterCutoff, requiresProjection, legalDate } = useHorarioCorte();
   const esCorteSuperado = isAfterCutoff || requiresProjection;
   const proximoDiaHabil = legalDate;
@@ -21,8 +23,9 @@ export default function VentanillaPresencialPage() {
   const [tipoDocumento, setTipoDocumento] = useState("SOLICITUD");
   const [asunto, setAsunto] = useState("");
   const [cantidadFolios, setCantidadFolios] = useState(1);
-  const [cargoGenerado, setCargoGenerado] = useState<any>(null);
+  const [cargoGenerado, setCargoGenerado] = useState<CargoOficialTramite | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [error, setError] = useState("");
 
   const procedimientoSeleccionado = PROCEDIMIENTOS_TUPA_2026.find(
     (procedimiento) => procedimiento.codigo === procedimientoTupa,
@@ -30,80 +33,76 @@ export default function VentanillaPresencialPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setError("");
 
     const asuntoFinal = procedimientoSeleccionado
       ? `TUPA ${procedimientoSeleccionado.codigo}: ${procedimientoSeleccionado.nombre}\n${asunto}`
       : asunto;
 
-    const dniValido = /^[0-9]{8}$/.test(numeroDoc) ? numeroDoc : "74561238";
-    const fechaActual = new Date().toISOString();
-    const cutSimulado = `CUT-2026-${Math.floor(100000 + Math.random() * 900000)}`;
-
-    let serverData: any;
-
     try {
       const res = await apiClient.post(
         "/api/v1/tramites/ventanilla-presencial",
         {
-          dniSolicitante: dniValido,
-          datosRemitente: nombre.trim() || "Ciudadano Administrado",
-          asunto: asuntoFinal.trim() || "Solicitud de trámite presencial",
-          foliosTotales: Number(cantidadFolios) || 1,
+          dniSolicitante: numeroDoc,
+          datosRemitente: nombre,
+          asunto: asuntoFinal,
+          foliosTotales: Number(cantidadFolios),
         },
       );
-      serverData = res.data;
-    } catch (error) {
-      console.warn("[VentanillaPresencial] Activando simulación local de respaldo para demostración:", error);
-      serverData = {
-        cut: cutSimulado,
-        fechaRadicacion: fechaActual,
+      const datos = res.data as {
+        cut: string;
+        fechaRadicacion: string;
         cargo: {
-          cut: cutSimulado,
-          remitente: nombre.trim() || "JUAN RAMIRO PÉREZ GARCÍA",
-          dni: dniValido,
-          asunto: asuntoFinal,
-          folios: Number(cantidadFolios) || 1,
-          fechaRecepcion: fechaActual,
-          hashSha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          qrSeguimientoUrl: `https://sigd.iestp-suiza.edu.pe/tramite?cut=${cutSimulado}`,
-        },
+          cut: string;
+          fechaRecepcion: string;
+          hashSha256: string;
+          qrSeguimientoUrl: string;
+        };
       };
+      const cargoServer = datos.cargo;
+      if (!cargoServer?.cut) {
+        throw new Error("El servidor no devolvió un CUT válido.");
+      }
+
+      const fechaRecepcion = cargoServer.fechaRecepcion || datos.fechaRadicacion;
+      const nuevoCargo: CargoOficialTramite = {
+        codigoExpediente: cargoServer.cut,
+        fechaRecepcionIso: fechaRecepcion,
+        fechaIngresoFormalIso: esCorteSuperado ? proximoDiaHabil : fechaRecepcion,
+        horaRecepcion: new Date(fechaRecepcion).toLocaleTimeString("es-PE", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+        operadorVentanillaNombre: "Operador de Mesa de Partes (Ventanilla 1)",
+        sedeInstitucional: "Sede Central - Jr. Tarapacá N° 645, Pucallpa",
+        solicitante: {
+          tipoPersona,
+          tipoDocumento: tipoDoc,
+          numeroDocumento: numeroDoc,
+          nombreOrazonSocial: nombre,
+          correoElectronico: correo,
+          telefono,
+        },
+        asunto: asuntoFinal,
+        documentoPrincipalTipo: tipoDocumento,
+        cantidadFolios: Number(cantidadFolios),
+        hashSha256Recepcion: cargoServer.hashSha256,
+        horaCorteAplicada: "16:30",
+        radicadoDiaSiguiente: esCorteSuperado,
+        urlSeguimiento: cargoServer.qrSeguimientoUrl,
+      };
+
+      setCargoGenerado(nuevoCargo);
+      setModalAbierto(true);
+      void queryClient.invalidateQueries({ queryKey: ["expedientes"] });
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "No se pudo completar la radicación en ventanilla.",
+      );
     }
-
-    const cargoServer = serverData.cargo;
-    const fechaRecepcion = cargoServer?.fechaRecepcion || serverData.fechaRadicacion || fechaActual;
-    const cutFinal = cargoServer?.cut || serverData.cut || cutSimulado;
-
-    const nuevoCargo: CargoOficialTramite = {
-      codigoExpediente: cutFinal,
-      fechaRecepcionIso: fechaRecepcion,
-      fechaIngresoFormalIso: esCorteSuperado ? proximoDiaHabil : fechaRecepcion,
-      horaRecepcion: new Date(fechaRecepcion).toLocaleTimeString("es-PE", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      }),
-      operadorVentanillaNombre: "Operador de Mesa de Partes (Ventanilla 1)",
-      sedeInstitucional: "Sede Central - Jr. Tarapacá N° 645, Pucallpa",
-      solicitante: {
-        tipoPersona,
-        tipoDocumento: tipoDoc,
-        numeroDocumento: numeroDoc || dniValido,
-        nombreOrazonSocial: nombre || "JUAN RAMIRO PÉREZ GARCÍA",
-        correoElectronico: correo || "ejemplo@correo.com",
-        telefono: telefono || "910000000",
-      },
-      asunto: asuntoFinal,
-      documentoPrincipalTipo: tipoDocumento,
-      cantidadFolios: Number(cantidadFolios) || 1,
-      hashSha256Recepcion: cargoServer?.hashSha256 || "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      horaCorteAplicada: "16:30",
-      radicadoDiaSiguiente: esCorteSuperado,
-      urlSeguimiento: cargoServer?.qrSeguimientoUrl || `https://sigd.iestpsuiza.edu.pe/tramite?cut=${cutFinal}`,
-    };
-
-    setCargoGenerado(nuevoCargo);
-    setModalAbierto(true);
   }
 
   function handleNuevoRegistro() {
@@ -115,6 +114,7 @@ export default function VentanillaPresencialPage() {
     setAsunto("");
     setCantidadFolios(1);
     setModalAbierto(false);
+    setError("");
   }
 
   return (
@@ -185,10 +185,11 @@ export default function VentanillaPresencialPage() {
 
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="vp-tipo-doc" className="block text-xs font-semibold text-slate-700 mb-1">
                 Tipo Documento Identidad *
               </label>
               <select
+                id="vp-tipo-doc"
                 value={tipoDoc}
                 onChange={(e) => setTipoDoc(e.target.value as "DNI" | "RUC" | "CE")}
                 className="w-full rounded-lg border-2 border-amber-300 bg-rose-100/60 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
@@ -205,10 +206,11 @@ export default function VentanillaPresencialPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="vp-numero-doc" className="block text-xs font-semibold text-slate-700 mb-1">
                 Número de Documento *
               </label>
               <input
+                id="vp-numero-doc"
                 type="text"
                 required
                 value={numeroDoc}
@@ -219,10 +221,11 @@ export default function VentanillaPresencialPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="vp-nombre" className="block text-xs font-semibold text-slate-700 mb-1">
                 {tipoPersona === "NATURAL" ? "Apellidos y Nombres *" : "Razón Social *"}
               </label>
               <input
+                id="vp-nombre"
                 type="text"
                 required
                 value={nombre}
@@ -235,10 +238,11 @@ export default function VentanillaPresencialPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="vp-correo" className="block text-xs font-semibold text-slate-700 mb-1">
                 Correo Electrónico para Notificación *
               </label>
               <input
+                id="vp-correo"
                 type="email"
                 required
                 value={correo}
@@ -249,10 +253,11 @@ export default function VentanillaPresencialPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="vp-telefono" className="block text-xs font-semibold text-slate-700 mb-1">
                 Teléfono / Celular de Contacto *
               </label>
               <input
+                id="vp-telefono"
                 type="tel"
                 required
                 value={telefono}
@@ -265,10 +270,11 @@ export default function VentanillaPresencialPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="vp-procedimiento" className="block text-xs font-semibold text-slate-700 mb-1">
                 Procedimiento TUPA 2026 *
               </label>
               <select
+                id="vp-procedimiento"
                 required
                 value={procedimientoTupa}
                 onChange={(e) => setProcedimientoTupa(e.target.value)}
@@ -285,10 +291,11 @@ export default function VentanillaPresencialPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="vp-tipo-documento" className="block text-xs font-semibold text-slate-700 mb-1">
                 Tipo de Documento Presentado *
               </label>
               <select
+                id="vp-tipo-documento"
                 value={tipoDocumento}
                 onChange={(e) => setTipoDocumento(e.target.value)}
                 className="w-full rounded-lg border-2 border-amber-300 bg-rose-100/60 px-3 py-2 text-sm text-slate-800 focus:border-blue-600 focus:outline-none"
@@ -300,10 +307,11 @@ export default function VentanillaPresencialPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="vp-folios" className="block text-xs font-semibold text-slate-700 mb-1">
                 Cantidad de Folios Físicos *
               </label>
               <input
+                id="vp-folios"
                 type="number"
                 min={1}
                 required
@@ -314,11 +322,42 @@ export default function VentanillaPresencialPage() {
             </div>
           </div>
 
+          {procedimientoSeleccionado && (
+            <section className="rounded-xl border border-sky-300 bg-white/70 p-4 text-xs text-slate-700">
+              <h3 className="mb-2 text-sm font-bold text-slate-900">
+                TUPA {procedimientoSeleccionado.codigo} · {procedimientoSeleccionado.nombre}
+              </h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="font-semibold text-slate-800">Requisitos</p>
+                  <ul className="mt-1 list-disc pl-4">
+                    {procedimientoSeleccionado.requisitos?.map((requisito) => (
+                      <li key={requisito}>{requisito}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="space-y-1">
+                  <p><span className="font-semibold">Derecho de pago:</span> {procedimientoSeleccionado.derechoPago}</p>
+                  <p><span className="font-semibold">Plazo máximo:</span> {procedimientoSeleccionado.tiempoMaximo}</p>
+                  <p><span className="font-semibold">Dependencia:</span> {procedimientoSeleccionado.dependencia}</p>
+                  <p><span className="font-semibold">Autoridad:</span> {procedimientoSeleccionado.autoridad}</p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {error && (
+            <div role="alert" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+              {error}
+            </div>
+          )}
+
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label htmlFor="vp-asunto" className="block text-xs font-semibold text-slate-700 mb-1">
               ASUNTO / PETITORIO CONCRETO *
             </label>
             <textarea
+              id="vp-asunto"
               rows={3}
               required
               value={asunto}
@@ -346,11 +385,13 @@ export default function VentanillaPresencialPage() {
         </form>
       </div>
 
-      <CargoDigitalModal
-        isOpen={modalAbierto}
-        onClose={() => setModalAbierto(false)}
-        cargo={cargoGenerado}
-      />
+      {cargoGenerado && (
+        <CargoDigitalModal
+          isOpen={modalAbierto}
+          onClose={() => setModalAbierto(false)}
+          cargo={cargoGenerado}
+        />
+      )}
     </main>
   );
 }

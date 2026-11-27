@@ -201,6 +201,7 @@ describe('Auth Router — Schema Alignment & Database Interactions', () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
       id: '11111111-1111-1111-1111-111111111111',
+      idPersona: '22222222-2222-2222-2222-222222222222',
       usuario: 'admin.institucional',
       correo: 'admin@iestp-suiza.edu.pe',
       nombreCompleto: 'Administrador General',

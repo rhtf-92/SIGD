@@ -16,11 +16,12 @@ export interface ActuacionTrazabilidad {
   datosAsociados: Record<string, unknown>;
   duracionMs: number | null;
   duracionMinutos: number | null;
+  hashTransaccion: string;
   tipoActuacion: 'NORMAL' | 'COMPENSATORIA';
 }
 
 export interface RepositorioTrazabilidadRutaDoc {
   existeExpediente(idExpediente: string): Promise<boolean>;
   listar(idExpediente: string): Promise<readonly Omit<ActuacionTrazabilidad,
-    'duracionMs' | 'duracionMinutos'>[]>;
+    'duracionMs' | 'duracionMinutos' | 'hashTransaccion'>[]>;
 }

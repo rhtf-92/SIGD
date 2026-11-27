@@ -1,10 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { webcrypto } from "node:crypto";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import HeaderInstitucional from "../../../src/components/HeaderInstitucional";
-import { ThemeProvider } from "../../../src/contexts/ThemeContext";
+vi.mock("@/api/client", () => ({
+  apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn() },
+}));
+
+import { apiClient } from "@/api/client";
 import MesaPartesVirtualPage from "../../../src/pages/tramite/MesaPartesVirtualPage";
+
+const get = vi.mocked(apiClient.get);
+const post = vi.mocked(apiClient.post);
+const put = vi.mocked(apiClient.put);
 
 function pdfFile() {
   return new File(
@@ -15,114 +25,153 @@ function pdfFile() {
 }
 
 function renderPage() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
-    <MemoryRouter initialEntries={["/tramite/mesa-partes-virtual"]}>
-      <ThemeProvider>
-        <HeaderInstitucional />
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={["/tramite/mesa-partes-virtual"]}>
         <MesaPartesVirtualPage />
-      </ThemeProvider>
-    </MemoryRouter>,
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
-describe("MesaPartesVirtualPage", () => {
-  it("cambia entre los temas normal, oscuro y claro", () => {
-    renderPage();
-    const main = screen.getByRole("main");
+describe("MesaPartesVirtualPage — radicación real", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.defineProperty(globalThis, "crypto", {
+      value: webcrypto,
+      configurable: true,
+    });
+    put.mockResolvedValue({ data: { confirmado: true } } as never);
 
-    expect(main).toHaveClass("bg-blue-50");
-    expect(screen.getByText("Claro")).toBeVisible();
-    expect(screen.getByText("Oscuro")).toBeVisible();
-    expect(screen.getByText("Normal")).toBeVisible();
+    get.mockImplementation(async (url: string) => {
+      if (url === "/api/v1/auth/me") {
+        return {
+          data: {
+            idPersona: "00000000-0000-0000-0000-000000000011",
+            correo: "admin.demo@iestpsuiza.edu.pe",
+          },
+        } as never;
+      }
+      if (url === "/api/v1/tramites/tipos") {
+        return {
+          data: [
+            {
+              id: "00000000-0000-0000-0000-000000000001",
+              codigo: "TUPA-01",
+              denominacion: "Constancia de estudios",
+            },
+          ],
+        } as never;
+      }
+      throw new Error(`URL no esperada: ${url}`);
+    });
 
-    fireEvent.click(screen.getByRole("button", { name: "Tema oscuro" }));
-    expect(main).toHaveClass("bg-[#070b19]");
-    expect(
-      screen.getByRole("button", { name: "Tema oscuro" }),
-    ).toHaveAttribute("aria-pressed", "true");
-
-    fireEvent.click(screen.getByRole("button", { name: "Tema claro" }));
-    expect(main).toHaveClass("bg-slate-100");
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Tema normal (institucional)" }),
-    );
-    expect(main).toHaveClass("bg-blue-50");
+    post.mockImplementation(async (url: string) => {
+      if (url === "/api/v1/storage/presigned-url") {
+        return {
+          data: {
+            uploadUrl: "https://storage.local/presigned",
+            s3Key: "expedientes/2026/solicitud.pdf",
+          },
+        } as never;
+      }
+      if (url === "/api/v1/tramites/radicacion-virtual") {
+        return {
+          data: {
+            cut: "EXP-2026-000001",
+            fechaEnvioReal: "2026-11-24T18:00:00.000Z",
+            fechaRadicacionLegal: "2026-11-24T13:00:00.000Z",
+          },
+        } as never;
+      }
+      throw new Error(`URL no esperada: ${url}`);
+    });
   });
 
-  it("muestra los créditos del Grupo SIGD y la rama F_SORIA", () => {
+  it("carga la identidad del backend y el catálogo TUPA real", async () => {
     renderPage();
 
-    expect(
-      screen.getByRole("heading", { name: /Grupo SIGD · Equipo de Desarrollo/ }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("F_SORIA")).toBeVisible();
-    expect(screen.getByText("Rama oficial: F_SORIA")).toBeVisible();
-
-    for (const nombre of [
-      "Isaac",
-      "Perea",
-      "Clider",
-      "Cristiam",
-      "Urquia",
-      "Jhonatan",
-      "Arevalo",
-      "Vargas Lloner",
-      "Azañero",
-      "Bolaños",
-      "Pool Carranza",
-      "Serruche",
-    ]) {
-      expect(screen.getByText(nombre)).toBeVisible();
-    }
+    await waitFor(() => {
+      expect(get).toHaveBeenCalledWith("/api/v1/auth/me");
+      expect(get).toHaveBeenCalledWith("/api/v1/tramites/tipos");
+      expect(screen.getByDisplayValue("admin.demo@iestpsuiza.edu.pe")).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: /TUPA-01/ })).toBeInTheDocument();
+    });
   });
 
-  it("permite cargar, escribir, cambiar horario y registrar", async () => {
+  it("calcula el hash real, transmite el PDF y radica con CUT del servidor", async () => {
     renderPage();
+    const user = userEvent.setup();
 
-    const inputSolicitante = screen.getByPlaceholderText(
-      "Nombre del administrado",
-    );
-    fireEvent.change(inputSolicitante, { target: { value: "Ana Pérez" } });
-    expect(inputSolicitante).toHaveValue("Ana Pérez");
-
-    fireEvent.change(
-      screen.getByPlaceholderText("Descripción breve del trámite"),
-      { target: { value: "Solicitud de constancia" } },
+    await waitFor(() =>
+      expect(screen.getByRole("option", { name: /TUPA-01/ })).toBeInTheDocument()
     );
 
-    fireEvent.change(screen.getByLabelText("Seleccionar archivo PDF"), {
+    await user.type(
+      screen.getByPlaceholderText("Nombres y Apellidos del administrado"),
+      "Ana Pérez",
+    );
+    await user.type(
+      screen.getByPlaceholderText("Descripción detallada del trámite"),
+      "Solicitud de constancia",
+    );
+
+    const inputArchivo = document.querySelector('input[type="file"]');
+    expect(inputArchivo).not.toBeNull();
+    fireEvent.change(inputArchivo as HTMLInputElement, {
       target: { files: [pdfFile()] },
     });
 
-    await waitFor(
-      () =>
-        expect(
-          screen.getByText(/Documento validado y firmado \(simulación\)/),
-        ).toBeInTheDocument(),
-      { timeout: 5000 },
+    await waitFor(() =>
+      expect(screen.getByText(/^Archivo listo: solicitud.pdf$/)).toBeInTheDocument()
     );
 
-    fireEvent.change(screen.getByLabelText("Fecha y hora de simulación"), {
-      target: { value: "2026-10-23T17:00" },
+    await user.click(
+      screen.getByRole("button", { name: /Iniciar Carga Segura y Registrar Trámite/i }),
+    );
+
+    await waitFor(() => {
+      expect(put).toHaveBeenCalledWith(
+        "/api/v1/storage/upload-binario",
+        expect.objectContaining({ name: "solicitud.pdf" }),
+        expect.objectContaining({
+          params: { s3Key: "expedientes/2026/solicitud.pdf" },
+          headers: expect.objectContaining({
+            "Content-Type": "application/pdf",
+            "X-SHA256": expect.stringMatching(/^[0-9a-f]{64}$/),
+          }),
+        }),
+      );
+      expect(post).toHaveBeenCalledWith(
+        "/api/v1/tramites/radicacion-virtual",
+        expect.objectContaining({
+          idPersona: "00000000-0000-0000-0000-000000000011",
+          idTipoTramiteTupa: "00000000-0000-0000-0000-000000000001",
+          documentos: [
+            expect.objectContaining({
+              storagePath: "expedientes/2026/solicitud.pdf",
+              contentType: "application/pdf",
+            }),
+          ],
+        }),
+      );
+      expect(screen.getByText(/EXP-2026-000001/)).toBeInTheDocument();
     });
+  });
 
-    expect(screen.getByTestId("condicion-horario")).toHaveTextContent(
-      "Corte o día inhábil: proyectar",
+  it("muestra error si no se puede cargar la identidad", async () => {
+    get.mockImplementation(async () => {
+      throw new Error("401");
+    });
+    renderPage();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Inicie sesión para radicar un trámite/i),
+      ).toBeInTheDocument()
     );
-
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: /Registrar Trámite \/ Enviar Solicitud/,
-      }),
-    );
-
-    await waitFor(
-      () => expect(screen.getByText("Registrado con éxito")).toBeInTheDocument(),
-      { timeout: 3000 },
-    );
-
-    expect(screen.getByText(/MPV-\d{8}-\d{6}/)).toBeInTheDocument();
-    expect(screen.getAllByText("Ana Pérez").length).toBeGreaterThanOrEqual(2);
   });
 });

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { ForbiddenError, NotFoundError } from '../../shared/domain/errors/index.js';
 import type { ActorRutaDoc } from './rutadoc.types.js';
 import type { ActuacionTrazabilidad, RepositorioTrazabilidadRutaDoc } from './trazabilidad.types.js';
@@ -14,8 +15,12 @@ export class ServicioTrazabilidadRutaDoc {
     const actuaciones = historial.map((actuacion, indice) => {
       const siguiente = historial[indice + 1];
       const duracionMs = siguiente ? Date.parse(siguiente.fechaHora) - Date.parse(actuacion.fechaHora) : null;
+      const hashTransaccion = createHash('sha256')
+        .update(`${actuacion.movimientoId}|${actuacion.fechaHora}|${actuacion.evento}|${actuacion.estadoAnterior}|${actuacion.estadoNuevo}`)
+        .digest('hex');
       return { ...actuacion,
-        duracionMs, duracionMinutos: duracionMs === null ? null : duracionMs / 60_000 };
+        duracionMs, duracionMinutos: duracionMs === null ? null : duracionMs / 60_000,
+        hashTransaccion };
     });
     // La actuación abierta no tiene duración de ciclo cerrada; no se extiende a “ahora”.
     return { expedienteId: idExpediente, actuaciones };

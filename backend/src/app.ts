@@ -5,8 +5,6 @@ import { errorMiddleware } from './middleware/error-middleware.js';
 import { crearRouterReferencia } from './referencia/expediente.router.js';
 import { crearRouterResoluciones } from './domains/docucore/resoluciones.controller.js';
 import { crearUsuariosAdminRouter } from './domains/organicore/usuariosAdmin.routes.js';
-
-// Módulos de DocuCore / Firma Digital (B_VALENTIN)
 import { crearFirmaRouter } from './domains/docucore/firma.controller.js';
 import {
   InMemoryFirmaSessionStore,
@@ -16,8 +14,6 @@ import {
 import { InMemoryAlmacenDocumentosFirmables } from './domains/docucore/documentoFirmable.store.js';
 import { RefirmaGatewayService } from './domains/docucore/refirmaGateway.service.js';
 import { ServicioFirmaService } from './domains/docucore/firma.service.js';
-
-// Módulos CoreLink, IdentiCore, TramiCore, RutaDoc (B_REATEGUI)
 import { crearRouterIdenticore } from './domains/identicore/identicore.router.js';
 import type { CacheDistribuida } from './domains/identicore/ubigeo.service.js';
 import { crearRouterRutaDoc } from './domains/rutadoc/rutadoc.router.js';
@@ -33,32 +29,21 @@ import type { ClasificadorCcdPort } from './domains/rutadoc/ccd.types.js';
 import type { DocumentoMetadataPort } from './domains/rutadoc/foliacion.types.js';
 import { crearRouterTramites } from './domains/tramicore/tramites.controller.js';
 import { crearRouterReportes } from './domains/corelink/reportes.router.js';
-
-// Módulos OrganiCore Maestras, Calendario y Organigrama
 import { crearRouterAdminMaestras } from './domains/organicore/adminMaestras.routes.js';
 import { OrganigramaService } from './domains/organicore/organigrama.service.js';
 import { crearControladorOrganigrama } from './domains/organicore/organigrama.controller.js';
-
-// Módulos DocuCore Router y Validador CVD
 import { crearRouterDocuCore } from './domains/docucore/docucore.router.js';
 import { crearVerificadorCvd } from './domains/docucore/validadorCvd.controller.js';
-
-// Streaming SSE CoreLink
 import { BusSse } from './modules/corelink/sseStream.service.js';
 import { crearRouterRealtime } from './modules/corelink/realtime.routes.js';
-
-// Módulos IdentiCore Auth y Casilla
 import { crearRouterAuth } from './domains/identicore/auth.router.js';
 import { crearRouterCasilla } from './domains/identicore/casilla.router.js';
-
-// Módulo Almacenamiento S3 MinIO
 import { crearRouterStorage } from './core/storage/storage.router.js';
-
-// Módulo Firma Pendientes (#56)
 import { crearRouterFirma as crearRouterFirmaPendientes } from './modules/firma/firma.routes.js';
-
 import { corsMiddleware } from './middleware/cors.middleware.js';
 import { verificarTokenAcceso } from './core/auth/jwt.service.js';
+import { resolverIdentidad } from './core/auth/auth.guard.js';
+import { AppError } from './shared/domain/errors/index.js';
 import { createApiRoutes } from './routes/index.js';
 
 export interface AppOptions {
@@ -74,8 +59,16 @@ export interface AppOptions {
   clasificadorCcdRutaDoc?: ClasificadorCcdPort;
   documentoMetadataRutaDoc?: DocumentoMetadataPort;
   porcentajeAmarilloSlaRutaDocDesde?: number;
-  /** Proveedor de identidad de la analítica ejecutiva; sin él, falla cerrado. */
   actorProviderReportes?: ActorProviderRutaDoc;
+}
+
+function exigirAdmin(req: express.Request): void {
+  const identidad = resolverIdentidad(req);
+  const roles = identidad.roles ?? [];
+  const permitido = roles.some((r) => r === 'ADMIN' || r === 'SUPER_ADMIN' || r === 'ADMINISTRADOR');
+  if (!permitido) {
+    throw new AppError({ status: 403, code: 'FORBIDDEN', message: 'No autorizado.' });
+  }
 }
 
 export function construirApp(
@@ -104,7 +97,15 @@ export function construirApp(
   app.disable('x-powered-by');
 
   app.use(corsMiddleware);
-  app.use(express.json());
+  app.use(
+    express.json({
+      verify: (req: any, _res, buf) => {
+        if (buf && buf.length > 0) {
+          req.rawBody = Buffer.from(buf);
+        }
+      },
+    }),
+  );
   app.use(contextMiddleware);
 
   app.get('/health', (_req, res) => {

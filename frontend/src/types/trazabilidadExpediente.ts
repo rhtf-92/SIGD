@@ -16,7 +16,8 @@ export type TipoEventoBitacora =
   | "SUBSANACION"
   | "NOTIFICACION"
   | "ARCHIVADO"
-  | "DESARCHIVADO";
+  | "DESARCHIVADO"
+  | "OTRO";
 
 /** Bitácora de auditoría inmutable y eventos del expediente (un nodo del Timeline). */
 export interface BitacoraEventoExpediente {
@@ -46,4 +47,5 @@ export const ETIQUETAS_TIPO_EVENTO: Record<TipoEventoBitacora, string> = {
   NOTIFICACION: "Notificación al administrado",
   ARCHIVADO: "Archivo definitivo",
   DESARCHIVADO: "Desarchivo motivado",
+  OTRO: "Actuación registrada",
 };

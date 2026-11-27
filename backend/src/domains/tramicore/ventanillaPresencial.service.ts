@@ -80,7 +80,10 @@ export class VentanillaPresencialService {
 
       let solicitanteId: string;
       const personaExistente = await cliente.query<{ id_persona: string }>(
-        'SELECT id_persona FROM sigd_auth.persona_natural WHERE numero_documento = $1 LIMIT 1',
+        `SELECT p.id_persona::text AS id_persona
+           FROM sigd_auth.persona p
+          WHERE p.tipo = 'NATURAL' AND p.id_documento = $1
+          LIMIT 1`,
         [datos.dniSolicitante],
       );
 
@@ -88,19 +91,23 @@ export class VentanillaPresencialService {
         solicitanteId = personaExistente.rows[0].id_persona;
       } else {
         const nuevaPersona = await cliente.query<{ id_persona: string }>(
-          `INSERT INTO sigd_auth.persona (tipo_persona, estado)
-           VALUES ('NATURAL', TRUE)
-           RETURNING id_persona;`,
+          `INSERT INTO sigd_auth.persona (tipo, id_documento)
+           VALUES ('NATURAL', $1)
+           RETURNING id_persona::text AS id_persona;`,
+          [datos.dniSolicitante],
         );
         solicitanteId = nuevaPersona.rows[0].id_persona;
 
         await cliente.query(
-          `INSERT INTO sigd_auth.persona_natural (id_persona, numero_documento, nombres, apellido_paterno, ubigeo_distrito)
-           VALUES ($1, $2, $3, 'REGISTRADO', '250101')
-           ON CONFLICT DO NOTHING;`,
-          [solicitanteId, datos.dniSolicitante, datos.datosRemitente],
+          `INSERT INTO sigd_auth.persona_natural
+             (id_persona, nombres, apellidos, nombre_completo)
+           VALUES ($1, $2, '', $2)
+           ON CONFLICT (id_persona) DO NOTHING;`,
+          [solicitanteId, datos.datosRemitente],
         );
       }
+
+      const tipoDocumentalId = await this.obtenerTipoDocumental(cliente, datos.tipoDocumentalId);
 
       const ahora = new Date();
       const expRes = await cliente.query<{ expediente_id: string }>(
@@ -117,16 +124,16 @@ export class VentanillaPresencialService {
            $1,
            $1,
            $2,
-           COALESCE($3::uuid, '00000000-0000-0000-0000-000000000001'::uuid),
-           $4,
-           $5::uuid,
+            $3,
+            $4,
+            $5::uuid,
            'RECEPCIONADO',
            $6
          ) RETURNING expediente_id;`,
         [
           cut,
           datos.dniSolicitante,
-          datos.tipoDocumentalId ?? null,
+          tipoDocumentalId,
           solicitanteId,
           datos.areaDestinoId ?? null,
           ahora,
@@ -135,30 +142,17 @@ export class VentanillaPresencialService {
       const expedienteId = expRes.rows[0].expediente_id;
 
       await cliente.query(
-        `INSERT INTO sigd_tra.asiento_registro (
-           numero_asiento,
-           tipo_libro,
-           anio_fiscal,
-           cut,
-           remitente,
-           remitente_documento,
-           asunto,
-           folios,
-           canal_recepcion,
-           fecha_asiento
-         ) VALUES (
-           $1,
-           'ENTRADA',
-           $2,
-           $1,
-           $3,
-           $4,
-           $5,
-           $6,
-           'VENTANILLA_PRESENCIAL',
-           $7
-         ) ON CONFLICT (numero_asiento, anio_fiscal) DO NOTHING;`,
-        [cut, anioActual, datos.datosRemitente, datos.dniSolicitante, datos.asunto, datos.foliosTotales, ahora],
+        `INSERT INTO sigd_tra.asiento_registro
+           (expediente_id, canal_ingreso, asunto, remitente_id, fecha_ingreso)
+          VALUES ($1, 'MESA_PRESENCIAL', $2, $3, $4)`,
+        [expedienteId, datos.asunto, solicitanteId, ahora],
+      );
+
+      await cliente.query(
+        `INSERT INTO sigd_tra.tramite
+           (expediente_id, codigo_tramite, asunto, estado)
+          VALUES ($1, $2, $3, 'REGISTRADO')`,
+        [expedienteId, cut, datos.asunto],
       );
 
       if (debeManejarTx) await cliente.query('COMMIT');
@@ -201,6 +195,36 @@ export class VentanillaPresencialService {
     } finally {
       if (debeManejarTx) cliente.release();
     }
+  }
+
+  private async obtenerTipoDocumental(
+    cliente: PoolClient,
+    tipoDocumentalId?: string,
+  ): Promise<string> {
+    if (tipoDocumentalId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tipoDocumentalId)) {
+      const configurado = await cliente.query<{ tipo_documental_id: string }>(
+        `SELECT tipo_documental_id::text AS tipo_documental_id
+           FROM sigd_doc.tipo_documento
+          WHERE tipo_documental_id = $1 AND vigente = TRUE`,
+        [tipoDocumentalId],
+      );
+      const id = configurado.rows[0]?.tipo_documental_id;
+      if (id) return id;
+    }
+
+    const resultado = await cliente.query<{ tipo_documental_id: string }>(
+      `SELECT tipo_documental_id::text AS tipo_documental_id
+         FROM sigd_doc.tipo_documento
+        WHERE codigo = 'SOLICITUD' AND vigente = TRUE
+        LIMIT 1`,
+    );
+    const id = resultado.rows[0]?.tipo_documental_id;
+    if (!id) {
+      throw new ValidationError({
+        invalidParams: [{ name: 'tipoDocumentalId', reason: 'TIPO_DOCUMENTAL_NO_CONFIGURADO: falta el tipo documental SOLICITUD en el catálogo.' }],
+      });
+    }
+    return id;
   }
 }
 

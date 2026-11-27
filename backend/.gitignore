@@ -18,6 +18,9 @@ tsconfig.tsbuildinfo
 .env.*
 !.env.example
 
+# --- Almacenamiento local de carga (fallback sin MinIO) ---
+uploads/
+
 # --- Cobertura de Pruebas y Reportes ---
 coverage/
 .nyc_output/

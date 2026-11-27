@@ -17,6 +17,8 @@ interface DocumentoFirmado {
   estado: string;
   s3_bucket: string;
   s3_key: string;
+  numero_documento: string | null;
+  asunto: string | null;
 }
 
 const defaultStorage: GeneradorUrlDescarga = {
@@ -44,16 +46,38 @@ export function crearVerificadorCvd(
     }
 
     const resultado = await pool.query<DocumentoFirmado>(
-      `SELECT
-         cvd,
-         sha256_firmado,
-         firmante,
-         fecha_sello_tsa,
-         estado,
-         s3_bucket,
-         s3_key
-       FROM sigd_doc.firma_digital_documento
-       WHERE cvd = $1`,
+      `WITH firmado AS (
+         SELECT
+           cvd,
+           sha256_firmado,
+           firmante,
+           fecha_sello_tsa,
+           estado,
+           s3_bucket,
+           s3_key,
+           NULL::text AS numero_documento,
+           NULL::text AS asunto
+         FROM sigd_doc.firma_digital_documento
+         WHERE cvd = $1
+       ), notificado AS (
+         SELECT
+           cvd,
+           hash_sha256 AS sha256_firmado,
+           'Dirección General IESTP Suiza'::text AS firmante,
+           fecha_deposito AS fecha_sello_tsa,
+           'FIRMADO_DIGITALMENTE'::text AS estado,
+           'sigd-docs'::text AS s3_bucket,
+           ('notificaciones/' || cvd || '.pdf')::text AS s3_key,
+           numero_documento::text,
+           asunto::text
+         FROM sigd_auth.notificacion_casilla
+         WHERE cvd = $1
+       )
+       SELECT * FROM firmado
+       UNION ALL
+       SELECT * FROM notificado
+       WHERE NOT EXISTS (SELECT 1 FROM firmado)
+       LIMIT 1`,
       [cvd],
     );
 
@@ -65,15 +89,17 @@ export function crearVerificadorCvd(
 
     const documento = resultado.rows[0];
     const cvdStr = documento?.cvd ?? cvd;
-    const numeroDocSuffix = cvdStr ? cvdStr.slice(-6) : '000001';
+    const numeroDocSuffix = cvdStr.match(/-(\d{6})-/)?.[1] ?? '000001';
 
     const s3Bucket = documento?.s3_bucket || 'sigd-docs';
     const s3Key = documento?.s3_key || `resoluciones/${cvdStr}.pdf`;
-    const descarga_copia_certificada =
-      await storage.generarUrlDescarga(
-        s3Bucket,
-        s3Key,
-      );
+    let descarga_copia_certificada: string;
+    try {
+      descarga_copia_certificada = await storage.generarUrlDescarga(s3Bucket, s3Key);
+    } catch {
+      descarga_copia_certificada =
+        await defaultStorage.generarUrlDescarga(s3Bucket, s3Key);
+    }
 
     const esValido = documento?.estado === 'FIRMADO_DIGITALMENTE';
     const fechaEmision = documento?.fecha_sello_tsa
@@ -81,9 +107,11 @@ export function crearVerificadorCvd(
       : new Date().toISOString();
 
     const docMetadata = {
-      numeroDocumento: `RD N.° ${numeroDocSuffix}-2026-DG-IESTP-SUIZA`,
+      numeroDocumento:
+        documento?.numero_documento || `RD N.° ${numeroDocSuffix}-2026-DG-IESTP-SUIZA`,
       tipo: 'RD',
-      asunto: 'Documento Oficial con Firma Digital Verificada - IESTP Suiza',
+      asunto:
+        documento?.asunto || 'Documento Oficial con Firma Digital Verificada - IESTP Suiza',
       fechaEmision,
       firmantes: [
         {
@@ -93,7 +121,7 @@ export function crearVerificadorCvd(
           entidadCertificadora: 'RENIEC / PKI Estado Peruano',
         },
       ],
-      hashIntegridadSha256: documento?.sha256_firmado || '',
+      hashIntegridadSha256: (documento?.sha256_firmado || '').trim(),
       urlDescargaAutentica: descarga_copia_certificada,
     };
 

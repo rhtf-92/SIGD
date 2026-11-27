@@ -19,8 +19,8 @@ describe("Suite de Pruebas de Componente SlaBadge (ENT-M03-02)", () => {
 
     const badge = screen.getByLabelText(/25d hábiles \[Al día\]/i);
     expect(badge).toBeInTheDocument();
-    expect(badge.className).toContain("text-emerald-800");
-    expect(badge.className).toContain("border-emerald-300");
+    expect(badge.className).toContain("text-emerald-200");
+    expect(badge.className).toContain("border-emerald-400/50");
   });
 
   it("renderiza correctamente el estado ALERTA (Ámbar / Atención)", () => {
@@ -37,8 +37,8 @@ describe("Suite de Pruebas de Componente SlaBadge (ENT-M03-02)", () => {
 
     const badge = screen.getByLabelText(/10d hábiles \[Atención\]/i);
     expect(badge).toBeInTheDocument();
-    expect(badge.className).toContain("text-amber-900");
-    expect(badge.className).toContain("border-amber-300");
+    expect(badge.className).toContain("text-amber-200");
+    expect(badge.className).toContain("border-amber-400/60");
   });
 
   it("renderiza correctamente el estado CRITICO (Rojo / Vencimiento inminente)", () => {
@@ -55,8 +55,8 @@ describe("Suite de Pruebas de Componente SlaBadge (ENT-M03-02)", () => {
 
     const badge = screen.getByLabelText(/2d hábiles \[Crítico\]/i);
     expect(badge).toBeInTheDocument();
-    expect(badge.className).toContain("text-rose-800");
-    expect(badge.className).toContain("border-rose-300");
+    expect(badge.className).toContain("text-fuchsia-200");
+    expect(badge.className).toContain("border-fuchsia-400/60");
   });
 
   it("renderiza correctamente el estado VENCIDO con animación pulse de advertencia legal", () => {
@@ -74,8 +74,8 @@ describe("Suite de Pruebas de Componente SlaBadge (ENT-M03-02)", () => {
     const badge = screen.getByLabelText(/Vencido \(4d hábiles\)/i);
     expect(badge).toBeInTheDocument();
     expect(badge.className).toContain("animate-pulse");
-    expect(badge.className).toContain("text-red-900");
-    expect(badge.className).toContain("border-red-500");
+    expect(badge.className).toContain("text-red-200");
+    expect(badge.className).toContain("border-red-400/70");
   });
 
   it("despliega la estructura accesible del tooltip con el desglose de días", () => {
