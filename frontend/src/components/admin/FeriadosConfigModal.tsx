@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 
+type TipoFeriado = 'NACIONAL' | 'REGIONAL_UCAYALI' | 'INSTITUCIONAL';
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -9,7 +11,7 @@ interface ModalProps {
 export default function FeriadosConfigModal({ isOpen, onClose, onSave }: ModalProps) {
   const [fecha, setFecha] = useState('');
   const [descripcion, setDescripcion] = useState('');
-  const [tipo, setTipo] = useState<'NACIONAL' | 'REGIONAL_UCAYALI' | 'INSTITUCIONAL'>('NACIONAL');
+  const [tipo, setTipo] = useState<TipoFeriado>('NACIONAL');
   const [error, setError] = useState('');
 
   if (!isOpen) return null;
@@ -57,7 +59,7 @@ export default function FeriadosConfigModal({ isOpen, onClose, onSave }: ModalPr
             <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Feriado</label>
             <select
               value={tipo}
-              onChange={(e) => setTipo(e.target.value as any)}
+              onChange={(e) => setTipo(e.target.value as TipoFeriado)}
               className="w-full border border-gray-300 rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="NACIONAL">NACIONAL</option>

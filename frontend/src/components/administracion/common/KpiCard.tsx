@@ -72,18 +72,18 @@ export default function KpiCard({
     <article
       className={`relative overflow-hidden rounded-2xl border bg-white p-5 ${styles.border} ${styles.glow} transition-all duration-300 hover:-translate-y-0.5`}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-semibold tracking-wider uppercase text-slate-500">
             {title}
           </p>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${styles.valueText}`}>
+            <span className={`text-lg sm:text-xl font-extrabold tracking-tight ${styles.valueText}`}>
               {value}
             </span>
             {badge && (
               <span
-                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-semibold ${
                   BADGE_STYLES[badge.variant ?? "neutral"]
                 }`}
               >
@@ -97,7 +97,7 @@ export default function KpiCard({
         </div>
 
         <div
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border backdrop-blur-md ${styles.iconBg} shadow-inner`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border backdrop-blur-md ${styles.iconBg} shadow-inner`}
         >
           <Icon className="h-6 w-6" />
         </div>

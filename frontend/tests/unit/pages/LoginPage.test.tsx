@@ -25,6 +25,7 @@ describe("LoginPage — Componente de Inicio de Sesión SIGD IESTP 'Suiza'", () 
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    window.history.pushState({}, "", "/login");
   });
 
   describe("1. Diseño de acceso", () => {

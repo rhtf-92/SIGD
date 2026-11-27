@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { apiClient } from "../../api/client";
 import { CASILLA_ENDPOINTS } from "../../services/casillaService";
@@ -58,20 +58,27 @@ export default function AcuseNotificacionModal({
   onClose,
   onAcuseGenerado,
 }: AcuseNotificacionModalProps) {
+  if (!isOpen || !notificacion) return null;
+
+  return (
+    <AcuseModalContent
+      key={notificacion.id}
+      notificacion={notificacion}
+      onClose={onClose}
+      onAcuseGenerado={onAcuseGenerado}
+    />
+  );
+}
+
+function AcuseModalContent({
+  notificacion: currentNotification,
+  onClose,
+  onAcuseGenerado,
+}: Omit<AcuseNotificacionModalProps, "isOpen"> & { notificacion: Notificacion }) {
   const [confirmed, setConfirmed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [acuse, setAcuse] = useState<AcuseEmitidoServidor | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setConfirmed(false);
-    setIsSubmitting(false);
-    setAcuse(null);
-    setError(null);
-  }, [isOpen, notificacion?.id]);
-
-  if (!isOpen || !notificacion) return null;
-  const currentNotification = notificacion;
 
   async function handleConfirm() {
     if (!confirmed || isSubmitting) return;
@@ -133,7 +140,7 @@ export default function AcuseNotificacionModal({
             {acuse ? "Acuse registrado" : "Confirmación de notificación"}
           </h2>
           <p className="mt-1 text-sm text-slate-300">
-            {notificacion.numeroNotificacion} · {notificacion.numeroExpediente}
+            {currentNotification.numeroNotificacion} · {currentNotification.numeroExpediente}
           </p>
         </header>
 

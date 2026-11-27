@@ -28,7 +28,7 @@ const ESTILOS_ESTADO: Record<
     etiquetaTexto: "Al día",
   },
   ALERTA: {
-    contenedor: "bg-amber-50 text-amber-800 border-amber-200",
+    contenedor: "bg-amber-50 text-amber-900 border-amber-300",
     puntoIndicador: "bg-amber-500",
     etiquetaTexto: "Atención",
   },
@@ -38,7 +38,7 @@ const ESTILOS_ESTADO: Record<
     etiquetaTexto: "Crítico",
   },
   VENCIDO: {
-    contenedor: "bg-red-50 text-red-800 border-red-200 font-bold",
+    contenedor: "bg-red-100 text-red-900 border-red-500 animate-pulse font-bold shadow-sm",
     puntoIndicador: "bg-red-600",
     etiquetaTexto: "Vencido",
   },

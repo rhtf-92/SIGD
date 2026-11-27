@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -71,16 +71,10 @@ export default function AdminSidebar({
 }: AdminSidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [colapsado, setColapsado] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const guardado = window.localStorage.getItem("adminSidebarColapsado");
-      if (guardado) {
-        setColapsado(guardado === "true");
-      }
-    }
-  }, []);
+  const [colapsado, setColapsado] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("adminSidebarColapsado") === "true";
+  });
 
   const toggleColapsado = () => {
     setColapsado((prev) => {
@@ -152,7 +146,7 @@ export default function AdminSidebar({
         </div>
 
         {/* Navigation List */}
-        <ul className="flex flex-col gap-1.5 p-3">
+        <ul className="flex max-h-[calc(100vh-9rem)] flex-col gap-1 overflow-y-auto p-2">
           {ADMIN_NAV_ITEMS.map((item) => {
             const Icono = item.icono;
             const esActiva = checkIsActive(item);
@@ -162,7 +156,7 @@ export default function AdminSidebar({
                 <button
                   type="button"
                   onClick={() => handleNavClick(item.ruta)}
-                  className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-all duration-200 cursor-pointer ${
+                  className={`group relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-all duration-200 cursor-pointer ${
                     esActiva
                       ? "bg-blue-50 text-blue-800 border-l-4 border-blue-700 shadow-sm"
                       : "text-slate-600 hover:bg-slate-50 hover:text-blue-800"
@@ -171,7 +165,7 @@ export default function AdminSidebar({
                   title={colapsado ? item.titulo : undefined}
                 >
                   <Icono
-                    className={`h-5 w-5 shrink-0 transition-colors ${
+                    className={`h-4 w-4 shrink-0 transition-colors ${
                       esActiva
                         ? "text-blue-700"
                         : "text-slate-400 group-hover:text-blue-700"

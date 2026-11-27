@@ -20,7 +20,7 @@
  * desalineada de la real sin que nadie lo note.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   alinearUmboloATramo,
   calcularIndicadoresMgd,
@@ -43,6 +43,7 @@ import {
   META_TRO,
   META_VTEP,
 } from '../../../../src/domains/corelink/mgdAnalytics.types.js';
+import { RepositorioMgdAnalytics } from '../../../../src/domains/corelink/mgdAnalytics.repository.js';
 import {
   anioEnLima,
   filtrosCuellosBotellaSchema,
@@ -467,6 +468,13 @@ describe('Validación de la query de reportes', () => {
     })).toThrow();
   });
 
+  it('28b acepta la unidad orgánica y rechaza caracteres inyectables', () => {
+    expect(filtrosResumenSchema.parse({ unidadOrganicaId: 'SIN_AREA' })).toEqual({
+      unidadOrganicaId: 'SIN_AREA',
+    });
+    expect(() => filtrosCuellosBotellaSchema.parse({ unidadOrganicaId: "x'; DROP TABLE" })).toThrow();
+  });
+
   it('29 toma el año en Lima y no en la zona del host', () => {
     // 31 de diciembre a las 20:00 en Lima ya es 1 de enero en UTC. Un host en
     // UTC+14 pediría el año siguiente y el tablero volvería vacío.
@@ -566,5 +574,72 @@ describe('Servicio: agregación y degradación sin caché', () => {
     };
     const servicio = new ServicioMgdAnalytics(repositorioFalso as never, { cache });
     await expect(servicio.resumen(null)).resolves.toBeDefined();
+  });
+
+  it('35 propaga la unidad orgánica al repositorio y la separa en la caché', async () => {
+    const obtenerContadores = vi.fn(async () => [{
+      periodo: '2026-09',
+      actualizadoEn: null,
+      contadores: { ...CONTADORES_VACIOS },
+    }]);
+    const cache = {
+      get: vi.fn(async () => null),
+      set: vi.fn(async () => undefined),
+    };
+    const servicio = new ServicioMgdAnalytics(
+      { obtenerContadores } as never,
+      { cache },
+    );
+
+    await servicio.resumen(null, null, null, 'unidad-1');
+    expect(obtenerContadores).toHaveBeenCalledWith(null, null, null, 'unidad-1');
+    expect(cache.get).toHaveBeenCalledWith('cache:mgd:resumen:todo:unidad-1');
+
+    await servicio.resumen(null);
+    expect(obtenerContadores).toHaveBeenCalledWith(null, null, null, null);
+    expect(cache.get).toHaveBeenCalledWith('cache:mgd:resumen:todo:todas');
+  });
+
+  it('36 consolida todas las unidades del mismo mes en la tendencia', async () => {
+    const servicio = new ServicioMgdAnalytics({
+      obtenerTendencias: async () => [
+        {
+          periodo: '2026-11',
+          actualizadoEn: null,
+          contadores: { ...CONTADORES_VACIOS, nRadicados: 4, nAtendidos: 1, nObservados: 1 },
+        },
+        {
+          periodo: '2026-11',
+          actualizadoEn: null,
+          contadores: { ...CONTADORES_VACIOS, nRadicados: 2, nAtendidos: 1, nArchivados: 1 },
+        },
+      ],
+    } as never);
+
+    const serie = await servicio.tendencias(2026);
+    expect(serie[10]).toEqual({ mes: 11, radicados: 6, atendidos: 3, observados: 1 });
+  });
+
+  it('37 propaga el rango de períodos a la distribución de retención', async () => {
+    const obtenerRetencion = vi.fn(async () => []);
+    const servicio = new ServicioMgdAnalytics({ obtenerRetencion } as never);
+
+    await servicio.distribucionRetencion(null, '2026-03', '2026-06', 'unidad-1');
+    expect(obtenerRetencion).toHaveBeenCalledWith(null, '2026-03', '2026-06', 'unidad-1');
+  });
+
+  it('38 consulta las tendencias con límites de fecha explícitos y sin make_date', async () => {
+    const query = vi.fn(async (_sql: string, _valores: unknown[]) => ({ rows: [] }));
+    const repositorio = new RepositorioMgdAnalytics({ query } as never);
+
+    await repositorio.obtenerTendencias(2026, 'unidad-1');
+
+    expect(query).toHaveBeenCalledTimes(1);
+    const [sql, valores] = query.mock.calls[0];
+    expect(sql).toContain('periodo >= $1::date');
+    expect(sql).toContain('periodo < $2::date');
+    expect(sql).toContain('$3::text IS NULL OR unidad_organica_id = $3::text');
+    expect(sql).not.toContain('make_date');
+    expect(valores).toEqual(['2026-01-01', '2027-01-01', 'unidad-1']);
   });
 });

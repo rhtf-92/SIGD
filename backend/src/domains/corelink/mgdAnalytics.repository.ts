@@ -156,6 +156,7 @@ export class RepositorioMgdAnalytics {
     periodo: string | null,
     periodoDesde: string | null = null,
     periodoHasta: string | null = null,
+    unidadOrganicaId: string | null = null,
   ): Promise<ContadoresPeriodo[]> {
     const sql = `SELECT to_char(MIN(periodo), 'YYYY-MM') AS periodo,
                         MAX(actualizado_en) AS actualizado_en,
@@ -170,12 +171,14 @@ export class RepositorioMgdAnalytics {
                    FROM sigd_tra.mv_kpis_mgd_mensual
                   WHERE ($1::date IS NULL OR periodo = $1::date)
                     AND ($2::date IS NULL OR periodo >= $2::date)
-                    AND ($3::date IS NULL OR periodo <= $3::date)`;
+                    AND ($3::date IS NULL OR periodo <= $3::date)
+                    AND ($4::text IS NULL OR unidad_organica_id = $4::text)`;
 
     const valores = [
       periodo ? `${periodo}-01` : null,
       periodoDesde ? `${periodoDesde}-01` : null,
       periodoHasta ? `${periodoHasta}-01` : null,
+      unidadOrganicaId,
     ];
     const { rows } = await this.pool.query<FilaContadores>(sql, valores);
     if (rows.length === 0) return [];
@@ -198,13 +201,17 @@ export class RepositorioMgdAnalytics {
   }
 
   /** Contadores crudos de los doce meses de un año, para la serie de tendencias. */
-  async obtenerTendencias(anio: number): Promise<ContadoresMes[]> {
+  async obtenerTendencias(
+    anio: number,
+    unidadOrganicaId: string | null = null,
+  ): Promise<ContadoresMes[]> {
     const { rows } = await this.pool.query<FilaContadores>(
       `${PROYECCION_CONTADORES}
-        WHERE periodo >= make_date($1, 1, 1)::date
-          AND periodo <  (make_date($1, 1, 1) + INTERVAL '1 year')::date
+        WHERE periodo >= $1::date
+          AND periodo < $2::date
+          AND ($3::text IS NULL OR unidad_organica_id = $3::text)
         ORDER BY periodo`,
-      [anio],
+      [`${anio}-01-01`, `${anio + 1}-01-01`, unidadOrganicaId],
     );
     return rows.flatMap((fila): ContadoresMes[] => {
       const periodo = aTextoPeriodo(fila.periodo);
@@ -236,6 +243,7 @@ export class RepositorioMgdAnalytics {
     periodo: string | null,
     periodoDesde: string | null = null,
     periodoHasta: string | null = null,
+    unidadOrganicaId: string | null = null,
   ): Promise<TramoRetencionFila[]> {
     const { rows } = await this.pool.query<FilaRetencion>(
       `SELECT unidad_organica_id,
@@ -248,11 +256,13 @@ export class RepositorioMgdAnalytics {
         WHERE ($1::date IS NULL OR periodo = $1::date)
           AND ($2::date IS NULL OR periodo >= $2::date)
           AND ($3::date IS NULL OR periodo <= $3::date)
+          AND ($4::text IS NULL OR unidad_organica_id = $4::text)
         ORDER BY unidad_organica_id, tramo_permanencia_dias_habiles`,
       [
         periodo ? `${periodo}-01` : null,
         periodoDesde ? `${periodoDesde}-01` : null,
         periodoHasta ? `${periodoHasta}-01` : null,
+        unidadOrganicaId,
       ],
     );
     return rows.map((fila) => {
@@ -272,26 +282,43 @@ export class RepositorioMgdAnalytics {
   }
 
   /**
-   * Nombres y siglas de las unidades orgánicas, para enriquecer el ranking.
+   * Nombres y siglas/códigos de las unidades orgánicas, para enriquecer el ranking.
    *
-   * `sigd_org.unidad_organica` NO es un requisito del motor analítico: el preflight
-   * del script DDL no lo exige y las vistas no lo necesitan. Por eso la consulta se
-   * degrada a un mapa vacío si OrganiCore no está instalado, y el servicio usa
-   * entonces el identificador como nombre. Un tablero sin siglas es un defecto
-   * cosmético; uno que devuelve 500 porque falta OrganiCore no lo es.
+   * `sigd_org.unidad_organica` es una tabla opcional de OrganiCore que no forma
+   * parte del pipeline ejecutable de migraciones. La tabla orgánica instalada por
+   * dicho pipeline es `sigd_org.area`, cuyos `area_id` son exactamente los
+   * `unidad_organica_id` de las vistas materializadas. Se consultan ambas: primero
+   * `area` (fuente real disponible) y después `unidad_organica` (cuando el
+   * despliegue la haya instalado) sin sobrescribir un nombre ya resuelto.
+   *
+   * Si ninguna existe se devuelve el mapa vacío y el servicio conserva el
+   * identificador: un tablero sin siglas es un defecto cosmético; uno que devuelve
+   * 500 porque falta una tabla auxiliar no lo es.
    */
   async obtenerNombresUnidades(): Promise<Map<string, { nombre: string; sigla: string | null }>> {
     const nombres = new Map<string, { nombre: string; sigla: string | null }>();
-    try {
-      const { rows } = await this.pool.query<{ id: string; sigla: string | null; nombre: string }>(
-        `SELECT id::text AS id, sigla, nombre
-           FROM sigd_org.unidad_organica`,
-      );
-      for (const fila of rows) {
-        nombres.set(fila.id, { nombre: fila.nombre, sigla: fila.sigla });
+    const consultas = [
+      `SELECT area_id::text AS id, codigo AS sigla, nombre
+         FROM sigd_org.area`,
+      `SELECT id::text AS id, sigla, nombre
+         FROM sigd_org.unidad_organica`,
+    ];
+
+    for (const sql of consultas) {
+      try {
+        const { rows } = await this.pool.query<{ id: string; sigla: string | null; nombre: string }>(
+          sql,
+        );
+        for (const fila of rows) {
+          if (nombres.has(fila.id)) continue;
+          nombres.set(fila.id, {
+            nombre: fila.nombre,
+            sigla: fila.sigla ?? null,
+          });
+        }
+      } catch {
+        // La fuente opcional no existe en este despliegue: se prueba la siguiente.
       }
-    } catch {
-      // Degradación documentada: sin OrganiCore se conserva el identificador.
     }
     return nombres;
   }

@@ -49,7 +49,7 @@ export default function AdminPageHeader({
               </div>
             </div>
 
-            <div className="mt-3 flex items-start gap-3.5">
+            <div className="mt-2 flex items-start gap-3">
               {Icon && (
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-700">
                   <Icon className="h-6 w-6" />

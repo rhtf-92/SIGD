@@ -26,6 +26,32 @@
 CREATE SCHEMA IF NOT EXISTS sigd_tra;
 
 -- -----------------------------------------------------------------------------
+-- Algunas instalaciones tienen estas relaciones como tablas normales. Se
+-- reconvierten a vistas materializadas sin tocar las tablas de origen.
+-- -----------------------------------------------------------------------------
+DO $reconcilia$
+DECLARE
+    v_rel REGCLASS;
+    v_tipo "char";
+BEGIN
+    FOREACH v_rel IN ARRAY ARRAY[
+        to_regclass('sigd_tra.mv_kpis_mgd_mensual'),
+        to_regclass('sigd_tra.mv_tiempos_retencion_area')
+    ]
+    LOOP
+        SELECT relkind INTO v_tipo FROM pg_class WHERE oid = v_rel;
+        IF v_tipo IS NOT NULL THEN
+            EXECUTE format(
+                'DROP %s %s CASCADE',
+                CASE v_tipo WHEN 'm' THEN 'MATERIALIZED VIEW' WHEN 'v' THEN 'VIEW' ELSE 'TABLE' END,
+                v_rel::text
+            );
+        END IF;
+    END LOOP;
+END
+$reconcilia$;
+
+-- -----------------------------------------------------------------------------
 -- 7.1 mv_kpis_mgd_mensual · consolidado mensual de los 4 indicadores
 -- -----------------------------------------------------------------------------
 CREATE MATERIALIZED VIEW IF NOT EXISTS sigd_tra.mv_kpis_mgd_mensual AS

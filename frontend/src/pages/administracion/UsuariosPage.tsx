@@ -66,7 +66,7 @@ export default function UsuariosPage() {
     try {
       await actualizarUsuario(usuarioActualizado);
       setUsuarioEditando(null);
-      setMensaje("Los cambios fueron registrados correctamente en el directorio institucional.");
+      setMensaje("Los cambios fueron registrados correctamente.");
     } catch (err) {
       setMensaje("");
       setErrorServidor(
@@ -201,7 +201,7 @@ export default function UsuariosPage() {
               <div>
                 <FilterSelect
                   id="area"
-                  label="Unidad Orgánica"
+                  label="Unidad orgánica"
                   value={area}
                   onChange={(e) => setArea(e.target.value)}
                 >
@@ -233,7 +233,7 @@ export default function UsuariosPage() {
               <div>
                 <FilterSelect
                   id="rol"
-                  label="Rol Asignado"
+                  label="Rol asignado"
                   value={rol}
                   onChange={(e) => setRol(e.target.value)}
                 >

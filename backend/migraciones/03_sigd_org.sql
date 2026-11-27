@@ -31,6 +31,15 @@ CREATE TABLE IF NOT EXISTS sigd_org.area (
     CONSTRAINT chk_area_nivel CHECK (nivel >= 1)
 );
 
+-- El cluster existente puede tener sigd_org.area sin la columna ltree. La
+-- reconciliamos sin tocar filas ya radicadas.
+ALTER TABLE sigd_org.area ADD COLUMN IF NOT EXISTS path LTREE;
+UPDATE sigd_org.area
+   SET path = text2ltree('a.' || replace(codigo, '.', '_'))
+ WHERE path IS NULL;
+ALTER TABLE sigd_org.area ALTER COLUMN path SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_area_path ON sigd_org.area (path);
+
 COMMENT ON COLUMN sigd_org.area.path IS
     'Ruta jerárquica calculada automáticamente por sigd_org.fn_area_set_path() a partir de area_padre_id.';
 
@@ -262,6 +271,15 @@ CREATE TABLE IF NOT EXISTS sigd_org.calendario_laboral (
     actualizado_en      TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT uq_calendario_fecha_unidad UNIQUE (fecha, unidad_territorial)
 );
+
+ALTER TABLE sigd_org.calendario_laboral
+    ADD COLUMN IF NOT EXISTS anio INT GENERATED ALWAYS AS (EXTRACT(YEAR FROM fecha)::INT) STORED;
+ALTER TABLE sigd_org.calendario_laboral
+    ADD COLUMN IF NOT EXISTS es_feriado BOOLEAN GENERATED ALWAYS AS (NOT es_laborable) STORED;
+ALTER TABLE sigd_org.calendario_laboral
+    ADD COLUMN IF NOT EXISTS registrado_por UUID NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_calendario_fecha_unidad
+    ON sigd_org.calendario_laboral (fecha, unidad_territorial);
 
 CREATE INDEX IF NOT EXISTS idx_calendario_fecha
     ON sigd_org.calendario_laboral (fecha);

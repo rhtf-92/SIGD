@@ -268,7 +268,7 @@ export default function UserEditModal({
                 htmlFor="usuario-cargo"
                 className="mb-1.5 block text-xs font-semibold tracking-wider uppercase text-slate-400"
               >
-                Cargo institucional
+                Cargo
               </label>
               <input
                 id="usuario-cargo"
@@ -371,7 +371,7 @@ export default function UserEditModal({
               htmlFor="usuario-correo"
               className="mb-1.5 block text-xs font-semibold tracking-wider uppercase text-slate-400"
             >
-              Correo institucional (@{CORREO_INSTITUCIONAL_DOMINIO})
+              Correo institucional
             </label>
             <input
               id="usuario-correo"

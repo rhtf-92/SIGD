@@ -3,10 +3,6 @@ import {
   Users,
   ShieldCheck,
   ClipboardList,
-  Database,
-  Calendar,
-  Lock,
-  ArrowRight,
   Sparkles,
   Clock,
   Layers,
@@ -119,7 +115,7 @@ export default function AdministracionPage() {
         badge="Hub Central"
       />
 
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <section className="mx-auto w-[88%] max-w-[1500px] space-y-3.5 py-3.5">
         {/* Banner de Bienvenida Institucional */}
         <div className="relative overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-cyan-50 p-6 shadow-sm sm:p-8">
           <div className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-blue-700 to-cyan-600" />
@@ -153,7 +149,7 @@ export default function AdministracionPage() {
         </div>
 
         {/* 4 Indicadores Rápidos */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard
             title="Directorio Activo"
             value="12 Cuentas"

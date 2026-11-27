@@ -33,6 +33,24 @@ export interface ExecutiveSummaryMetrics {
   desksHealth: string;
 }
 
+export interface DashboardCounters {
+  total: number;
+  pendientes: number;
+  atendidos: number;
+  enTramite: number;
+  vencidos: number;
+  observados: number;
+}
+
+const CONTADORES_VACIOS: DashboardCounters = {
+  total: 0,
+  pendientes: 0,
+  atendidos: 0,
+  enTramite: 0,
+  vencidos: 0,
+  observados: 0,
+};
+
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
 }
@@ -47,15 +65,44 @@ function unwrapPayload(value: unknown): unknown {
   return record.data ?? value;
 }
 
+type DashboardEndpointError = Error & { endpoint?: string; endpointUrl?: string };
+
+const ENDPOINT_LABELS: Readonly<Record<string, string>> = {
+  "/api/v1/reportes/dashboard/resumen": "resumen de indicadores",
+  "/api/v1/reportes/dashboard/tendencias": "tendencias mensuales",
+  "/api/v1/reportes/dashboard/cuellos-botella": "cuellos de botella",
+};
+
+async function dashboardGet<T>(
+  url: string,
+  params: Record<string, string | number | undefined>,
+) {
+  try {
+    return await apiClient.get<T>(url, { params });
+  } catch (error) {
+    const labeled = (error instanceof Error ? error : new Error(String(error))) as DashboardEndpointError;
+    labeled.endpoint = ENDPOINT_LABELS[url] ?? url;
+    labeled.endpointUrl = url;
+    throw labeled;
+  }
+}
+
+function errorMeta(error: unknown, key: "endpoint" | "endpointUrl"): string | undefined {
+  const value = (error as DashboardEndpointError | null | undefined)?.[key];
+  return typeof value === "string" ? value : undefined;
+}
+
 interface DashboardResponses {
   resumen: unknown;
   tendencias: unknown;
   cuellosBotella: unknown;
+  opcionesUnidades?: unknown;
 }
 
 function normalizeDashboard(value: DashboardResponses, params: DashboardMetricsQuery): DashboardEjecutivoData & {
   executive: ExecutiveSummaryMetrics;
   units: DashboardUnitOption[];
+  counters: DashboardCounters;
 } {
   const resumen = asRecord(unwrapPayload(value.resumen));
   const indicadores = asRecord(resumen);
@@ -70,7 +117,17 @@ function normalizeDashboard(value: DashboardResponses, params: DashboardMetricsQ
   const enTramite = asNumber(contadores.nEnTramite);
   const observados = asNumber(contadores.nObservados);
   const procesados = atendidos + archivados;
+  const resueltos = asNumber(contadores.nResueltos);
+  const dentroPlazo = asNumber(contadores.nResueltosDentroPlazo);
   const otros = Math.max(total - procesados - enTramite - observados, 0);
+  const counters: DashboardCounters = {
+    total,
+    pendientes: Math.max(total - procesados - enTramite, 0),
+    atendidos: procesados,
+    enTramite,
+    vencidos: Math.max(resueltos - dentroPlazo, 0),
+    observados,
+  };
 
   const trendData = unwrapPayload(value.tendencias);
   const trend: DashboardTrendPoint[] = Array.isArray(trendData)
@@ -174,7 +231,11 @@ function normalizeDashboard(value: DashboardResponses, params: DashboardMetricsQ
     };
   });
 
-  const units = bottlenecks.flatMap((entry) => {
+  const unidadesFuente = value.opcionesUnidades !== undefined
+    ? unwrapPayload(value.opcionesUnidades)
+    : bottlenecks;
+  const unidadesArreglo = Array.isArray(unidadesFuente) ? unidadesFuente : [];
+  const units: DashboardUnitOption[] = unidadesArreglo.flatMap((entry) => {
     const item = asRecord(entry);
     return item.areaId !== undefined && item.areaNombre !== undefined
       ? [{ id: String(item.areaId), name: String(item.areaNombre) }]
@@ -194,31 +255,59 @@ function normalizeDashboard(value: DashboardResponses, params: DashboardMetricsQ
         : "Sin registro de actualización",
     },
     units,
+    counters,
   };
 }
 
 export function useDashboardMetrics(params: DashboardMetricsQuery) {
   const query = useQuery({
-    queryKey: ["dashboard-ejecutivo", params],
+    queryKey: [
+      "dashboard-ejecutivo",
+      params.anio,
+      params.mes,
+      params.periodo,
+      params.periodoDesde,
+      params.periodoHasta,
+      params.diasLimite,
+      params.unidadOrganicaId,
+    ],
     queryFn: async () => {
-      const filtrosPeriodo = params.periodo
-        ? { periodo: params.periodo }
-        : params.periodoDesde && params.periodoHasta
-          ? { periodoDesde: params.periodoDesde, periodoHasta: params.periodoHasta }
-          : {};
-      const [resumen, tendencias, cuellosBotella] = await Promise.all([
-        apiClient.get<unknown>("/api/v1/reportes/dashboard/resumen", { params: filtrosPeriodo }),
-        apiClient.get<unknown>("/api/v1/reportes/dashboard/tendencias", {
-          params: { anio: params.anio },
+      const unidadOrganicaId = params.unidadOrganicaId?.trim() || undefined;
+      const filtrosComunes = {
+        ...(params.periodo
+          ? { periodo: params.periodo }
+          : params.periodoDesde && params.periodoHasta
+            ? { periodoDesde: params.periodoDesde, periodoHasta: params.periodoHasta }
+            : {}),
+        ...(unidadOrganicaId ? { unidadOrganicaId } : {}),
+      };
+      const opcionesUnidadesPromise = unidadOrganicaId
+        ? dashboardGet<unknown>("/api/v1/reportes/dashboard/cuellos-botella", {
+            ...(params.periodo
+              ? { periodo: params.periodo }
+              : params.periodoDesde && params.periodoHasta
+                ? { periodoDesde: params.periodoDesde, periodoHasta: params.periodoHasta }
+                : {}),
+            diasLimite: params.diasLimite ?? 5,
+          }).then((response) => response.data).catch(() => undefined)
+        : Promise.resolve(undefined);
+      const [resumen, tendencias, cuellosBotella, opcionesUnidades] = await Promise.all([
+        dashboardGet<unknown>("/api/v1/reportes/dashboard/resumen", filtrosComunes),
+        dashboardGet<unknown>("/api/v1/reportes/dashboard/tendencias", {
+          anio: params.anio,
+          ...(unidadOrganicaId ? { unidadOrganicaId } : {}),
         }),
-        apiClient.get<unknown>("/api/v1/reportes/dashboard/cuellos-botella", {
-          params: { ...filtrosPeriodo, diasLimite: params.diasLimite ?? 5 },
+        dashboardGet<unknown>("/api/v1/reportes/dashboard/cuellos-botella", {
+          ...filtrosComunes,
+          diasLimite: params.diasLimite ?? 5,
         }),
+        opcionesUnidadesPromise,
       ]);
       return normalizeDashboard({
         resumen: resumen.data,
         tendencias: tendencias.data,
         cuellosBotella: cuellosBotella.data,
+        opcionesUnidades,
       }, params);
     },
     staleTime: 60_000,
@@ -234,11 +323,16 @@ export function useDashboardMetrics(params: DashboardMetricsQuery) {
     cuellosBotella: query.data?.cuellosBotella ?? [],
     executive: query.data?.executive ?? { conformity: 0, growth: null, desksHealth: "Sin datos" },
     units: query.data?.units ?? [],
+    counters: query.data?.counters ?? CONTADORES_VACIOS,
     isLoading: query.isPending,
     isFetching: query.isFetching,
     isError: query.isError,
     errorMessage: query.error instanceof Error ? query.error.message : undefined,
     errorStatus: query.error instanceof ApiHttpError ? query.error.status : undefined,
+    errorCode: query.error instanceof ApiHttpError ? query.error.problemDetails.code : undefined,
+    errorCorrelationId: query.error instanceof ApiHttpError ? query.error.correlationId : undefined,
+    errorEndpoint: errorMeta(query.error, "endpoint"),
+    errorEndpointUrl: errorMeta(query.error, "endpointUrl"),
     refetch: () => query.refetch(),
   };
 }

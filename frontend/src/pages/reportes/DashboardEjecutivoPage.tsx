@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, BarChart3, RefreshCw, TriangleAlert } from "lucide-react";
+import { ArrowLeft, BarChart3, KeyRound, RefreshCw, TriangleAlert } from "lucide-react";
 
 import ExecutiveKpiSummary from "@/components/dashboard/ExecutiveKpiSummary";
 import TimeFilterControls, { type DashboardPeriodMode } from "@/components/dashboard/TimeFilterControls";
@@ -49,15 +49,34 @@ export default function DashboardEjecutivoPage() {
     diasLimite: 5,
     anio: year,
     ...(periodMode === "month" ? { mes: month } : {}),
+    ...(unitId ? { unidadOrganicaId: unitId } : {}),
   };
-  const { summary, trend, estados, cuellosBotella, executive, units, isLoading, isFetching, isError, errorMessage, errorStatus, refetch } = useDashboardMetrics(filters);
+  const {
+    summary,
+    trend,
+    estados,
+    cuellosBotella,
+    executive,
+    units,
+    counters,
+    isLoading,
+    isFetching,
+    isError,
+    errorMessage,
+    errorStatus,
+    errorCode,
+    errorCorrelationId,
+    errorEndpoint,
+    errorEndpointUrl,
+    refetch,
+  } = useDashboardMetrics(filters);
 
   const state: DashboardPageState = isLoading ? "loading" : isError ? "error" : "ready";
   const summaryMetrics = summary?.metrics ?? [];
   const hasTrendData = trend.some((point) => point.radicados > 0 || point.resueltos > 0);
-  const visibleBottlenecks = unitId
-    ? cuellosBotella.filter((item) => units.find((unit) => unit.id === unitId)?.name === item.area)
-    : cuellosBotella;
+  const falloConexion = errorCode === "ERR_NETWORK"
+    || errorStatus === 0
+    || (errorStatus === undefined && /network|timeout|fetch|conexi|conectar/i.test(errorMessage ?? ""));
   const filterControls = (
     <TimeFilterControls
       year={year}
@@ -145,15 +164,33 @@ export default function DashboardEjecutivoPage() {
                 <TriangleAlert size={24} aria-hidden="true" />
               </span>
               <h2 className="mt-4 text-xl font-bold text-slate-900">No se pudo cargar el tablero</h2>
+              {errorEndpoint && (
+                <p className="mt-2 text-sm font-semibold text-amber-800">
+                  Consulta afectada: {errorEndpoint}
+                  {errorEndpointUrl ? ` (${errorEndpointUrl})` : ""}
+                </p>
+              )}
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                {errorMessage?.toLowerCase() === "network error"
-                  ? "El servidor de reportes no está disponible en localhost:3000. Inicia el backend del SIGD y vuelve a intentarlo."
-                  : errorStatus === 401
-                    ? "La sesión no es válida para el servicio de reportes. Inicia sesión con tu cuenta institucional."
-                    : errorStatus === 403
-                      ? "Tu cuenta no tiene permiso para consultar el tablero. Se requiere el rol DIRECTOR o SUPER_ADMIN."
-                  : errorMessage ?? "El servicio de reportes no respondió correctamente. Vuelve a intentarlo."}
+                {errorStatus === 401
+                  ? "La sesión no es válida para el servicio de reportes. Inicia sesión con tu cuenta institucional."
+                  : errorStatus === 403
+                    ? "Tu cuenta no tiene permiso para consultar el tablero. Se requiere el rol DIRECTOR o SUPER_ADMIN."
+                    : errorCode === "ERR_TIMEOUT"
+                      ? "El servicio de reportes está tardando más de lo esperado. Vuelve a intentarlo en unos instantes."
+                      : falloConexion
+                        ? "No se pudo contactar con el servicio de reportes. Comprueba tu conexión e inténtalo de nuevo; si el problema continúa, avisa a soporte técnico."
+                        : typeof errorStatus === "number" && errorStatus > 0 && errorMessage
+                            && !/localhost|https?:\/\/|ECONN|ERR_/i.test(errorMessage)
+                          ? errorMessage
+                          : "El servicio de reportes no respondió correctamente. Vuelve a intentarlo."}
               </p>
+              {(errorStatus !== undefined || errorCorrelationId) && (
+                <p className="mt-3 text-xs text-slate-500">
+                  {errorStatus !== undefined && <>Estado HTTP {errorStatus}. </>}
+                  {errorCorrelationId && <>Id. de correlación: {errorCorrelationId}. </>}
+                  Si el problema persiste, proporcione estos datos al administrador.
+                </p>
+              )}
               <div className="mt-6 flex flex-wrap justify-center gap-3">
                 <button
                   type="button"
@@ -164,6 +201,15 @@ export default function DashboardEjecutivoPage() {
                   <RefreshCw size={16} className={isFetching ? "animate-spin" : ""} aria-hidden="true" />
                   {isFetching ? "Conectando..." : "Reintentar"}
                 </button>
+                {(errorStatus === 401 || errorStatus === 403) && (
+                  <Link
+                    to="/login"
+                    className="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+                  >
+                    <KeyRound size={16} aria-hidden="true" />
+                    Iniciar sesión
+                  </Link>
+                )}
                 <Link
                   to="/"
                   className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
@@ -223,6 +269,30 @@ export default function DashboardEjecutivoPage() {
             Actualizando indicadores...
           </p>
         )}
+        <section
+          className="dashboard-enter dashboard-enter-delay-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
+          aria-label="Resumen de expedientes"
+        >
+          {[
+            { label: "Total de expedientes", value: counters.total, hint: "Radicados en el periodo", tone: "text-slate-900" },
+            { label: "Pendientes", value: counters.pendientes, hint: "Sin procesar ni en trámite", tone: "text-amber-700" },
+            { label: "Atendidos", value: counters.atendidos, hint: "Atendidos y archivados", tone: "text-emerald-700" },
+            { label: "En trámite", value: counters.enTramite, hint: "En revisión, subsanación u observados", tone: "text-blue-700" },
+            { label: "Vencidos", value: counters.vencidos, hint: "Resueltos fuera de plazo", tone: "text-rose-700" },
+          ].map((card) => (
+            <article
+              key={card.label}
+              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md"
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{card.label}</p>
+              <p className={`mt-2 text-2xl font-bold tabular-nums ${card.tone}`}>
+                {card.value.toLocaleString("es-PE")} exp.
+              </p>
+              <p className="mt-1 text-xs leading-4 text-slate-500">{card.hint}</p>
+            </article>
+          ))}
+        </section>
+
         <div className="dashboard-enter dashboard-enter-delay-2">
           <ExecutiveKpiSummary metrics={executive} />
         </div>
@@ -317,7 +387,7 @@ export default function DashboardEjecutivoPage() {
                 </tr>
               </thead>
               <tbody>
-                {visibleBottlenecks.length === 0 ? (
+                {cuellosBotella.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-3 py-8 text-center text-sm text-slate-500">
                       {unitId
@@ -325,7 +395,7 @@ export default function DashboardEjecutivoPage() {
                         : "No se identificaron cuellos de botella para el periodo seleccionado."}
                     </td>
                   </tr>
-                ) : visibleBottlenecks.map((item) => (
+                ) : cuellosBotella.map((item) => (
                   <tr key={item.area} className="border-b border-slate-100 last:border-none">
                     <td className="px-3 py-3 font-medium text-slate-800">{item.area}</td>
                     <td className="px-3 py-3 text-slate-600">{item.expedienteCount}</td>

@@ -18,7 +18,7 @@
  * ==============================================================================
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { useTramiteWizardReducer } from "../../hooks/useTramiteWizardReducer";
 import {
   StepIdentificacion,
@@ -48,14 +48,10 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
   className = "",
 }) => {
   const { state, dispatch } = useTramiteWizardReducer();
-  const [modalAbierto, setModalAbierto] = useState(false);
-
-  // Apertura automática del modal institucional de cargo cuando se asienta el trámite
-  useEffect(() => {
-    if (state.cargoEmitido) {
-      setModalAbierto(true);
-    }
-  }, [state.cargoEmitido]);
+  const [cargoCerrado, setCargoCerrado] = useState<string | null>(null);
+  const modalAbierto = Boolean(
+    state.cargoEmitido && state.cargoEmitido.cut !== cargoCerrado,
+  );
 
   const handleNext = useCallback(() => {
     if (state.currentStep < 4) {
@@ -84,7 +80,7 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
 
   const handleSuccess = useCallback(
     (cargo: CargoDigitalResponse, cut: string) => {
-      setModalAbierto(true);
+      setCargoCerrado(null);
       if (onSuccess) {
         onSuccess(cargo, cut);
       }
@@ -141,7 +137,7 @@ export const TramiteWizard: React.FC<TramiteWizardProps> = ({
       {state.cargoEmitido && (
         <CargoDigitalModal
           isOpen={modalAbierto}
-          onClose={() => setModalAbierto(false)}
+          onClose={() => setCargoCerrado(state.cargoEmitido?.cut ?? null)}
           cargo={state.cargoEmitido}
         />
       )}

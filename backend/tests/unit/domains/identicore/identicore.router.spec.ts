@@ -68,6 +68,7 @@ describe('rutas HTTP de validación IdentiCore', () => {
         direccion: 'Jr. Lima 123',
         password: 'secreto123',
         consentimiento_datos: true,
+        declaracion_jurada: true,
       });
 
     expect(respuesta.status).toBe(400);

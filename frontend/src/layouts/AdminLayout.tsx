@@ -24,8 +24,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           onCloseMobile={() => setMobileSidebarOpen(false)}
         />
 
-        <div className="flex flex-1 flex-col min-w-0">
-          <main className="flex-1 min-w-0">
+        <div className="flex h-full flex-1 flex-col min-w-0 min-h-0">
+          <main className="flex-1 min-w-0 w-full overflow-y-auto">
             {children ?? <Outlet />}
           </main>
 
