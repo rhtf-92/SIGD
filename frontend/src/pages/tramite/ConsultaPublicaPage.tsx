@@ -95,33 +95,37 @@ export default function ConsultaPublicaPage() {
 
   return (
     <div
-      className="relative w-full min-h-[calc(100vh-96px)] text-slate-800 flex flex-col overflow-x-hidden bg-[#eef4fb] bg-cover bg-center bg-no-repeat"
+      className="relative w-full flex-1 text-slate-800 flex flex-col justify-between overflow-x-hidden bg-[#0A3D9E] bg-cover bg-center bg-no-repeat selection:bg-[#0073E6]/20"
       style={{
-        backgroundImage: "url('/images/fondo-consuttramite.png')",
+        backgroundImage: "url('/fondo-consultatramite.png')",
         backgroundAttachment: "fixed",
       }}
     >
-      {/* 1. Fondo fijo de respaldo continuo con fondo-consuttramite.png */}
+      {/* 1. Fondo fijo de respaldo continuo con fondo-consultatramite.png */}
       <div
         className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
         style={{
-          backgroundImage: "url('/images/fondo-consuttramite.png')",
+          backgroundImage: "url('/fondo-consultatramite.png')",
         }}
         aria-hidden="true"
       />
 
-      {/* 2. Área principal de contenido */}
-      <main className="relative z-10 w-full pt-6 sm:pt-10 pb-16 px-4 sm:px-6 lg:px-8 flex-1">
-        <div className="mx-auto w-[94%] max-w-[1180px] space-y-8">
+      {/* 2. Área principal de contenido centrada */}
+      <main className="relative z-10 w-full flex-1 flex items-center justify-center py-6 sm:py-8 px-4 sm:px-6 lg:px-8">
+        <div className="w-full max-w-[1140px] my-auto space-y-6">
           {/* Tarjeta Principal de Consulta Pública */}
-          <div className="rounded-3xl border border-sky-100/80 bg-white shadow-[0_16px_40px_-8px_rgba(2,30,80,0.1),0_4px_16px_-2px_rgba(2,30,80,0.05)] overflow-hidden transition-all duration-300">
-            {/* Cabecera Superior: Ícono + Título en 2 líneas + Botón Volver al Portal */}
-            <div className="p-6 sm:p-8 lg:p-10 flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+          <div className="rounded-3xl border-2 border-blue-200/80 bg-white shadow-[0_20px_60px_rgba(4,38,110,0.18)] overflow-hidden relative transition-all duration-300">
+            {/* Brillo / degradado celeste superior en el borde de la tarjeta */}
+            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#00A3FF] via-[#38BDF8] to-[#0052CC]" />
+            <div className="absolute top-2 left-0 right-0 h-8 bg-gradient-to-b from-sky-100/50 to-transparent pointer-events-none" />
+
+            {/* Cabecera Superior: Ícono + Título + Botón Volver al Portal */}
+            <div className="p-6 sm:p-8 lg:p-9 flex flex-col md:flex-row md:items-start md:justify-between gap-6 relative z-10">
               <div className="flex items-start gap-5 sm:gap-6 min-w-0">
-                {/* Círculo / Ícono suave con documento y lupa */}
-                <div className="flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-full bg-blue-50/90 border border-blue-200/80 text-[#0073E6] shadow-xs">
+                {/* Recuadro redondeado celeste claro con el ícono de documento y lupa en azul intenso */}
+                <div className="flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-b from-sky-50 to-blue-100/80 border-2 border-sky-200 text-[#0052CC] shadow-xs">
                   <svg
-                    className="w-8 h-8 sm:w-10 sm:h-10 text-[#0073E6]"
+                    className="w-8 h-8 sm:w-10 sm:h-10 text-[#0052CC]"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -129,25 +133,25 @@ export default function ConsultaPublicaPage() {
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      strokeWidth={1.75}
+                      strokeWidth={1.8}
                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
-                    <circle cx="15.5" cy="15.5" r="3.5" strokeWidth={1.75} />
+                    <circle cx="15.5" cy="15.5" r="3.5" strokeWidth={1.8} />
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      strokeWidth={1.75}
+                      strokeWidth={1.8}
                       d="M18 18l3 3"
                     />
                   </svg>
                 </div>
 
                 {/* Separador vertical fino */}
-                <div className="hidden sm:block h-16 sm:h-20 w-px bg-slate-200 shrink-0" />
+                <div className="hidden sm:block h-16 sm:h-20 w-px bg-slate-200/90 shrink-0 self-center" />
 
-                {/* Título en dos líneas + subtítulo + subrayado azul */}
+                {/* Título en dos líneas + subtítulo + barra horizontal corta azul */}
                 <div className="min-w-0">
-                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#082F7C] tracking-tight leading-tight">
+                  <h1 className="text-2xl sm:text-3xl lg:text-[32px] font-extrabold text-[#002D88] tracking-tight leading-tight">
                     Consulta Pública de <br className="hidden sm:inline" />
                     Trámites y Expedientes
                   </h1>
@@ -158,10 +162,11 @@ export default function ConsultaPublicaPage() {
                 </div>
               </div>
 
-              {/* Botón superior derecho "← Volver al Portal" con borde azul redondeado */}
+              {/* Arriba a la derecha dentro de la tarjeta: Botón tipo píldora con borde celeste/azul suave */}
               <Link
                 to="/"
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border-2 border-[#0073E6] text-[#0073E6] hover:bg-[#0073E6] hover:text-white font-semibold text-xs sm:text-sm transition-all duration-200 shadow-2xs group shrink-0 self-start"
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-blue-200/90 hover:border-[#0073E6] bg-white hover:bg-blue-50/50 text-[#0052CC] font-semibold text-xs sm:text-sm transition-all shadow-2xs group shrink-0 self-start cursor-pointer"
+                aria-label="Volver a la portada principal"
               >
                 <span className="transition-transform group-hover:-translate-x-0.5 font-bold">←</span>
                 <span>Volver al Portal</span>
@@ -171,7 +176,7 @@ export default function ConsultaPublicaPage() {
             {/* Barra Inferior de Consulta de Expediente */}
             <div className="border-t border-slate-100 bg-[#f8fafc]/95 px-6 sm:px-8 py-5 sm:py-6">
               <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-6">
-                {/* A la izquierda: Ícono azul "i" + etiqueta "Ejemplo:" + píldora "EXP-2026-000104" */}
+                {/* A la izquierda: Ícono azul "i" + etiqueta "Ejemplo:" + badge celeste "EXP-2026-000104" */}
                 <div className="flex items-center gap-2.5 shrink-0">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0073E6] text-white text-xs font-serif font-bold shadow-xs">
                     i
@@ -182,14 +187,14 @@ export default function ConsultaPublicaPage() {
                   <button
                     type="button"
                     onClick={() => setCutInput("EXP-2026-000104")}
-                    className="inline-flex items-center px-2.5 py-1 rounded-md bg-blue-100 text-[#0073E6] font-mono text-xs font-bold hover:bg-blue-200 transition cursor-pointer select-all shadow-2xs"
+                    className="inline-flex items-center px-2.5 py-1 rounded-md bg-sky-100 text-[#0052CC] border border-sky-200 font-mono text-xs font-bold hover:bg-sky-200 transition cursor-pointer select-all shadow-2xs"
                     title="Hacer clic para usar el código de ejemplo"
                   >
                     EXP-2026-000104
                   </button>
                 </div>
 
-                {/* Formulario de Búsqueda: Input con ícono a la derecha y Botón Verde sólido */}
+                {/* Formulario de Búsqueda: Input blanco redondeado con ícono a la derecha y Botón azul intenso en degradado */}
                 <form onSubmit={handleBuscar} className="flex-1 flex flex-col sm:flex-row items-center gap-3 w-full">
                   <div className="relative w-full flex-1">
                     <label htmlFor="cut-input" className="sr-only">
@@ -198,12 +203,12 @@ export default function ConsultaPublicaPage() {
                     <input
                       id="cut-input"
                       type="text"
-                      placeholder="Ingrese el número de expediente... (EXP-2026-000104)"
+                      placeholder="INGRESE EL NÚMERO DE EXPEDIENTE... (EXP-2026-000104)"
                       value={cutInput}
                       onChange={(e) => setCutInput(e.target.value)}
                       className="w-full pl-4 pr-11 py-3 sm:py-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 font-mono text-sm sm:text-base uppercase shadow-2xs focus:outline-none focus:ring-2 focus:ring-[#0073E6]/30 focus:border-[#0073E6] transition"
                     />
-                    {/* Ícono de documento/lupa dentro del input a la derecha */}
+                    {/* Ícono de documento dentro del input a la derecha */}
                     <div className="pointer-events-none absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400">
                       <svg
                         className="w-5 h-5 text-slate-400"
@@ -221,11 +226,11 @@ export default function ConsultaPublicaPage() {
                     </div>
                   </div>
 
-                  {/* A la derecha: Botón verde sólido redondeado con lupa y texto "Consultar Estado >" */}
+                  {/* A la derecha: Botón principal en degradado azul intenso con lupa y texto "Consultar Estado >" */}
                   <button
                     type="submit"
                     disabled={cargando}
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl bg-[#008744] hover:bg-[#007338] text-white font-bold text-sm sm:text-base shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 cursor-pointer shrink-0"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl bg-gradient-to-r from-[#005bb5] via-[#0066cc] to-[#007fe6] hover:from-[#004d99] hover:via-[#005bb5] hover:to-[#0073cc] text-white font-bold text-sm sm:text-base shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 disabled:opacity-50 cursor-pointer shrink-0"
                   >
                     <svg
                       className="w-4 h-4 text-white shrink-0"

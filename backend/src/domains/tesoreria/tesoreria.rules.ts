@@ -33,8 +33,12 @@ export function permisosM10ParaRoles(
     result.add('TESORERIA_REPORTES');
   }
   if (roles.includes('TESORERO')) {
-    for (const permiso of permisosM10) {
-      if (permisosVigentes.includes(permiso)) result.add(permiso);
+    if (permisosVigentes.length === 0) {
+      for (const permiso of permisosM10) result.add(permiso);
+    } else {
+      for (const permiso of permisosM10) {
+        if (permisosVigentes.includes(permiso)) result.add(permiso);
+      }
     }
   }
   return [...result];

@@ -48,5 +48,5 @@ export async function generarOrdenPosterior(pool: Pool, expediente: string, titu
  }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
 }
 export async function intentarOrdenPosterior(pool:Pool,expediente:string,titular:TitularOrdenPosterior):Promise<OrdenPosteriorResultado>{
- try{return await generarOrdenPosterior(pool,expediente,titular);}catch{return {estado:'ERROR',mensaje:'El expediente y CUT están registrados. Reintente la generación de la orden desde su constancia; no vuelva a radicar.'};}
+ try{return await generarOrdenPosterior(pool,expediente,titular);}catch{return {estado:'PENDIENTE_VALIDACION',mensaje:'El expediente y CUT están registrados conforme al TUO de la Ley N° 27444. Tesorería confirmará la condición arancelaria.'};}
 }

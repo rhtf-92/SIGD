@@ -5,11 +5,11 @@ import {
   Lock,
   Eye,
   EyeOff,
-  ShieldCheck,
-  ArrowRight,
   AlertCircle,
   Loader2,
   Mail,
+  ArrowRight,
+  KeyRound,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
 import { ApiHttpError } from "../../types/api";
@@ -56,22 +56,19 @@ export default function CasillaLoginPage() {
       const esCiudadano = roles.includes("CIUDADANO") || usuarioActual?.rol === "CIUDADANO";
 
       if (!esCiudadano) {
-        // La cuenta existe pero no posee rol CIUDADANO para la Casilla
         useAuthStore.getState().logout();
         setError(
-          "Su cuenta institucional no cuenta con rol CIUDADANO para acceder a la Casilla Electrónica. Este servicio es de uso exclusivo para ciudadanos y personas jurídicas administradas.",
+          "Su cuenta institucional no cuenta con rol CIUDADANO para acceder a la Ventanilla Electrónica. Este servicio es de uso exclusivo para ciudadanos y personas jurídicas administradas.",
         );
         return;
       }
 
-      // Acceso concedido: Redirigir directamente a su casilla personal
       navigate("/casilla", { replace: true });
     } catch (err: unknown) {
       if (err instanceof ApiHttpError) {
         const detail = err.problemDetails?.detail ?? err.message;
         const code = err.problemDetails?.code;
         if (err.status === 401) {
-          // Escenario C: Usuario no registrado o credenciales incorrectas (no revelar si existe o no)
           setError(
             "No fue posible iniciar sesión. Verifique sus credenciales o regístrese para continuar.",
           );
@@ -81,7 +78,6 @@ export default function CasillaLoginPage() {
             detail?.toLowerCase().includes("inactiv") ||
             detail?.toLowerCase().includes("suspendid"))
         ) {
-          // Escenario D: Cuenta registrada pero aún inactiva
           setCuentaInactiva(true);
           setError(
             "Su cuenta se encuentra registrada pero aún no ha completado la activación requerida. Debe ingresar el código de verificación enviado a su correo electrónico institucional o personal.",
@@ -103,100 +99,158 @@ export default function CasillaLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F0F6FD] text-slate-900 flex flex-col justify-between selection:bg-[#0073E6]/20">
-      {/* Barra superior institucional simplificada */}
-      <header className="w-full bg-[#082F7C] border-b border-[#005bb5]/30 text-white shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center font-bold text-white tracking-wider text-sm border border-white/20 group-hover:bg-white/20 transition">
-              IS
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold text-blue-200 uppercase tracking-widest leading-none">
-                IESTP «Suiza» — Pucallpa
-              </p>
-              <h1 className="text-sm font-bold text-white tracking-tight leading-snug">
-                SIGD RENATO
-              </h1>
-            </div>
-          </Link>
-          <Link
-            to="/"
-            className="text-xs font-semibold text-blue-100 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition"
-          >
-            ← Volver a la portada
-          </Link>
-        </div>
-      </header>
+    <div
+      className="relative w-full flex-1 flex flex-col justify-between overflow-x-hidden bg-[#030d22] bg-cover bg-center bg-no-repeat selection:bg-[#0073E6]/20"
+      style={{
+        backgroundImage: "url('/fondo-casillaelectronic.png')",
+        backgroundAttachment: "fixed",
+      }}
+    >
+      {/* 1. Fondo fijo de respaldo con fondo-casillaelectronic.png */}
+      <div
+        className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: "url('/fondo-casillaelectronic.png')",
+        }}
+        aria-hidden="true"
+      />
 
-      {/* Contenedor central con tarjeta de autenticación */}
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
-        <div className="w-full max-w-[480px]">
-          {/* Tarjeta principal */}
-          <div className="bg-white rounded-2xl border border-[#D7E8F8] shadow-[0_8px_30px_rgba(8,47,124,0.08)] overflow-hidden">
-            {/* Encabezado visual de la tarjeta con franja institucional */}
-            <div className="bg-gradient-to-r from-[#082F7C] to-[#0A3D9E] p-6 text-white text-center relative">
-              <div className="mx-auto w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center mb-3 shadow-inner border border-white/20">
-                <Mail className="w-6 h-6 text-blue-200" aria-hidden="true" />
+      {/* 2. Botón "← Volver a la portada" en la parte superior izquierda */}
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2.5 sm:pt-3 pb-1">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white/90 hover:bg-white text-[#082F7C] hover:text-[#0052CC] border border-blue-200 shadow-xs hover:shadow-md text-xs sm:text-sm font-semibold transition-all w-fit cursor-pointer"
+          aria-label="Volver a la portada principal"
+        >
+          <span>← Volver a la portada</span>
+        </Link>
+      </div>
+
+      {/* 3. Área principal: Tarjeta de Ventanilla Electrónica centrada horizontal y verticalmente */}
+      <main className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-5 flex-1 flex items-center justify-center">
+        <div className="w-full flex justify-center items-center">
+          <div className="w-full max-w-[480px] sm:max-w-lg bg-white rounded-[32px] border-2 border-blue-200/80 shadow-[0_20px_60px_rgba(8,47,124,0.25)] relative px-7 sm:px-9 lg:px-10 pt-5 sm:pt-6 pb-6 sm:pb-7 z-10 my-auto">
+              
+              {/* 1. Decoraciones suaves en tonos celeste y azul dentro del marco */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[30px] z-0 select-none">
+                {/* Esquina superior con ondas azul y celeste */}
+                <div className="absolute -top-1 -left-1 -right-1 h-20 opacity-80 pointer-events-none">
+                  <svg viewBox="0 0 500 80" fill="none" preserveAspectRatio="none" className="w-full h-full">
+                    <path
+                      d="M0,0 L500,0 L500,28 C410,55 330,12 250,38 C160,62 80,24 0,48 Z"
+                      fill="url(#topBlueWave1)"
+                    />
+                    <path
+                      d="M0,0 L500,0 L500,16 C390,40 310,8 210,26 C120,46 50,15 0,30 Z"
+                      fill="url(#topBlueWave2)"
+                    />
+                    <defs>
+                      <linearGradient id="topBlueWave1" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#0052CC" stopOpacity="0.16" />
+                        <stop offset="50%" stopColor="#00A3FF" stopOpacity="0.22" />
+                        <stop offset="100%" stopColor="#38BDF8" stopOpacity="0.1" />
+                      </linearGradient>
+                      <linearGradient id="topBlueWave2" x1="100%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#0038A8" stopOpacity="0.22" />
+                        <stop offset="100%" stopColor="#0073E6" stopOpacity="0.14" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+
+                {/* Esquina inferior con ondas azul y celeste */}
+                <div className="absolute -bottom-1 -left-1 -right-1 h-20 opacity-80 pointer-events-none">
+                  <svg viewBox="0 0 500 80" fill="none" preserveAspectRatio="none" className="w-full h-full">
+                    <path
+                      d="M0,80 L500,80 L500,45 C410,20 330,65 240,35 C150,5 70,50 0,25 Z"
+                      fill="url(#botBlueWave1)"
+                    />
+                    <path
+                      d="M0,80 L500,80 L500,60 C390,35 310,70 210,50 C120,30 50,65 0,55 Z"
+                      fill="url(#botBlueWave2)"
+                    />
+                    <defs>
+                      <linearGradient id="botBlueWave1" x1="0%" y1="100%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#0052CC" stopOpacity="0.18" />
+                        <stop offset="60%" stopColor="#00A3FF" stopOpacity="0.22" />
+                        <stop offset="100%" stopColor="#38BDF8" stopOpacity="0.1" />
+                      </linearGradient>
+                      <linearGradient id="botBlueWave2" x1="100%" y1="100%" x2="0%" y2="0%">
+                        <stop offset="0%" stopColor="#0038A8" stopOpacity="0.2" />
+                        <stop offset="100%" stopColor="#0073E6" stopOpacity="0.12" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
               </div>
-              <span className="inline-block px-2.5 py-0.5 rounded-full bg-blue-500/30 text-blue-100 text-[11px] font-bold tracking-wider uppercase mb-1">
-                Acceso Autenticado
-              </span>
-              <h2 className="text-2xl font-black tracking-tight text-white uppercase">
-                CASILLA ELECTRÓNICA
-              </h2>
-              <p className="mt-1.5 text-xs text-blue-100/90 max-w-[340px] mx-auto leading-relaxed">
-                Accede de manera segura a tus notificaciones y documentos electrónicos institucionales
-              </p>
-            </div>
 
-            {/* Formulario */}
-            <div className="p-6 sm:p-8">
-              {/* Alerta de Error / Validación */}
-              {error && (
-                <div
-                  role="alert"
-                  className={`mb-5 p-3.5 rounded-xl border flex items-start gap-3 text-xs sm:text-sm leading-relaxed ${
-                    cuentaInactiva
-                      ? "bg-amber-50 border-amber-200 text-amber-900"
-                      : "bg-red-50 border-red-200 text-red-800"
-                  }`}
-                >
-                  <AlertCircle
-                    className={`w-5 h-5 shrink-0 mt-0.5 ${
-                      cuentaInactiva ? "text-amber-600" : "text-red-600"
+              {/* 2. Contenido interactivo relativo */}
+              <div className="relative z-10">
+                {/* Medallón superior del sobre con líneas horizontales a los lados */}
+                <div className="relative flex items-center justify-center -mt-14 sm:-mt-16 mb-4 sm:mb-5">
+                  {/* Línea horizontal delgada izquierda */}
+                  <div className="h-[1.5px] bg-gradient-to-r from-transparent via-blue-200 to-blue-300 flex-1 mr-3" />
+
+                  {/* Círculo azul intenso sobresaliendo con borde blanco grueso y sombra */}
+                  <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-gradient-to-b from-[#0066FF] via-[#0047AB] to-[#002D88] border-[5px] border-white shadow-xl flex items-center justify-center text-white shrink-0">
+                    <Mail className="w-7 h-7 sm:w-8 sm:h-8 text-white" aria-hidden="true" />
+                  </div>
+
+                  {/* Línea horizontal delgada derecha */}
+                  <div className="h-[1.5px] bg-gradient-to-l from-transparent via-blue-200 to-blue-300 flex-1 ml-3" />
+                </div>
+
+                {/* 3. Encabezado interno: Título y texto de 2 líneas */}
+                <div className="text-center mb-4 sm:mb-5">
+                  <h2 className="text-2xl sm:text-[28px] font-extrabold text-[#002D88] tracking-tight">
+                    Ventanilla Electrónica
+                  </h2>
+                  <p className="mt-1.5 text-xs sm:text-sm text-slate-600 max-w-[340px] mx-auto leading-relaxed">
+                    Accede de manera segura a tus notificaciones y <br className="hidden sm:inline" />
+                    documentos electrónicos institucionales
+                  </p>
+                </div>
+
+                {/* Alerta de Error / Validación */}
+                {error && (
+                  <div
+                    role="alert"
+                    className={`mb-5 p-3.5 rounded-2xl border flex items-start gap-2.5 text-xs sm:text-sm leading-relaxed ${
+                      cuentaInactiva
+                        ? "bg-amber-50/95 border-amber-200 text-amber-900"
+                        : "bg-red-50/95 border-red-200 text-red-800"
                     }`}
-                  />
-                  <div className="space-y-2">
-                    <p className="font-medium">{error}</p>
-                    {cuentaInactiva && (
-                      <div>
+                  >
+                    <AlertCircle
+                      className={`w-4.5 h-4.5 shrink-0 mt-0.5 ${
+                        cuentaInactiva ? "text-amber-600" : "text-red-600"
+                      }`}
+                    />
+                    <div className="space-y-1 flex-1">
+                      <p className="font-medium">{error}</p>
+                      {cuentaInactiva && (
                         <Link
                           to="/activar-cuenta"
-                          className="inline-flex items-center gap-1.5 font-bold text-amber-800 underline hover:text-amber-950 mt-1"
+                          className="inline-flex items-center gap-1 font-bold text-amber-900 underline hover:text-amber-950 text-xs"
                         >
-                          <span>Proceder a la activación de mi cuenta</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
+                          <span>Activar cuenta</span>
+                          <ArrowRight className="w-3 h-3" />
                         </Link>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <form onSubmit={handleLogin} className="space-y-4.5" aria-busy={cargando}>
-                {/* Campo 1: Usuario o correo */}
-                <div>
-                  <label
-                    htmlFor="identificador"
-                    className="block text-xs font-bold text-[#082F7C] uppercase tracking-wider mb-1.5"
-                  >
-                    Usuario o correo electrónico
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <User className="w-4.5 h-4.5" aria-hidden="true" />
+                      )}
                     </div>
+                  </div>
+                )}
+
+                {/* 4. Campos de entrada tipo píldora (rounded-full) con separador fino */}
+                <form onSubmit={handleLogin} className="space-y-3 sm:space-y-3.5" aria-busy={cargando}>
+                  {/* Campo 1: Usuario o correo electrónico */}
+                  <div className="relative flex items-center bg-white rounded-full border border-blue-200/90 hover:border-[#0073E6] focus-within:border-[#0073E6] focus-within:ring-3 focus-within:ring-[#0073E6]/15 transition-all shadow-xs px-4 py-1.5 sm:py-2">
+                    <div className="text-slate-400 pl-1 shrink-0">
+                      <User className="w-5 h-5 text-slate-400" aria-hidden="true" />
+                    </div>
+                    {/* Separador vertical fino */}
+                    <div className="w-[1.5px] h-5 bg-slate-200/90 mx-3 shrink-0" />
+                    <label htmlFor="identificador" className="sr-only">Usuario o correo electrónico</label>
                     <input
                       id="identificador"
                       name="identificador"
@@ -208,27 +262,19 @@ export default function CasillaLoginPage() {
                       value={identificador}
                       onChange={(e) => setIdentificador(e.target.value)}
                       disabled={cargando}
-                      placeholder="DNI, RUC o correo registrado"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-[#0073E6] focus:ring-2 focus:ring-[#0073E6]/20 text-sm font-medium text-slate-800 placeholder:text-slate-400 transition outline-none disabled:bg-slate-100 disabled:cursor-not-allowed"
+                      placeholder="Usuario o correo electrónico"
+                      className="w-full py-2 text-sm sm:text-base font-medium text-slate-800 placeholder:text-slate-400 placeholder:font-normal bg-transparent outline-none disabled:cursor-not-allowed"
                     />
                   </div>
-                  <span className="text-[11px] text-slate-500 mt-1 block">
-                    Ingrese el DNI/RUC registrado o la dirección de correo de su cuenta.
-                  </span>
-                </div>
 
-                {/* Campo 2: Contraseña */}
-                <div>
-                  <label
-                    htmlFor="password"
-                    className="block text-xs font-bold text-[#082F7C] uppercase tracking-wider mb-1.5"
-                  >
-                    Contraseña
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Lock className="w-4.5 h-4.5" aria-hidden="true" />
+                  {/* Campo 2: Contraseña */}
+                  <div className="relative flex items-center bg-white rounded-full border border-blue-200/90 hover:border-[#0073E6] focus-within:border-[#0073E6] focus-within:ring-3 focus-within:ring-[#0073E6]/15 transition-all shadow-xs px-4 py-1.5 sm:py-2">
+                    <div className="text-slate-400 pl-1 shrink-0">
+                      <Lock className="w-5 h-5 text-slate-400" aria-hidden="true" />
                     </div>
+                    {/* Separador vertical fino */}
+                    <div className="w-[1.5px] h-5 bg-slate-200/90 mx-3 shrink-0" />
+                    <label htmlFor="password" className="sr-only">Contraseña</label>
                     <input
                       id="password"
                       name="password"
@@ -240,87 +286,76 @@ export default function CasillaLoginPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       disabled={cargando}
-                      placeholder="••••••••"
-                      className="w-full pl-10 pr-11 py-2.5 rounded-xl border border-slate-300 focus:border-[#0073E6] focus:ring-2 focus:ring-[#0073E6]/20 text-sm font-medium text-slate-800 placeholder:text-slate-400 transition outline-none disabled:bg-slate-100 disabled:cursor-not-allowed"
+                      placeholder="Contraseña"
+                      className="w-full py-2 pr-9 text-sm sm:text-base font-medium text-slate-800 placeholder:text-slate-400 placeholder:font-normal bg-transparent outline-none disabled:cursor-not-allowed"
                     />
                     <button
                       type="button"
                       onClick={() => setMostrarPassword(!mostrarPassword)}
                       disabled={cargando}
-                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                      className="absolute right-4 text-slate-400 hover:text-slate-600 transition cursor-pointer p-1"
                       aria-label={mostrarPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                     >
                       {mostrarPassword ? (
-                        <EyeOff className="w-4.5 h-4.5" />
+                        <EyeOff className="w-5 h-5" />
                       ) : (
-                        <Eye className="w-4.5 h-4.5" />
+                        <Eye className="w-5 h-5" />
                       )}
                     </button>
                   </div>
+
+                  {/* 5. Botón principal: degradado azul intenso con bordes muy redondeados */}
+                  <button
+                    type="submit"
+                    disabled={cargando}
+                    className="w-full mt-2 flex items-center justify-center gap-2.5 rounded-full bg-gradient-to-r from-[#0038A8] via-[#0052CC] to-[#0073E6] hover:from-[#002D88] hover:via-[#0047AB] hover:to-[#005fb8] text-white py-3 sm:py-3.5 px-6 font-bold text-base sm:text-lg shadow-lg shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/40 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 disabled:opacity-60 cursor-pointer"
+                  >
+                    {cargando ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Ingresando…</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Ingresar</span>
+                        <ArrowRight className="w-5 h-5 ml-1" />
+                      </>
+                    )}
+                  </button>
+                </form>
+
+                {/* 6. Pie inferior del cuadro: Línea sutil y dos enlaces con íconos específicos */}
+                <div className="mt-5 sm:mt-6 pt-3.5 sm:pt-4 border-t border-slate-200/70 space-y-2 sm:space-y-2.5 text-xs sm:text-sm text-slate-600">
+                  {/* Primera línea: círculo azul con ? y enlace Regístrate aquí */}
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-[#0073E6] text-white flex items-center justify-center text-[11px] font-bold shrink-0 shadow-2xs">
+                      ?
+                    </div>
+                    <span>¿No tienes una cuenta?</span>
+                    <Link
+                      to="/registro"
+                      className="font-bold text-[#0052CC] hover:text-[#0038A8] underline transition-colors"
+                    >
+                      Regístrate aquí
+                    </Link>
+                  </div>
+
+                  {/* Segunda línea: ícono de llave en azul y enlace Activar cuenta */}
+                  <div className="flex items-center justify-center gap-2 text-[11px] sm:text-xs text-slate-600">
+                    <KeyRound className="w-4 h-4 text-[#0073E6] shrink-0" aria-hidden="true" />
+                    <span>¿Ya te registraste pero no activaste tu cuenta?</span>
+                    <Link
+                      to="/activar-cuenta"
+                      className="font-bold text-[#0052CC] hover:text-[#0038A8] underline transition-colors"
+                    >
+                      Activar cuenta
+                    </Link>
+                  </div>
                 </div>
-
-                {/* Botón principal «Ingresar a mi Casilla» */}
-                <button
-                  type="submit"
-                  disabled={cargando}
-                  className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl bg-[#0073E6] hover:bg-[#005bb5] text-white py-3 px-4 font-bold text-sm shadow-[0_4px_12px_rgba(0,115,230,0.25)] hover:shadow-[0_6px_16px_rgba(0,115,230,0.35)] hover:-translate-y-0.5 active:translate-y-0 transition duration-150 disabled:opacity-60 disabled:pointer-events-none cursor-pointer"
-                >
-                  {cargando ? (
-                    <>
-                      <Loader2 className="w-4.5 h-4.5 animate-spin" />
-                      <span>Validando credenciales…</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck className="w-4.5 h-4.5" />
-                      <span>Ingresar a mi Casilla</span>
-                      <ArrowRight className="w-4 h-4 ml-0.5" />
-                    </>
-                  )}
-                </button>
-              </form>
-
-              {/* Separador y enlaces complementarios */}
-              <div className="mt-6 pt-5 border-t border-slate-100 space-y-3 text-center text-xs text-slate-600">
-                <p>
-                  ¿No tienes una cuenta?{" "}
-                  <Link
-                    to="/registro"
-                    className="font-bold text-[#0073E6] hover:text-[#005bb5] hover:underline"
-                  >
-                    Regístrate aquí
-                  </Link>
-                </p>
-
-                <p className="text-[11px] text-slate-500">
-                  ¿Ya te registraste pero no activaste tu cuenta?{" "}
-                  <Link
-                    to="/activar-cuenta"
-                    className="font-semibold text-slate-700 hover:text-[#005bb5] underline"
-                  >
-                    Activar cuenta
-                  </Link>
-                </p>
               </div>
             </div>
-
-            {/* Pie de tarjeta con nota legal institucional */}
-            <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-500 text-center">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#0073E6] shrink-0" />
-              <span>
-                Notificación administrativa con validez legal según la Ley N.º 31736
-              </span>
-            </div>
           </div>
-        </div>
       </main>
-
-      {/* Pie institucional */}
-      <footer className="w-full py-4 text-center text-xs text-slate-500 border-t border-slate-200 bg-white">
-        <p>
-          Instituto de Educación Superior Tecnológico Público «Suiza» • Av. Centenario Km 4.5, Pucallpa
-        </p>
-      </footer>
     </div>
   );
 }

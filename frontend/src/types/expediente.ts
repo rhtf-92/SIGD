@@ -186,6 +186,8 @@ export interface ExpedienteResumenRutaDoc {
   fechaIngreso?: string | null;
   estadoActual: string;
   areaActualId: string | null;
+  solicitanteNombre?: string | null;
+  solicitanteNumeroDocumento?: string | null;
   habilitacionInfo?: HabilitacionInfoRutaDoc | null;
 }
 export interface DocumentoAdjuntoRutaDoc {

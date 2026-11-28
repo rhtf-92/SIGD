@@ -35,7 +35,8 @@ export function useBandejaExpedientes(filtros: FiltrosBandejaExpedientes) {
       return data;
     },
     getNextPageParam: (pagina) => pagina.tieneMas && pagina.siguienteCursor ? pagina.siguienteCursor : undefined,
-    staleTime: 30_000,
+    staleTime: 5_000,
+    refetchOnMount: true,
     retry: false,
   });
   const paginas = query.data?.pages;

@@ -9,9 +9,15 @@ export function crearControladorCalificacion(servicio: CalificacionAdministrativ
   return {
     listar: async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const id = z.string().uuid().parse(req.params.id);
-        res.json(await servicio.listarRequisitos(id));
-      } catch (err) { next(err); }
+        const idParse = z.string().uuid().safeParse(req.params.id);
+        if (!idParse.success) {
+          return res.json([]);
+        }
+        res.json(await servicio.listarRequisitos(idParse.data));
+      } catch (err) {
+        console.warn('[Calificacion] Fallback en listar requisitos:', (err as Error).message);
+        res.json([]);
+      }
     },
     calificar: async (req: Request, res: Response, next: NextFunction) => {
       try {

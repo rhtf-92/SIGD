@@ -91,7 +91,9 @@ export default function CargoDigitalModal({
   const hashSha256 = isDigitalResponse
     ? cargo.hashTransaccion
     : cargo.hashSha256Recepcion;
-  const radicadoDiaSiguiente = !isDigitalResponse && cargo.radicadoDiaSiguiente;
+  const radicadoDiaSiguiente = isDigitalResponse
+    ? Boolean(cargo.mensajeLegal && (cargo.mensajeLegal.includes('corte') || cargo.mensajeLegal.includes('16:30') || cargo.mensajeLegal.includes('no habil') || cargo.mensajeLegal.includes('no hábil')))
+    : Boolean(cargo.radicadoDiaSiguiente);
   const horaCorteAplicada = !isDigitalResponse ? cargo.horaCorteAplicada : "16:30";
 
   function handleImprimirTicket() {
@@ -189,6 +191,9 @@ export default function CargoDigitalModal({
                 ESTADO INICIAL: REGISTRADO
               </span>
             </div>
+            <div className="mt-2 text-[10px] text-emerald-800 bg-emerald-50 rounded p-1.5 border border-emerald-200">
+              📧 Copia oficial del Cargo Digital enviada al correo registrado del solicitante.
+            </div>
           </div>
 
           {/* Código QR Centrado */}
@@ -239,8 +244,9 @@ export default function CargoDigitalModal({
             <div className="rounded bg-amber-50 p-2 text-[10px] border border-amber-300 text-amber-900 print:border-black">
               <p className="font-bold">⚠️ NOTA NORMATIVA LEY N.° 27444:</p>
               <p className="leading-snug mt-0.5">
-                Ingreso registrado después del corte de las {horaCorteAplicada} hrs.
-                La radicación formal se computa a partir de las 08:00 hrs del día hábil siguiente.
+                {isDigitalResponse && cargo.mensajeLegal
+                  ? cargo.mensajeLegal
+                  : `Ingreso registrado después del corte de las ${horaCorteAplicada} hrs. La radicación formal se computa a partir de las 08:00 hrs del día hábil siguiente.`}
               </p>
             </div>
           )}

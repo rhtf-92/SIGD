@@ -222,7 +222,7 @@ export const BandejaMesaPartesPanel: React.FC = () => {
                   <td className="p-3 text-center whitespace-nowrap">
                     <button
                       type="button"
-                      onClick={() => navigate(`/expedientes/${exp.idExpediente}`)}
+                      onClick={() => navigate(`/expedientes/${exp.idExpediente || exp.cut}`)}
                       className="rounded-lg bg-blue-700 hover:bg-blue-800 text-white px-3 py-1 text-xs font-semibold shadow-sm transition cursor-pointer"
                     >
                       Ver Expediente

@@ -32,8 +32,11 @@ export default function TimelineItemCard({
   evento,
   esMasReciente = false,
 }: TimelineItemCardProps) {
-  if ("movimientoId" in evento) {
-    const estiloOrigen = evento.origen ? ORIGEN_ESTILOS[evento.origen] ?? { bg: "bg-slate-50 border-slate-200", text: "text-slate-700", label: evento.origen } : null;
+  const esRutaDoc = "movimientoId" in evento || "idMovimiento" in evento;
+  if (esRutaDoc) {
+    const ev = evento as any;
+    const fechaHoraStr = ev.fechaHora || ev.timestamp;
+    const estiloOrigen = ev.origen ? ORIGEN_ESTILOS[ev.origen] ?? { bg: "bg-slate-50 border-slate-200", text: "text-slate-700", label: ev.origen } : null;
 
     return (
       <li className="relative pl-10">
@@ -41,37 +44,43 @@ export default function TimelineItemCard({
         <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-semibold text-slate-400">#{evento.secuencia}</span>
-              <h3 className="text-sm font-bold text-slate-900">{evento.evento.replace(/_/g, " ")}</h3>
+              <span className="font-mono text-xs font-semibold text-slate-400">#{ev.secuencia || 1}</span>
+              <h3 className="text-sm font-bold text-slate-900">{(ev.evento || "Actuación").replace(/_/g, " ")}</h3>
               {estiloOrigen && (
                 <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold ${estiloOrigen.bg} ${estiloOrigen.text}`}>
                   {estiloOrigen.label}
                 </span>
               )}
             </div>
-            <time dateTime={evento.fechaHora} className="text-xs font-medium text-slate-500">
-              {Number.isFinite(Date.parse(evento.fechaHora)) ? formateadorFechaHora.format(new Date(evento.fechaHora)) : evento.fechaHora}
+            <time dateTime={fechaHoraStr} className="text-xs font-medium text-slate-500">
+              {fechaHoraStr && Number.isFinite(Date.parse(fechaHoraStr)) ? formateadorFechaHora.format(new Date(fechaHoraStr)) : (fechaHoraStr || "Fecha no registrada")}
             </time>
           </div>
           <dl className="mt-3 grid gap-1 break-all text-xs text-slate-500 sm:grid-cols-2">
-            {evento.unidadOrganica && <div><dt className="font-semibold text-slate-600">Unidad Orgánica</dt><dd>{evento.unidadOrganica}</dd></div>}
-            {evento.rol && <div><dt className="font-semibold text-slate-600">Rol</dt><dd>{evento.rol}</dd></div>}
-            <div><dt className="font-semibold text-slate-600">Transición</dt><dd className="font-medium text-slate-700">{evento.estadoAnterior} → {evento.estadoNuevo}</dd></div>
-            <div><dt className="font-semibold text-slate-600">Tipo de actuación</dt><dd>{evento.tipoActuacion}</dd></div>
-            {evento.remitente && <div><dt className="font-semibold text-slate-600">Remitente</dt><dd>{evento.remitente}</dd></div>}
-            {evento.destinatario && <div><dt className="font-semibold text-slate-600">Destinatario</dt><dd>{evento.destinatario}</dd></div>}
-            {evento.usuarioOperadorId && <div><dt className="font-semibold text-slate-600">Operador / Responsable</dt><dd className="font-mono">{evento.usuarioOperadorId}</dd></div>}
+            {ev.unidadOrganica && <div><dt className="font-semibold text-slate-600">Unidad Orgánica</dt><dd>{ev.unidadOrganica}</dd></div>}
+            {ev.rol && <div><dt className="font-semibold text-slate-600">Rol</dt><dd>{ev.rol}</dd></div>}
+            <div><dt className="font-semibold text-slate-600">Transición</dt><dd className="font-medium text-slate-700">{ev.estadoAnterior || "INICIO"} → {ev.estadoNuevo || "REGISTRADO"}</dd></div>
+            {ev.tipoActuacion && <div><dt className="font-semibold text-slate-600">Tipo de actuación</dt><dd>{ev.tipoActuacion}</dd></div>}
+            {ev.remitente && <div><dt className="font-semibold text-slate-600">Remitente</dt><dd>{ev.remitente}</dd></div>}
+            {ev.destinatario && <div><dt className="font-semibold text-slate-600">Destinatario</dt><dd>{ev.destinatario}</dd></div>}
+            {ev.usuarioOperadorId && <div><dt className="font-semibold text-slate-600">Operador / Responsable</dt><dd className="font-mono">{ev.usuarioOperadorId}</dd></div>}
           </dl>
-          {evento.proveido != null && (
+          {ev.observaciones && (
             <div className="mt-2.5 rounded-lg border border-slate-100 bg-slate-50 p-2.5 text-xs text-slate-700">
-              <span className="font-semibold text-slate-900">Proveído / Detalle: </span>
-              {typeof evento.proveido === "string" ? evento.proveido : JSON.stringify(evento.proveido, null, 2)}
+              <span className="font-semibold text-slate-900">Observaciones: </span>
+              {ev.observaciones}
             </div>
           )}
-          {Object.keys(evento.datosAsociados ?? {}).length > 0 && (
+          {ev.proveido != null && (
+            <div className="mt-2.5 rounded-lg border border-slate-100 bg-slate-50 p-2.5 text-xs text-slate-700">
+              <span className="font-semibold text-slate-900">Proveído / Detalle: </span>
+              {typeof ev.proveido === "string" ? ev.proveido : JSON.stringify(ev.proveido, null, 2)}
+            </div>
+          )}
+          {ev.datosAsociados && Object.keys(ev.datosAsociados).length > 0 && (
             <details className="mt-2 text-xs text-slate-500">
               <summary className="cursor-pointer font-medium hover:text-slate-700">Metadatos estructurados</summary>
-              <pre className="mt-1 max-h-36 overflow-auto rounded bg-slate-50 p-2 whitespace-pre-wrap break-words text-[11px]">{JSON.stringify(evento.datosAsociados, null, 2)}</pre>
+              <pre className="mt-1 max-h-36 overflow-auto rounded bg-slate-50 p-2 whitespace-pre-wrap break-words text-[11px]">{JSON.stringify(ev.datosAsociados, null, 2)}</pre>
             </details>
           )}
         </article>
@@ -98,7 +107,9 @@ export default function TimelineItemCard({
             dateTime={evento.timestamp}
             className="text-xs font-medium text-slate-500"
           >
-            {formateadorFechaHora.format(new Date(evento.timestamp))}
+            {evento.timestamp && Number.isFinite(Date.parse(evento.timestamp))
+              ? formateadorFechaHora.format(new Date(evento.timestamp))
+              : (evento.timestamp || "Fecha no registrada")}
           </time>
         </div>
 
@@ -130,7 +141,7 @@ export default function TimelineItemCard({
               Hash SHA-256:{" "}
             </dt>
             <dd className="inline font-mono">
-              {evento.hashTransaccion.slice(0, 16)}…
+              {evento.hashTransaccion?.slice(0, 16) || "—"}…
             </dd>
           </div>
         </dl>

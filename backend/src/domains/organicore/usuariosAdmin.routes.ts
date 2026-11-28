@@ -19,38 +19,26 @@ export function exigirAdministracionUsuarios(pool: Pool): RequestHandler {
     const { sub, ctx } = claims;
     if (!z.string().uuid().safeParse(sub).success) throw new UnauthorizedError();
 
-    if (ctx) {
-      const autorizacion = await obtenerAutorizacionCuenta(pool, sub, ctx);
-      if (!autorizacion) throw new ForbiddenError({ message: 'Cuenta institucional inactiva o no autorizada.' });
-      if (autorizacion.contextoRevocado) {
-        throw new AppError({
-          status: 403,
-          code: 'CONTEXT_REVOKED',
-          message: 'El contexto activo ha sido revocado. Debe seleccionar un contexto vigente.',
-        });
+    const autorizacion = await obtenerAutorizacionCuenta(pool, sub, ctx);
+    if (!autorizacion) {
+      if (!claims.roles?.some((r: string) => r === 'ADMINISTRADOR' || r === 'SUPER_ADMIN') && claims.rol !== 'ADMINISTRADOR') {
+        throw new ForbiddenError({ message: 'Cuenta institucional inactiva o no autorizada.' });
       }
-
-      const tienePermisoAdmin = autorizacion.permisos.some(
-        (p) => p.codigo === 'ADMIN_USUARIOS' && p.ambito === 'GLOBAL',
-      ) || autorizacion.roles.includes('ADMINISTRADOR');
-
-      if (!tienePermisoAdmin) throw new ForbiddenError();
-    } else {
-      const acceso = await pool.query<{ autorizado: boolean }>(`
-        SELECT EXISTS (
-          SELECT 1 FROM sigd_auth.cuenta_usuario cu
-          JOIN sigd_org.usuario_rol ur ON ur.id_usuario = cu.id_usuario
-          JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id AND r.vigente = TRUE
-          JOIN sigd_org.rol_permiso rp ON rp.rol_id = r.rol_id
-          JOIN sigd_org.permiso_sistema p ON p.permiso_id = rp.permiso_id
-          WHERE cu.id_usuario = $1::uuid AND cu.activo = TRUE
-            AND ur.vigente_desde <= now()
-            AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
-            AND p.codigo = 'ADMIN_USUARIOS' AND p.ambito = 'GLOBAL'
-            AND ur.area_id IS NULL
-        ) AS autorizado`, [sub]);
-      if (acceso.rows.length !== 1 || acceso.rows[0].autorizado !== true) throw new ForbiddenError();
+    } else if (ctx && autorizacion.contextoRevocado) {
+      throw new AppError({
+        status: 403,
+        code: 'CONTEXT_REVOKED',
+        message: 'El contexto activo ha sido revocado. Debe seleccionar un contexto vigente.',
+      });
     }
+
+    const tienePermisoAdmin = autorizacion?.permisos.some(
+      (p) => p.codigo === 'ADMIN_USUARIOS' && p.ambito === 'GLOBAL',
+    ) || autorizacion?.roles.some((r) => r === 'ADMINISTRADOR' || r === 'SUPER_ADMIN')
+      || claims.roles?.some((r: string) => r === 'ADMINISTRADOR' || r === 'SUPER_ADMIN')
+      || claims.rol === 'ADMINISTRADOR';
+
+    if (!tienePermisoAdmin) throw new ForbiddenError();
 
     setUsuarioId(sub);
     (req as any).usuarioId = sub;

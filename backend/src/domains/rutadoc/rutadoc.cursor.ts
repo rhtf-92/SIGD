@@ -7,6 +7,13 @@ export function esIdExpediente(valor: unknown): valor is string {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor);
 }
 
+export function esIdentificadorExpediente(valor: unknown): valor is string {
+  return typeof valor === 'string' && (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor) ||
+    /^EXP-\d{4}-\d{6}$/i.test(valor)
+  );
+}
+
 export function huellaFiltros(filtros: FiltrosRutaDoc): string {
   return createHash('sha256').update(JSON.stringify({
     pestana: filtros.pestana,

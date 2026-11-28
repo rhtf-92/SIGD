@@ -246,7 +246,7 @@ export default function BandejaExpedientesPage() {
               type="search"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar por CUT o asunto" maxLength={100}
+              placeholder="Buscar por CUT, solicitante (DNI/nombres) o asunto" maxLength={100}
               className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
             />
           </div>

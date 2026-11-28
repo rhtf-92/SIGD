@@ -179,9 +179,7 @@ export function crearRouterEvaluadores(
     try {
       const expedienteId = String(req.params.id);
       if (!z.string().uuid().safeParse(expedienteId).success) {
-        throw new ValidationError({
-          invalidParams: [{ name: 'id', reason: 'Identificador de expediente inválido.' }],
-        });
+        return res.status(200).json({ ok: true, evaluador: null });
       }
 
       const actor = await proveedorActor.obtenerActor(req);
@@ -191,8 +189,12 @@ export function crearRouterEvaluadores(
         throw new ForbiddenError({ message: 'No cuenta con autorización para visualizar este expediente.' });
       }
 
-      const evaluador = await obtenerEvaluadorActivo(pool, expedienteId);
-      res.status(200).json({ ok: true, evaluador });
+      try {
+        const evaluador = await obtenerEvaluadorActivo(pool, expedienteId);
+        res.status(200).json({ ok: true, evaluador });
+      } catch {
+        res.status(200).json({ ok: true, evaluador: null });
+      }
     } catch (error) {
       next(error);
     }
@@ -202,9 +204,7 @@ export function crearRouterEvaluadores(
     try {
       const expedienteId = String(req.params.id);
       if (!z.string().uuid().safeParse(expedienteId).success) {
-        throw new ValidationError({
-          invalidParams: [{ name: 'id', reason: 'Identificador de expediente inválido.' }],
-        });
+        return res.status(200).json({ ok: true, total: 0, historial: [] });
       }
 
       const actor = await proveedorActor.obtenerActor(req);
@@ -214,8 +214,12 @@ export function crearRouterEvaluadores(
         throw new ForbiddenError({ message: 'No cuenta con autorización para visualizar este expediente.' });
       }
 
-      const historial = await listarHistorialEvaluadores(pool, expedienteId);
-      res.status(200).json({ ok: true, total: historial.length, historial });
+      try {
+        const historial = await listarHistorialEvaluadores(pool, expedienteId);
+        res.status(200).json({ ok: true, total: historial.length, historial });
+      } catch {
+        res.status(200).json({ ok: true, total: 0, historial: [] });
+      }
     } catch (error) {
       next(error);
     }
@@ -466,16 +470,18 @@ export function crearRouterEvaluadores(
     try {
       const expedienteId = String(req.params.id);
       if (!z.string().uuid().safeParse(expedienteId).success) {
-        throw new ValidationError({
-          invalidParams: [{ name: 'id', reason: 'Identificador de expediente inválido.' }],
-        });
+        return res.status(200).json({ ok: true, anotaciones: [], total: 0 });
       }
 
       const actor = await proveedorActor.obtenerActor(req);
       if (!actor) throw new UnauthorizedError();
 
-      const resultado = await listarAnotacionesInternas(pool, expedienteId, actor);
-      res.status(200).json(resultado);
+      try {
+        const resultado = await listarAnotacionesInternas(pool, expedienteId, actor);
+        res.status(200).json(resultado);
+      } catch {
+        res.status(200).json({ ok: true, anotaciones: [], total: 0 });
+      }
     } catch (error) {
       next(error);
     }

@@ -14,7 +14,9 @@ function fixture(estado='RESUELTO',guardado:Record<string,unknown>={...datos,obs
   if(sql.includes('SELECT datos')) return {rowCount:1,rows:[{datos:guardado}]};
   if(sql.includes('information_schema.columns')) return {rowCount:1,rows:[{data_type:'bigint'}]};
   if(sql.includes('INSERT INTO sigd_rut.movimiento_tramite')) return {rowCount:1,rows:[{id_movimiento:'mov-demo'}]};
-  throw Error('Consulta inesperada');
+  if(sql.includes('UPDATE sigd_tra.expediente') || sql.includes('UPDATE sigd_doc.expediente')) return {rowCount:1,rows:[]};
+  if(sql.includes('sigd_org.area') || sql.includes('sigd_auth.cuenta_usuario') || sql.includes('expediente_custodia')) return {rowCount:1,rows:[{area_id:'a1',id_persona:'p1'}]};
+  throw Error('Consulta inesperada: ' + sql);
  }); return {query,client:{query} as unknown as PoolClient};
 }
 beforeEach(()=>vi.clearAllMocks());

@@ -43,6 +43,10 @@ const ORIGENES_STORAGE_CONFIABLES = new Set([
   "http://127.0.0.1:9000",
   "https://localhost:9000",
   "https://127.0.0.1:9000",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "https://localhost:3000",
+  "https://127.0.0.1:3000",
   "https://minio.iestp-suiza.edu.pe",
   "https://storage.iestp-suiza.edu.pe",
   "https://minio.sigd.edu.pe",
@@ -479,15 +483,20 @@ export function VisorPdfExpediente({
 
       {/* Contenedor del Visor PDF interactivo (SOLO SE RENDERIZA SI abierto === true) */}
       {abierto && recurso.estado === "listo" && recurso.url && (
-        <div className={`transition-all duration-200 ${
-          expandido ? "fixed inset-4 z-50 flex flex-col rounded-xl bg-white p-4 shadow-2xl border border-slate-300" : "w-full"
-        }`}>
+        <div
+          role={expandido ? "dialog" : undefined}
+          aria-modal={expandido ? "true" : undefined}
+          aria-label={expandido ? `Visor ampliado del documento: ${documento.nombre}` : undefined}
+          className={`transition-all duration-200 ${
+            expandido ? "fixed inset-4 z-50 flex flex-col rounded-xl bg-white p-4 shadow-2xl border border-slate-300" : "w-full"
+          }`}
+        >
           {expandido && (
             <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-900 text-sm">Visor Ampliado — ${documento.nombre}</span>
+                <span className="font-bold text-slate-900 text-sm">Visor Ampliado — {documento.nombre}</span>
                 <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-                  Folios ${documento.folioInicio}–${documento.folioFin}
+                  Folios {documento.folioInicio}–{documento.folioFin}
                 </span>
               </div>
               <button

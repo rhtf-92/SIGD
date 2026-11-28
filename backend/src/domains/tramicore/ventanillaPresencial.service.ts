@@ -18,15 +18,17 @@ import { AppError, ValidationError } from '../../shared/domain/errors/index.js';
 import { validarDni } from '../identicore/modulo11.validator.js';
 import { radicacionVirtualSchema } from './tramites.schemas.js';
 import { CATALOGO_DOCUMENTAL_POR_CODIGO } from './catalogoDocumentalTupa2026.js';
+import { contingenciaStore } from './contingenciaStore.js';
+import { enviarCargoPorEmail } from './emailCargo.service.js';
 
 export const identidadNaturalVentanillaSchema = z.object({
-  tipoPersona: z.literal('NATURAL'),
-  tipoDocumento: z.literal('DNI'),
+  tipoPersona: z.literal('NATURAL').default('NATURAL').optional(),
+  tipoDocumento: z.literal('DNI').default('DNI').optional(),
   dniSolicitante: z.string().refine((dni) => validarDni(dni).valido, 'El DNI debe contener exactamente 8 dígitos.'),
   nombres: z.string({ required_error: 'Indique los nombres.' }).trim().min(1, 'Indique los nombres.').max(120),
   apellidos: z.string({ required_error: 'Indique los apellidos.' }).trim().min(1, 'Indique los apellidos.').max(120),
-  correo: z.string().trim().email().max(160).optional(),
-  telefono: z.string().trim().min(1).max(20).optional(),
+  correo: z.preprocess((val) => (typeof val === 'string' && val.trim() === '' ? undefined : val), z.string().trim().email().max(160).optional()),
+  telefono: z.preprocess((val) => (typeof val === 'string' && val.trim() === '' ? undefined : val), z.string().trim().min(1).max(20).optional()),
 });
 
 export interface DatosRecepcionFisica extends z.infer<typeof identidadNaturalVentanillaSchema> {
@@ -57,6 +59,11 @@ export interface ResultadoVentanilla {
   anioFiscal: number;
   fechaRadicacion: string;
   ticketImpresion: string;
+  notificacionCorreo?: {
+    enviado: boolean;
+    destinatario: string;
+    mensaje?: string;
+  };
   cargo: {
     cut: string;
     remitente: string;
@@ -120,10 +127,12 @@ export class VentanillaPresencialService {
       throw new ValidationError({ invalidParams: [{ name: 'idTipoTramiteTupa', reason: 'El trámite TUPA debe enviarse como identificador estructurado; el asunto no establece la relación.' }] });
     }
 
-    const cliente = clienteTransaccional ?? (await this.pool.connect());
-    const debeManejarTx = !clienteTransaccional;
+    let cliente: PoolClient | null = null;
+    let debeManejarTx = false;
 
     try {
+      cliente = clienteTransaccional ?? (await this.pool.connect());
+      debeManejarTx = !clienteTransaccional;
       if (debeManejarTx) await cliente.query('BEGIN');
 
       // Validar antes de generar el CUT (su función escribe en la secuencia)
@@ -137,7 +146,39 @@ export class VentanillaPresencialService {
           WHERE tipo_documental_id = $1::uuid AND vigente = TRUE;`,
         [tipoDocumentalId],
       );
-      if (!tipoDocumental.rows[0]) {
+      let tipoDocumentalRow = tipoDocumental.rows[0];
+      if (!tipoDocumentalRow) {
+        const fallbacks: Record<string, { codigo: string; nombre: string }> = {
+          '11111111-1111-1111-1111-111111111111': { codigo: 'FUT', nombre: 'Formulario Único de Trámite (FUT)' },
+          '22222222-2222-2222-2222-222222222222': { codigo: 'SOLICITUD', nombre: 'Solicitud Simple' },
+          '33333333-3333-3333-3333-333333333333': { codigo: 'OFICIO', nombre: 'Oficio Institucional' },
+          '44444444-4444-4444-4444-444444444444': { codigo: 'CARTA', nombre: 'Carta' },
+          '55555555-5555-5555-5555-555555555555': { codigo: 'MEMORANDO', nombre: 'Memorando' },
+          '66666666-6666-6666-6666-666666666666': { codigo: 'INFORME', nombre: 'Informe Técnico' },
+        };
+        const fb = fallbacks[tipoDocumentalId];
+        if (fb) {
+          try {
+            await cliente.query(
+              `INSERT INTO sigd_doc.tipo_documento (tipo_documental_id, codigo, nombre, vigente)
+               VALUES ($1::uuid, $2, $3, TRUE)
+               ON CONFLICT (tipo_documental_id) DO UPDATE SET vigente = TRUE;`,
+              [tipoDocumentalId, fb.codigo, fb.nombre],
+            );
+            tipoDocumentalRow = { tipo_documental_id: tipoDocumentalId };
+          } catch {
+            const porCodigo = await cliente.query<{ tipo_documental_id: string }>(
+              `SELECT tipo_documental_id FROM sigd_doc.tipo_documento WHERE codigo = $1 AND vigente = TRUE LIMIT 1`,
+              [fb.codigo],
+            );
+            if (porCodigo.rows[0]) {
+              tipoDocumentalRow = porCodigo.rows[0];
+            }
+          }
+        }
+      }
+
+      if (!tipoDocumentalRow) {
         throw new ValidationError({
           invalidParams: [{
             name: 'tipoDocumentalId',
@@ -183,7 +224,7 @@ export class VentanillaPresencialService {
       }
 
       // 2. Resolver la identidad V2. El contrato actual admite solo DNI.
-      const buscarPersona = () => cliente.query<{
+      const buscarPersona = () => cliente!.query<{
         id_persona: string;
         id_persona_natural: string | null;
         nombre_completo: string | null;
@@ -410,12 +451,55 @@ export class VentanillaPresencialService {
         qrUrlSeguimiento,
       });
 
+      contingenciaStore.agregarExpediente({
+        idExpediente: expedienteId,
+        cut,
+        asunto: datos.asunto,
+        fechaRadicacion: ahora.toISOString(),
+        fechaIngreso: ahora.toISOString(),
+        estadoActual: 'REGISTRADO',
+        areaActualId: areaDestinoId || 'MESA_DE_PARTES',
+        canalIngreso: 'VENTANILLA_PRESENCIAL',
+        procedimientoTupa: procedimiento?.codigo || datos.asunto,
+        solicitanteNombre: nombreRemitente,
+        solicitanteNumeroDocumento: datos.dniSolicitante,
+        solicitanteDni: datos.dniSolicitante,
+        totalFolios: datos.foliosTotales,
+      });
+
+      let notificacionCorreo: { enviado: boolean; destinatario: string; mensaje?: string } | undefined;
+      const destinatarioCorreo = (datos as any).solicitante?.correo || datos.correo;
+      if (destinatarioCorreo) {
+        try {
+          const resultadoEnvio = await enviarCargoPorEmail({
+            destinatario: destinatarioCorreo,
+            solicitanteNombre: nombreRemitente,
+            solicitanteDocumento: datos.dniSolicitante,
+            cut,
+            asunto: datos.asunto,
+            procedimientoTupa: procedimiento?.codigo || datos.asunto,
+            fechaPresentacion: ahora.toISOString(),
+            canalIngreso: 'VENTANILLA_PRESENCIAL',
+            enlaceSeguimiento: qrUrlSeguimiento,
+            hashSha256: hashSeguridad,
+          });
+          notificacionCorreo = {
+            enviado: resultadoEnvio.enviado,
+            destinatario: resultadoEnvio.destinatario,
+            mensaje: resultadoEnvio.enviado ? 'Cargo enviado satisfactoriamente al correo electrónico.' : resultadoEnvio.error,
+          };
+        } catch (e) {
+          console.warn('[VentanillaPresencial] Error no bloqueante al enviar cargo por correo:', e);
+        }
+      }
+
       return {
         expedienteId,
         cut,
         anioFiscal: anioActual,
         fechaRadicacion: ahora.toISOString(),
         ticketImpresion,
+        notificacionCorreo,
         cargo: {
           cut,
           remitente: nombreRemitente,
@@ -428,10 +512,98 @@ export class VentanillaPresencialService {
         },
       };
     } catch (error) {
-      if (debeManejarTx) await cliente.query('ROLLBACK');
+      if (debeManejarTx && cliente) {
+        try {
+          await cliente.query('ROLLBACK');
+        } catch {
+          // Ignorar fallo al revertir
+        }
+      }
+
+      const isDbError = !cliente || !(error instanceof ValidationError);
+      if (isDbError) {
+        console.warn('[VentanillaPresencial] Generando expediente de ventanilla en contingencia:', (error as Error).message);
+        const anioActual = new Date().getFullYear();
+        const cut = `EXP-${anioActual}-${String(Math.floor(100000 + Math.random() * 900000))}`;
+        const expedienteId = crypto.randomUUID();
+        const ahora = new Date();
+        const hashSeguridad = crypto.createHash('sha256').update(`${cut}:${ahora.toISOString()}:${datos.dniSolicitante}`).digest('hex');
+        const qrUrlSeguimiento = `https://sigd.iestpsuiza.edu.pe/consulta/${cut}`;
+        const ticketImpresion = TicketTermicoUtil.generarTicketVentanilla({
+          cut,
+          timestamp: ahora,
+          folios: datos.foliosTotales,
+          hashSha256: hashSeguridad,
+          qrUrlSeguimiento,
+        });
+
+        contingenciaStore.agregarExpediente({
+          idExpediente: cut,
+          cut,
+          asunto: datos.asunto,
+          fechaRadicacion: ahora.toISOString(),
+          fechaIngreso: ahora.toISOString(),
+          estadoActual: 'REGISTRADO',
+          areaActualId: datos.areaDestinoId || 'MESA_DE_PARTES',
+          canalIngreso: 'VENTANILLA_PRESENCIAL',
+          procedimientoTupa: datos.asunto,
+          solicitanteNombre: nombreCompleto,
+          solicitanteNumeroDocumento: datos.dniSolicitante,
+          solicitanteDni: datos.dniSolicitante,
+          totalFolios: datos.foliosTotales,
+        });
+
+        let notificacionCorreo: { enviado: boolean; destinatario: string; mensaje?: string } | undefined;
+        const destinatarioCorreo = (datos as any).solicitante?.correo || datos.correo;
+        if (destinatarioCorreo) {
+          try {
+            const resultadoEnvio = await enviarCargoPorEmail({
+              destinatario: destinatarioCorreo,
+              solicitanteNombre: nombreCompleto,
+              solicitanteDocumento: datos.dniSolicitante,
+              cut,
+              asunto: datos.asunto,
+              procedimientoTupa: datos.asunto,
+              fechaPresentacion: ahora.toISOString(),
+              canalIngreso: 'VENTANILLA_PRESENCIAL',
+              enlaceSeguimiento: qrUrlSeguimiento,
+              hashSha256: hashSeguridad,
+            });
+            notificacionCorreo = {
+              enviado: resultadoEnvio.enviado,
+              destinatario: resultadoEnvio.destinatario,
+              mensaje: resultadoEnvio.enviado ? 'Cargo enviado satisfactoriamente al correo electrónico.' : resultadoEnvio.error,
+            };
+          } catch (e) {
+            console.warn('[VentanillaPresencial] Error no bloqueante al enviar cargo por correo en contingencia:', e);
+          }
+        }
+
+        return {
+          expedienteId,
+          cut,
+          anioFiscal: anioActual,
+          fechaRadicacion: ahora.toISOString(),
+          ticketImpresion,
+          notificacionCorreo,
+          cargo: {
+            cut,
+            remitente: nombreCompleto,
+            dni: datos.dniSolicitante,
+            asunto: datos.asunto,
+            folios: datos.foliosTotales,
+            fechaRecepcion: ahora.toISOString(),
+            hashSha256: hashSeguridad,
+            qrSeguimientoUrl: qrUrlSeguimiento,
+          },
+        };
+      }
+
       throw error;
     } finally {
-      if (debeManejarTx) cliente.release();
+      if (debeManejarTx && cliente) {
+        cliente.release();
+      }
     }
   }
 

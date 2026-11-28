@@ -12,13 +12,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const esTesoreria = location.pathname === '/tesoreria';
   const esLogin = location.pathname === '/login';
   const esTramite = location.pathname.startsWith('/tramite');
-  const esCasilla = location.pathname.startsWith('/casilla');
+  const esCasilla = location.pathname.startsWith('/casilla') || location.pathname.startsWith('/ventanilla-electronica');
   const esConsulta = location.pathname.startsWith('/consulta');
   const esValidador = location.pathname.startsWith('/validador');
   const sinFondoGris = esPortada || esLogin || esTramite || esCasilla || esConsulta || esValidador;
 
   return (
-    <div className={`min-h-screen flex flex-col ${esTesoreria || esLogin ? 'min-w-0' : 'min-w-[1448px]'} ${sinFondoGris ? "bg-transparent" : "bg-[#F3F4F6]"} text-[#111111]`}>
+    <div className={`min-h-screen flex flex-col ${esTesoreria || esLogin || esCasilla ? 'min-w-0' : 'min-w-[1448px]'} ${sinFondoGris ? "bg-transparent" : "bg-[#F3F4F6]"} text-[#111111]`}>
       {esTesoreria ? (
         <div className="overflow-x-auto">
           <div className="min-w-[1448px]">
@@ -32,10 +32,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
       {children}
 
       {!esPortada && !esLogin && (
-        <footer className="border-t border-slate-200 bg-white/90 backdrop-blur-sm print:hidden relative z-10">
-          <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4 text-center text-xs font-medium text-slate-600 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-            <span>Instituto Suiza • Sistema Integral de Gestión Documentaria</span>
-            <span>© 2026</span>
+        <footer
+          className={`border-t print:hidden relative z-10 ${
+            esConsulta
+              ? "border-blue-950 bg-[#051c44] text-white"
+              : "border-slate-200 bg-white/90 backdrop-blur-sm text-slate-600"
+          }`}
+        >
+          <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-3.5 text-center text-xs font-medium sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+            <span className={esConsulta ? "text-white/95" : "text-slate-600"}>
+              {esConsulta
+                ? 'Instituto Superior Tecnológico Público “Suiza” | Sistema Integral de Gestión Documentaria'
+                : "Instituto Suiza • Sistema Integral de Gestión Documentaria"}
+            </span>
+            <span className={esConsulta ? "text-white/80" : "text-slate-600"}>© 2026</span>
           </div>
         </footer>
       )}

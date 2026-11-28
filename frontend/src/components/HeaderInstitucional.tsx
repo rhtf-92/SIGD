@@ -138,20 +138,24 @@ export default function HeaderInstitucional() {
         </div>
 
         {/* Navegación Desktop */}
-        <nav className="hidden xl:flex items-center gap-3 xl:gap-5 text-[13px] xl:text-[14px] font-medium whitespace-nowrap">
+        <nav className="hidden 2xl:flex items-center gap-3 2xl:gap-5 text-[13px] 2xl:text-[14px] font-medium whitespace-nowrap">
           {!isAuthenticated ? (
             <>
               {/* 1. Casilla Electrónica */}
               <button
                 type="button"
                 onClick={() => irA("/casilla")}
-                className="flex items-center gap-2 text-white hover:text-blue-200 transition cursor-pointer"
+                className={`flex items-center gap-2 transition cursor-pointer ${
+                  location.pathname.startsWith("/casilla") || location.pathname.startsWith("/ventanilla-electronica")
+                    ? "text-white font-bold border-b-2 border-white pb-0.5"
+                    : "text-white hover:text-blue-200"
+                }`}
               >
                 <Mail className="w-5 h-5 shrink-0" aria-hidden="true" />
                 <span>Casilla Electrónica</span>
               </button>
 
-              <div className="h-6 w-[1px] bg-white/30 hidden xl:block" />
+              <div className="h-6 w-[1px] bg-white/30 hidden 2xl:block" />
 
               {/* 2. Mesa de Partes */}
               <button
@@ -358,7 +362,7 @@ export default function HeaderInstitucional() {
         </nav>
 
         {/* Controles para Móviles y Tablets */}
-        <div className="flex xl:hidden shrink-0 items-center gap-2">
+        <div className="flex 2xl:hidden shrink-0 items-center gap-2">
           {!isAuthenticated ? (
             <button
               type="button"
@@ -391,7 +395,7 @@ export default function HeaderInstitucional() {
 
       {/* Menú Desplegable Móvil */}
       {menuMovilAbierto && (
-        <div className="block xl:hidden w-full bg-[#003b7a] border-t border-white/15 px-4 py-4 space-y-2 shadow-lg animate-in fade-in duration-150">
+        <div className="block 2xl:hidden w-full bg-[#003b7a] border-t border-white/15 px-4 py-4 space-y-2 shadow-lg animate-in fade-in duration-150">
           {!isAuthenticated ? (
             <>
               <button

@@ -7,7 +7,7 @@ import type { ServicioFoliacionRutaDoc } from './foliacion.service.js';
 import type { ServicioSlaRutaDoc } from './sla.service.js';
 import type { ServicioTrazabilidadRutaDoc } from './trazabilidad.service.js';
 import type { ActorRutaDoc } from './rutadoc.types.js';
-import { esIdExpediente } from './rutadoc.cursor.js';
+import { esIdExpediente, esIdentificadorExpediente } from './rutadoc.cursor.js';
 
 const ROLES_CCD = new Set(['DOCENTE', 'DIRECTOR', 'MESA_PARTES', 'SUPER_ADMIN']);
 
@@ -22,14 +22,16 @@ export function crearControladorLecturasRutaDoc(
     return actor;
   };
   const idValido = (id: string): string => {
-    if (!esIdExpediente(id)) throw new ValidationError({ invalidParams: [{
-      name: 'id', reason: 'Debe ser un identificador BIGINT positivo válido.',
-    }] });
+    if (!esIdentificadorExpediente(id) && !esIdExpediente(id) && !/^\d+$/.test(id) && !/^EXP-/i.test(id)) {
+      throw new ValidationError({ invalidParams: [{
+        name: 'id', reason: 'Debe ser un identificador válido de expediente (UUID o CUT).',
+      }] });
+    }
     return id;
   };
   const idDeRuta = (valor: string | string[] | undefined): string => {
     if (typeof valor !== 'string') throw new ValidationError({ invalidParams: [{
-      name: 'id', reason: 'Debe indicar un único identificador BIGINT positivo.',
+      name: 'id', reason: 'Debe indicar un único identificador de expediente.',
     }] });
     return idValido(valor);
   };

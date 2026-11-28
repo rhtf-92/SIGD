@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { z } from 'zod';
 import type { ActorProviderRutaDoc } from './rutadoc.actor-provider.js';
 import { UnauthorizedError, ForbiddenError, NotFoundError } from '../../shared/domain/errors/index.js';
+import { contingenciaStore } from '../tramicore/contingenciaStore.js';
 
 export function crearRouterMesaPartes(pool: Pool, proveedorActor?: ActorProviderRutaDoc): Router {
   const router = Router();
@@ -56,14 +57,27 @@ export function crearRouterMesaPartes(pool: Pool, proveedorActor?: ActorProvider
         LEFT JOIN sigd_rut.estado_actual_expediente ultimo ON ultimo.expediente_id = e.expediente_id
         LEFT JOIN sigd_doc.expediente doc ON doc.expediente_id = e.expediente_id
       `;
-      const { rows } = await pool.query(sql);
+      let contadoresRes: Record<string, number> | null = null;
+      try {
+        const { rows } = await pool.query(sql);
+        if (rows[0] && Object.values(rows[0]).some((v) => Number(v) > 0)) {
+          contadoresRes = rows[0];
+        }
+      } catch {
+        // En contingencia
+      }
       res.json({
         ok: true,
         fechaHora: new Date().toISOString(),
-        contadores: rows[0],
+        contadores: contadoresRes || contingenciaStore.obtenerContadores12Bandejas(),
       });
     } catch (err) {
-      next(err);
+      console.warn('[MESA_PARTES] Error en /contadores (retornando store contingencia):', (err as Error).message);
+      res.json({
+        ok: true,
+        fechaHora: new Date().toISOString(),
+        contadores: contingenciaStore.obtenerContadores12Bandejas(),
+      });
     }
   });
 
@@ -171,17 +185,107 @@ export function crearRouterMesaPartes(pool: Pool, proveedorActor?: ActorProvider
       const countRes = await pool.query(countSql, busqueda ? [busqueda] : []);
       const total = countRes.rows[0]?.total || 0;
 
+      let finalItems = rows;
+      let finalTotal = total;
+
+      if (rows.length === 0) {
+        const lista = contingenciaStore.listar({
+          bandeja,
+          busqueda: busqueda ? String(req.query.busqueda) : undefined,
+        });
+
+        let filtrados = lista;
+        if (bandeja === 'pendientes_recepcion') {
+          filtrados = lista.filter((e) => e.estadoActual === 'REGISTRADO');
+        } else if (bandeja === 'recepcionados') {
+          filtrados = lista.filter((e) => e.estadoActual === 'RECEPCIONADO');
+        } else if (bandeja === 'observados') {
+          filtrados = lista.filter((e) => e.estadoActual === 'OBSERVADO');
+        } else if (bandeja === 'subsanados') {
+          filtrados = lista.filter((e) => e.estadoActual === 'SUBSANADO');
+        } else if (bandeja === 'conformes') {
+          filtrados = lista.filter((e) => e.estadoActual === 'EN_CALIFICACION');
+        } else if (bandeja === 'derivados') {
+          filtrados = lista.filter((e) => e.estadoActual === 'DERIVADO');
+        } else if (bandeja === 'atendidos') {
+          filtrados = lista.filter((e) => ['ATENDIDO', 'RESUELTO', 'ARCHIVADO'].includes(e.estadoActual));
+        }
+
+        finalItems = filtrados.map((item) => ({
+          idExpediente: item.cut,
+          cut: item.cut,
+          asunto: item.asunto,
+          estadoActual: item.estadoActual,
+          fechaRadicacion: item.fechaRadicacion,
+          canalIngreso: item.canalIngreso,
+          procedimientoTupa: item.procedimientoTupa,
+          codigoTupa: item.codigoTupa,
+          areaDestino: 'Mesa de Partes',
+          solicitanteNombre: item.solicitanteNombre,
+          solicitanteDni: item.solicitanteDni,
+          cargo: item.cargo,
+        }));
+        finalTotal = finalItems.length;
+      }
+
       res.json({
         ok: true,
         bandeja,
         pagina,
         limite,
-        total,
-        totalPaginas: Math.ceil(total / limite),
-        items: rows,
+        total: finalTotal,
+        totalPaginas: Math.max(1, Math.ceil(finalTotal / limite)),
+        items: finalItems,
       });
     } catch (err) {
-      next(err);
+      console.warn('[MESA_PARTES] Error en /expedientes (retornando store contingencia):', (err as Error).message);
+      const bandejaStr = String(req.query.bandeja || 'pendientes_recepcion').toLowerCase();
+      const lista = contingenciaStore.listar({
+        bandeja: bandejaStr,
+        busqueda: req.query.busqueda ? String(req.query.busqueda) : undefined,
+      });
+
+      let filtrados = lista;
+      if (bandejaStr === 'pendientes_recepcion') {
+        filtrados = lista.filter((e) => e.estadoActual === 'REGISTRADO');
+      } else if (bandejaStr === 'recepcionados') {
+        filtrados = lista.filter((e) => e.estadoActual === 'RECEPCIONADO');
+      } else if (bandejaStr === 'observados') {
+        filtrados = lista.filter((e) => e.estadoActual === 'OBSERVADO');
+      } else if (bandejaStr === 'subsanados') {
+        filtrados = lista.filter((e) => e.estadoActual === 'SUBSANADO');
+      } else if (bandejaStr === 'conformes') {
+        filtrados = lista.filter((e) => e.estadoActual === 'EN_CALIFICACION');
+      } else if (bandejaStr === 'derivados') {
+        filtrados = lista.filter((e) => e.estadoActual === 'DERIVADO');
+      } else if (bandejaStr === 'atendidos') {
+        filtrados = lista.filter((e) => ['ATENDIDO', 'RESUELTO', 'ARCHIVADO'].includes(e.estadoActual));
+      }
+
+      const items = filtrados.map((item) => ({
+        idExpediente: item.cut,
+        cut: item.cut,
+        asunto: item.asunto,
+        estadoActual: item.estadoActual,
+        fechaRadicacion: item.fechaRadicacion,
+        canalIngreso: item.canalIngreso,
+        procedimientoTupa: item.procedimientoTupa,
+        codigoTupa: item.codigoTupa,
+        areaDestino: 'Mesa de Partes',
+        solicitanteNombre: item.solicitanteNombre,
+        solicitanteDni: item.solicitanteDni,
+        cargo: item.cargo,
+      }));
+
+      res.json({
+        ok: true,
+        bandeja: bandejaStr,
+        pagina: 1,
+        limite: 50,
+        total: items.length,
+        totalPaginas: Math.max(1, Math.ceil(items.length / 50)),
+        items,
+      });
     }
   });
 

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { esIdExpediente } from './rutadoc.cursor.js';
+import { esIdExpediente, esIdentificadorExpediente } from './rutadoc.cursor.js';
 import { ESTADOS_POR_PESTANA } from './rutadoc.types.js';
 
 const fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(
@@ -22,4 +22,4 @@ export const filtrosSchema = z.object({
   }
 });
 
-export const idSchema = z.string().refine(esIdExpediente, 'ID de expediente inválido.');
+export const idSchema = z.string().refine(esIdentificadorExpediente, 'ID de expediente inválido.');

@@ -18,7 +18,7 @@
  * ==============================================================================
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useContext } from 'react';
 import type {
   TramiteWizardState,
   WizardAction,
@@ -29,7 +29,9 @@ import QrCodeView from '../../common/QrCodeView';
 import { apiClient } from '../../../api/client';
 import { useAuthStore } from '../../../stores/authStore';
 import { ApiHttpError } from '../../../types/api';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useInRouterContext } from 'react-router-dom';
+import { QueryClientContext } from '@tanstack/react-query';
+import { useHorarioCorte } from '../../../hooks/useHorarioCorte';
 import {
   obtenerCatalogoFormalRespaldo,
   buscarTramiteTupa,
@@ -100,7 +102,7 @@ export interface StepConfirmacionProps {
   onSuccess?: (cargo: CargoDigitalResponse, cutGenerado: string) => void;
 }
 
-function EnlaceInicioSesionParaRetomar(): React.ReactElement {
+function EnlaceInicioSesionConRouter(): React.ReactElement {
   const location = useLocation();
   return (
     <Link
@@ -113,6 +115,51 @@ function EnlaceInicioSesionParaRetomar(): React.ReactElement {
   );
 }
 
+function EnlaceInicioSesionParaRetomar(): React.ReactElement {
+  const inRouter = useInRouterContext();
+  if (inRouter) {
+    return <EnlaceInicioSesionConRouter />;
+  }
+  return (
+    <a href="/login" className="font-bold underline">
+      Iniciar sesion y volver a la solicitud
+    </a>
+  );
+}
+
+function BotonBandejaConRouter(): React.ReactElement {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      onClick={() => navigate('/expedientes')}
+      className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-xs font-bold text-white hover:bg-emerald-800 transition cursor-pointer shadow-xs"
+    >
+      📋 Ver en Bandeja de Trámites
+    </button>
+  );
+}
+
+function BotonBandeja(): React.ReactElement {
+  const inRouter = useInRouterContext();
+  if (inRouter) {
+    return <BotonBandejaConRouter />;
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (typeof window !== 'undefined') {
+          window.location.assign('/expedientes');
+        }
+      }}
+      className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-xs font-bold text-white hover:bg-emerald-800 transition cursor-pointer shadow-xs"
+    >
+      📋 Ver en Bandeja de Trámites
+    </button>
+  );
+}
+
 export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
   state,
   dispatch,
@@ -120,6 +167,8 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
   onGoToStep,
   onSuccess,
 }) => {
+  const queryClient = useContext(QueryClientContext);
+  const { requiresProjection, legalDate } = useHorarioCorte();
   const [copiado, setCopiado] = useState(false);
   const [tiposFormales, setTiposFormales] = useState<TipoTramiteFormal[]>([]);
   const [estadoCatalogo, setEstadoCatalogo] = useState<'cargando' | 'disponible' | 'error'>('cargando');
@@ -278,9 +327,14 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         remitente: nombreCompleto,
         hashTransaccion: serverData.cargoDigital.hashSha256,
         qrValidationUrl: serverData.qrSeguimientoUrl,
+        mensajeLegal: serverData.mensajeLegal,
       };
 
       dispatch({ type: 'SET_CARGO', payload: cargoEmitido });
+
+      // Invalida inmediatamente la caché de la bandeja para reflejar el nuevo trámite de inmediato
+      void queryClient?.invalidateQueries({ queryKey: ['expedientes'] });
+      void queryClient?.invalidateQueries({ queryKey: ['mesa-partes'] });
 
       if (onSuccess) {
         onSuccess(cargoEmitido, serverData.cut);
@@ -303,12 +357,12 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
       dispatch({
         type: 'SET_ERROR',
         payload:
-          apiDetail ||
-          (status === 401
-            ? 'Inicie sesión con una cuenta vinculada a una persona para radicar la solicitud.'
-            : status === 403
-              ? 'La cuenta no está habilitada para radicar o los datos declarados no coinciden con su identidad.'
-              : 'No se pudo radicar formalmente el expediente en la sede digital. Verifique su conexión y requisitos.'),
+          status === 401
+            ? 'Inicie sesion con una cuenta vinculada a una persona para radicar la solicitud.'
+            : apiDetail ||
+              (status === 403
+                ? 'La cuenta no está habilitada para radicar o los datos declarados no coinciden con su identidad.'
+                : 'No se pudo radicar formalmente el expediente en la sede digital. Verifique su conexión y requisitos.'),
       });
     }
   };
@@ -372,6 +426,26 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
             </div>
           </div>
 
+          {/* Notificación de envío de copia al correo */}
+          <div className="mt-4 mx-auto max-w-lg rounded-xl border border-emerald-200 bg-emerald-50/90 p-3.5 text-xs text-emerald-900 flex items-center gap-3 text-left shadow-xs">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-bold text-emerald-950">
+                Se ha enviado una copia oficial de este Cargo Digital al correo:
+              </p>
+              <p className="font-semibold text-emerald-800 break-all">
+                {identificacion.correo || 'su correo registrado'}
+              </p>
+              <p className="text-[11px] text-emerald-700 mt-0.5">
+                Revise su bandeja de entrada (y la carpeta de spam si es necesario) para acceder al enlace directo de seguimiento.
+              </p>
+            </div>
+          </div>
+
           {/* Código QR de Validación 24/7 */}
           <div className="mt-6 flex flex-col items-center justify-center">
             <QrCodeView
@@ -421,6 +495,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
             >
               🖨️ Imprimir Ticket de Cargo
             </button>
+            <BotonBandeja />
             <button
               type="button"
               onClick={handleIniciarNuevoTramite}
@@ -459,7 +534,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         >
           <span className="space-y-2">
             <span className="block">⚠️ {error}</span>
-            {error.toLocaleLowerCase('es-PE').includes('inicie sesion') && (
+            {(error.toLocaleLowerCase('es-PE').includes('inicie sesion') || /inici(e|ar)\s+sesi[oó]n/i.test(error)) && (
               <span className="block"><EnlaceInicioSesionParaRetomar /></span>
             )}
           </span>
@@ -595,6 +670,22 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Aviso de Horario de Corte LPAG si aplica */}
+      {requiresProjection && (
+        <div
+          role="note"
+          className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-xs font-medium text-amber-900 shadow-2xs text-left"
+        >
+          <p className="font-bold flex items-center gap-1.5">
+            <span>⚠️</span>
+            <span>Aviso de Horario de Corte LPAG (Art. 138 Ley N° 27444):</span>
+          </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-amber-800">
+            Son más de las 16:30 hrs o es un día inhábil. Su solicitud será recibida de inmediato con la fecha y hora técnica actual, pero formalmente se computará como presentada a partir de las <strong>08:00 hrs del día hábil siguiente ({legalDate})</strong>.
+          </p>
+        </div>
+      )}
 
       {/* Tarjeta de Radicación */}
       <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-6 text-center">

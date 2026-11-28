@@ -18,13 +18,39 @@ export default function ExpedienteMetadatos({ expediente }: { expediente: Expedi
       <dl className="mt-6 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
         <Dato etiqueta="CUT">{expediente.cut}</Dato>
         <Dato etiqueta="Asunto">{expediente.asunto}</Dato>
-        <Dato etiqueta="Solicitante (UUID)">{expediente.solicitanteId ?? "No disponible"}</Dato>
+        <Dato etiqueta="Solicitante">
+          {expediente.solicitanteNombre ?? expediente.solicitanteId ?? "No disponible"}
+          {expediente.solicitanteNumeroDocumento ? ` (Doc: ${expediente.solicitanteNumeroDocumento})` : ""}
+        </Dato>
         <Dato etiqueta="Estado actual">{expediente.estadoActual}</Dato>
-        <Dato etiqueta="Área actual (ID)">{expediente.areaActualId ?? "No disponible"}</Dato>
+        <Dato etiqueta="Área actual (ID)">{expediente.areaActualId ?? "Mesa de Partes"}</Dato>
         <Dato etiqueta="Fecha de radicación"><time dateTime={expediente.fechaRadicacion}>{fechaExpediente(expediente.fechaRadicacion, true)}</time></Dato>
         <Dato etiqueta="Documentos">{expediente.resumenDocumentos?.cantidadDocumentos ?? "No disponible"}</Dato>
         <Dato etiqueta="Número de folios">{expediente.resumenDocumentos?.totalFolios ?? "No disponible"}</Dato>
-        <Dato etiqueta="Plazo de atención">No disponible</Dato>
+        <Dato etiqueta="Plazo de atención">
+          {expediente.habilitacionInfo ? (
+            expediente.habilitacionInfo.habilitado ? (
+              <span className="text-emerald-700 font-semibold">
+                Habilitado (0 días restantes de espera legal)
+              </span>
+            ) : (
+              <span className="text-amber-700 font-semibold">
+                {expediente.habilitacionInfo.diasHabilesRestantes ?? 15} días hábiles de espera legal
+                {expediente.habilitacionInfo.fechaHabilitacion
+                  ? ` (hasta ${fechaExpediente(expediente.habilitacionInfo.fechaHabilitacion, false)})`
+                  : ""}
+              </span>
+            )
+          ) : (
+            <span>30 días hábiles (LPAG Ley N° 27444)</span>
+          )}
+        </Dato>
+        {expediente.tipoTramiteDenominacion && (
+          <Dato etiqueta="Procedimiento TUPA">
+            {expediente.tipoTramiteCodigo ? `${expediente.tipoTramiteCodigo} — ` : ""}
+            {expediente.tipoTramiteDenominacion}
+          </Dato>
+        )}
         {expediente.ultimoMovimiento && <>
           <Dato etiqueta="Último evento">{expediente.ultimoMovimiento.evento}</Dato>
           <Dato etiqueta="Fecha del último movimiento">{fechaExpediente(expediente.ultimoMovimiento.fechaHora, true)}</Dato>

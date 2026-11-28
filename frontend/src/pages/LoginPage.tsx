@@ -33,7 +33,13 @@ export default function LoginPage() {
 
   function redirigirSegunContexto() {
     const usuario = useAuthStore.getState().usuario;
-    const codigoContexto = usuario?.rol || usuario?.capacidadActiva || usuario?.contextoActivo?.codigo || "";
+    const codigoContexto =
+      usuario?.rol ||
+      usuario?.capacidadActiva ||
+      usuario?.contextoActivo?.codigo ||
+      usuario?.roles?.find((r) => DESTINOS_POR_ROL[r]) ||
+      usuario?.roles?.[0] ||
+      "";
     const esAdministrador = Boolean(
       usuario?.roles?.some((r) => r === "ADMINISTRADOR" || r === "SUPER_ADMIN") ||
       codigoContexto === "ADMINISTRADOR" ||

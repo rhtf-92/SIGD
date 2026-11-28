@@ -10,6 +10,8 @@ interface FilaBandeja {
   fecha_ingreso?: Date | string | null;
   estado_actual: EstadoRutaDoc;
   area_actual_id: string | null;
+  solicitante_nombre?: string | null;
+  solicitante_documento?: string | null;
   habilitado?: boolean | null;
   estado_pago?: string | null;
   fecha_habilitacion?: Date | string | null;
@@ -58,7 +60,10 @@ const BASE = `
      WHERE anulado = FALSE
      ORDER BY expediente_id, numero_registro ASC
   ) ar ON ar.expediente_id = e.expediente_id
-  LEFT JOIN sigd_tra.expediente_habilitacion hab ON hab.expediente_id = e.expediente_id`;
+  LEFT JOIN sigd_tra.expediente_habilitacion hab ON hab.expediente_id = e.expediente_id
+  LEFT JOIN sigd_auth.persona p ON p.id_persona = e.solicitante_id
+  LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = p.id_persona
+  LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = p.id_persona`;
 
 // Physical reception is distinct from the projected legal start of deadlines.
 // No fallback to now(), a placeholder, or the legal date for missing receipts.
@@ -69,11 +74,21 @@ const AREA_EFECTIVA_SQL = `
     WHEN ultimo.expediente_id IS NOT NULL THEN NULLIF(ultimo.area_actual_id, '')
     WHEN ar.canal_ingreso IN ('MESA_PRESENCIAL', 'MESA_VIRTUAL')
       THEN (SELECT area_id::text FROM sigd_org.area WHERE codigo = 'MP')
-    ELSE NULL
+    ELSE COALESCE(e.area_destino_id::text, (SELECT area_id::text FROM sigd_org.area WHERE codigo = 'MP'))
   END`;
 
 const FILTROS = `
-  WHERE ($1::text IS NULL OR position(lower($1::text) in lower(e.codigo_expediente || ' ' || COALESCE(t.asunto, ar.asunto, ''))) > 0)
+  WHERE ($1::text IS NULL OR position(lower($1::text) in lower(
+    e.codigo_expediente || ' ' ||
+    COALESCE(t.asunto, ar.asunto, '') || ' ' ||
+    COALESCE(e.dni_solicitante, '') || ' ' ||
+    COALESCE(p.id_documento, '') || ' ' ||
+    COALESCE(pn.nombre_completo, '') || ' ' ||
+    COALESCE(pn.nombres, '') || ' ' ||
+    COALESCE(pn.apellidos, '') || ' ' ||
+    COALESCE(pj.razon_social, '') || ' ' ||
+    COALESCE(pj.ruc, '')
+  )) > 0)
     AND ($2::text IS NULL OR (${AREA_EFECTIVA_SQL}) = $2::text)
     AND ($3::date IS NULL OR ${FECHA_INGRESO_SQL} >= ($3::date::timestamp AT TIME ZONE 'America/Lima'))
     AND ($4::date IS NULL OR ${FECHA_INGRESO_SQL} < (($4::date + 1)::timestamp AT TIME ZONE 'America/Lima'))
@@ -85,6 +100,8 @@ export const SQL_LISTAR_RUTADOC = `
          ${FECHA_INGRESO_SQL} AS fecha_ingreso,
          COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
          (${AREA_EFECTIVA_SQL}) AS area_actual_id,
+         COALESCE(pn.nombre_completo, pj.razon_social, NULLIF(TRIM(COALESCE(pn.nombres,'') || ' ' || COALESCE(pn.apellidos,'')), '')) AS solicitante_nombre,
+         COALESCE(e.dni_solicitante, p.id_documento, pj.ruc) AS solicitante_documento,
          hab.habilitado, hab.estado_pago, hab.fecha_habilitacion,
          hab.fecha_inicio_computo, hab.fecha_confirmacion_pago,
          hab.dias_habiles_regla AS dias_habiles_restantes, hab.actualizado_en AS hab_actualizado_en
@@ -172,6 +189,8 @@ function mapearResumen(fila: FilaBandeja): ExpedienteResumen {
     fechaIngreso: fila.fecha_ingreso == null ? null : new Date(fila.fecha_ingreso).toISOString(),
     estadoActual: fila.estado_actual,
     areaActualId: fila.area_actual_id,
+    solicitanteNombre: fila.solicitante_nombre ?? null,
+    solicitanteNumeroDocumento: fila.solicitante_documento ?? null,
     habilitacionInfo: fila.habilitado !== undefined && fila.habilitado !== null ? {
       habilitado: Boolean(fila.habilitado),
       estadoPago: fila.estado_pago ?? 'NO_REQUIERE',
@@ -229,6 +248,11 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
              ${FECHA_INGRESO_SQL} AS fecha_ingreso,
              COALESCE(ultimo.estado_nuevo, 'REGISTRADO') AS estado_actual,
              (${AREA_EFECTIVA_SQL}) AS area_actual_id,
+             COALESCE(pn.nombre_completo, pj.razon_social, NULLIF(TRIM(COALESCE(pn.nombres,'') || ' ' || COALESCE(pn.apellidos,'')), '')) AS solicitante_nombre,
+             COALESCE(e.dni_solicitante, p.id_documento, pj.ruc) AS solicitante_documento,
+             hab.habilitado, hab.estado_pago, hab.fecha_habilitacion,
+             hab.fecha_inicio_computo, hab.fecha_confirmacion_pago,
+             hab.dias_habiles_regla AS dias_habiles_restantes, hab.actualizado_en AS hab_actualizado_en,
              e.solicitante_id::text,
              documentado.id_movimiento::text, documentado.evento, documentado.fecha_hora,
              documentado.usuario_operador_id::text
@@ -237,10 +261,14 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
         ON documentado.expediente_id = e.expediente_id
        AND documentado.id_movimiento = ultimo.id_movimiento
        AND documentado.secuencia = ultimo.secuencia AND documentado.estado_nuevo = ultimo.estado_nuevo
-      WHERE e.expediente_id = $1::uuid`, [idExpediente]);
+      WHERE (
+        (e.expediente_id::text = $1)
+        OR (e.codigo_expediente = $1)
+      )`, [idExpediente]);
     if (fila.rowCount === 0) return null;
 
     const dato = fila.rows[0];
+    const realExpedienteId = dato.id_expediente;
     let resumenDocumentos: ExpedienteDetalle['resumenDocumentos'] = null;
     let documentos: NonNullable<ExpedienteDetalle['documentos']> = [];
     const existeFoliacion = await this.pool.query<{ existe: string | null }>(
@@ -250,7 +278,7 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
         SELECT count(DISTINCT id_documento)::integer AS cantidad,
                COALESCE(sum(folio_fin - folio_inicio + 1), 0)::integer AS total
           FROM sigd_tra.expediente_documento_folio
-         WHERE expediente_id = $1::uuid`, [idExpediente]);
+         WHERE expediente_id = $1::uuid`, [realExpedienteId]);
       resumenDocumentos = {
         cantidadDocumentos: folios.rows[0].cantidad,
         totalFolios: folios.rows[0].total,
@@ -271,7 +299,7 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
           JOIN sigd_doc.documento_adjunto a
             ON a.documento_adjunto_id = f.id_documento AND a.expediente_id = f.expediente_id
          WHERE f.expediente_id = $1::uuid
-         ORDER BY f.folio_inicio ASC`, [idExpediente]);
+         ORDER BY f.folio_inicio ASC`, [realExpedienteId]);
       documentos = adjuntos.rows.map((adjunto) => ({
         idDocumento: adjunto.id_documento, nombre: adjunto.nombre,
         mimeType: adjunto.mime_type, folioInicio: adjunto.folio_inicio, folioFin: adjunto.folio_fin,
@@ -309,7 +337,7 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
          WHERE (a.expediente_principal = $1::uuid OR a.expediente_accesorio = $1::uuid)
            AND a.estado = 'ACUMULADO'
          ORDER BY a.fecha_acumulacion DESC
-         LIMIT 1`, [idExpediente]);
+         LIMIT 1`, [realExpedienteId]);
 
       const acumulacionFila = infoAcumulacion.rows[0];
       if (acumulacionFila) {
@@ -373,7 +401,7 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
            AND fd.estado = 'FIRMADO_DIGITALMENTE'
          WHERE r.expediente_id = $1::uuid
          ORDER BY r.creado_en DESC
-         LIMIT 1`, [idExpediente]);
+         LIMIT 1`, [realExpedienteId]);
 
       if (resResolucion.rows.length > 0) {
         const row = resResolucion.rows[0];
@@ -410,7 +438,7 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
            JOIN sigd_doc.tipo_tramite_tupa tt ON tt.tipo_tramite_id = doc_exp.tipo_tramite_id
           WHERE doc_exp.expediente_id = $1::uuid
           LIMIT 1`,
-        [idExpediente],
+        [realExpedienteId],
       );
       if (procTupaRes.rows[0]) {
         tipoTramiteCodigo = procTupaRes.rows[0].codigo;
@@ -452,7 +480,7 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
             ON fd.documento_id = c.documento_adjunto_id AND fd.estado = 'FIRMADO_DIGITALMENTE'
          WHERE c.expediente_id = $1::uuid AND c.estado <> 'ANULADO'
          ORDER BY c.creado_en DESC
-         LIMIT 1`, [idExpediente]);
+         LIMIT 1`, [realExpedienteId]);
 
       if (certRes.rows[0]) {
         const c = certRes.rows[0];
@@ -506,7 +534,7 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
           JOIN sigd_tes.orden_pago o ON o.id = a.orden_id
          WHERE a.expediente_id = $1::uuid
          LIMIT 1
-      `, [idExpediente]);
+      `, [realExpedienteId]);
       if (pagoRes.rows[0]) {
         const row = pagoRes.rows[0];
         ordenPagoInfo = {
@@ -532,7 +560,7 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
             SELECT 1 FROM sigd_tra.radicacion_publica
              WHERE expediente_id = $1::uuid AND datos_declarados->>'estado_economico' = 'NO_VERIFICADO'
           ) AS pendiente
-        `, [idExpediente]);
+        `, [realExpedienteId]);
         if (radPubRes.rows[0]?.pendiente) {
           ordenPagoInfo = {
             ordenId: '',
@@ -572,7 +600,7 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
           FROM sigd_tra.expediente_habilitacion
          WHERE expediente_id = $1::uuid
          LIMIT 1
-      `, [idExpediente]);
+      `, [realExpedienteId]);
 
       if (habRes.rows[0]) {
         const h = habRes.rows[0];
@@ -601,7 +629,9 @@ export class RepositorioPostgresRutaDoc implements RepositorioRutaDoc {
       : null;
     return {
       ...mapearResumen(dato), tipoTramiteCodigo, tipoTramiteDenominacion, solicitanteId: dato.solicitante_id,
-      resumenDocumentos, documentos, acumulacionInfo, resolucionInfo, certificadoInglesInfo, ordenPagoInfo, habilitacionInfo, ultimoMovimiento, sla: null,
+      resumenDocumentos, documentos, acumulacionInfo, resolucionInfo, certificadoInglesInfo, ordenPagoInfo,
+      habilitacionInfo: habilitacionInfo ?? (mapearResumen(dato).habilitacionInfo ?? null),
+      ultimoMovimiento, sla: null,
     };
   }
 }

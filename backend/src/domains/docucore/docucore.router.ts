@@ -232,6 +232,10 @@ export function crearRouterDocuCore(pool: Pool, storage?: GeneradorUrlDescarga):
     '/v1/validador-cvd/verificar/:cvd',
     crearVerificadorCvd(pool, storage),
   );
+  router.get(
+    '/v1/validador/cvd/:cvd',
+    crearVerificadorCvd(pool, storage),
+  );
 
   return router;
 }

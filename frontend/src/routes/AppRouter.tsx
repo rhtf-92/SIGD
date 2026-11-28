@@ -42,6 +42,8 @@ export default function AppRouter() {
 
       {/* Casilla electrónica ciudadana (portal administrado, autenticación obligatoria CIUDADANO) */}
       <Route path="/casilla/login" element={<CasillaLoginPage />} />
+      <Route path="/ventanilla-electronica" element={<CasillaLoginPage />} />
+      <Route path="/ventanilla-electronica/login" element={<CasillaLoginPage />} />
       <Route
         path="/casilla"
         element={
@@ -74,6 +76,18 @@ export default function AppRouter() {
       <Route
         path="/mesa-partes"
         element={<TramitePage />}
+      />
+      <Route
+        path="/mesa-partes/ventanilla"
+        element={<Navigate to="/tramite/ventanilla-presencial" replace />}
+      />
+      <Route
+        path="/mesa-partes/bandeja"
+        element={<Navigate to="/expedientes" replace />}
+      />
+      <Route
+        path="/configuracion"
+        element={<Navigate to="/administracion" replace />}
       />
 
       {/* Ventanilla presencial (restringido a MESA_PARTES) */}

@@ -17,6 +17,7 @@ export interface RateLimiterOptions {
 
 export class RateLimiterRedis {
   private conexion?: Promise<Redis>;
+  private memoria = new Map<string, { count: number; expira: number }>();
   private readonly maxPorIp: number;
   private readonly ventanaIpSegundos: number;
   private readonly maxPorCut: number;
@@ -75,6 +76,16 @@ export class RateLimiterRedis {
       return Number(res) === 1;
     } catch {
       this.conexion = undefined;
+      if (process.env.NODE_ENV !== 'production') {
+        const ahora = Date.now();
+        const item = this.memoria.get(clave);
+        if (!item || item.expira < ahora) {
+          this.memoria.set(clave, { count: 1, expira: ahora + ttlSegundos * 1000 });
+          return true;
+        }
+        item.count++;
+        return item.count <= max;
+      }
       // Fail-Secure estricto: deniega el servicio si el subsistema de protección está caído
       throw new AppError({
         status: 503,

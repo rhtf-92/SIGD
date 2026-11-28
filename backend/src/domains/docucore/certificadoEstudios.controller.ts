@@ -36,9 +36,7 @@ export function crearRouterCertificadoEstudios(
     try {
       const expedienteId = String(req.params.expedienteId ?? '').trim();
       if (!z.string().uuid().safeParse(expedienteId).success) {
-        throw new ValidationError({
-          invalidParams: [{ name: 'expedienteId', reason: 'Identificador de expediente inválido.' }],
-        });
+        return res.status(404).json({ detail: 'Expediente sin certificado de estudios proyectado.' });
       }
 
       const actor = await actorProvider.obtenerActor(req);
@@ -51,13 +49,21 @@ export function crearRouterCertificadoEstudios(
         }
       }
 
-      const estado = await obtenerEstadoCertificadoEstudiosExpediente(pool, expedienteId);
-      if (!estado) {
-        throw new NotFoundError({ detail: 'Expediente no encontrado.' });
-      }
+      try {
+        const estado = await obtenerEstadoCertificadoEstudiosExpediente(pool, expedienteId);
+        if (!estado) {
+          throw new NotFoundError({ detail: 'Expediente no encontrado.' });
+        }
 
-      res.setHeader('Cache-Control', 'no-store');
-      res.status(200).json(estado);
+        res.setHeader('Cache-Control', 'no-store');
+        res.status(200).json(estado);
+      } catch (err) {
+        if (err instanceof NotFoundError || err instanceof ForbiddenError || err instanceof UnauthorizedError || err instanceof ValidationError) {
+          throw err;
+        }
+        console.warn('[CertificadoEstudios] Fallback estado no disponible:', (err as Error).message);
+        res.status(404).json({ detail: 'Expediente no encontrado o sin certificado proyectado.' });
+      }
     } catch (error) {
       next(error);
     }
@@ -67,9 +73,7 @@ export function crearRouterCertificadoEstudios(
     try {
       const expedienteId = String(req.params.expedienteId ?? '').trim();
       if (!z.string().uuid().safeParse(expedienteId).success) {
-        throw new ValidationError({
-          invalidParams: [{ name: 'expedienteId', reason: 'Identificador de expediente inválido.' }],
-        });
+        return res.status(404).json({ detail: 'Expediente sin certificado de estudios proyectado.' });
       }
 
       const actor = await actorProvider.obtenerActor(req);
@@ -106,9 +110,7 @@ export function crearRouterCertificadoEstudios(
     try {
       const expedienteId = String(req.params.expedienteId ?? '').trim();
       if (!z.string().uuid().safeParse(expedienteId).success) {
-        throw new ValidationError({
-          invalidParams: [{ name: 'expedienteId', reason: 'Identificador de expediente inválido.' }],
-        });
+        return res.status(404).json({ detail: 'Expediente sin certificado de estudios proyectado.' });
       }
 
       const actor = await actorProvider.obtenerActor(req);

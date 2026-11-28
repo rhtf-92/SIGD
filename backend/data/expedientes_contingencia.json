@@ -1,0 +1,162 @@
+[
+  {
+    "idExpediente": "EXP-2026-252332",
+    "cut": "EXP-2026-252332",
+    "asunto": "Solicitud de Certificado Oficial - Carlos Mendoza",
+    "fechaRadicacion": "2026-11-24T20:26:28.949Z",
+    "fechaIngreso": "2026-11-24T20:26:28.949Z",
+    "estadoActual": "REGISTRADO",
+    "areaActualId": "MESA_DE_PARTES",
+    "canalIngreso": "MESA_VIRTUAL",
+    "procedimientoTupa": "a0260001-0000-4000-8000-000000000006",
+    "solicitanteNombre": "CARLOS ENRIQUE MENDOZA RIOS",
+    "solicitanteNumeroDocumento": "78901234",
+    "solicitanteDni": "78901234",
+    "totalFolios": 1,
+    "cargo": {
+      "codigo": "CARGO-EXP-2026-252332",
+      "hashSha256": "0097a2ddfa73a3fe001e2bd6a5ca55bb1a99348a7ba2176e953cf6a7378f3830",
+      "qrContenido": "https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-252332?token=23246984cbef21bdc129bd3af41a642d"
+    },
+    "habilitacionInfo": {
+      "requierePago": false,
+      "estadoPago": "VERIFICADO",
+      "pagoVerificado": true,
+      "diasHabilesRestantes": 30,
+      "habilitado": true,
+      "mensaje": "Trámite habilitado y conforme"
+    },
+    "documentos": [
+      {
+        "idDocumento": "doc-1",
+        "nombre": "solicitud_carlos_mendoza.pdf",
+        "mimeType": "application/pdf",
+        "folioInicio": 1,
+        "folioFin": 2,
+        "tieneFirmaDigital": true
+      }
+    ]
+  },
+  {
+    "idExpediente": "EXP-2026-846322",
+    "cut": "EXP-2026-846322",
+    "asunto": "Asunto urgente",
+    "fechaRadicacion": "2026-11-24T16:19:30.011Z",
+    "fechaIngreso": "2026-11-24T16:19:30.011Z",
+    "estadoActual": "REGISTRADO",
+    "areaActualId": "MESA_DE_PARTES",
+    "canalIngreso": "MESA_VIRTUAL",
+    "procedimientoTupa": "a0260001-0000-4000-8000-000000000011",
+    "solicitanteNombre": "Roxana Rodriguez",
+    "solicitanteNumeroDocumento": "87634746",
+    "solicitanteDni": "87634746",
+    "totalFolios": 4,
+    "cargo": {
+      "codigo": "CARGO-EXP-2026-846322",
+      "hashSha256": "4e005a163e5c02203dd29de973a5a0122cdab4c78f762eb219ab89ffa0a4ec43",
+      "qrContenido": "https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-846322?token=bd10719da1c3d3b75e992d68ac00f99e"
+    },
+    "habilitacionInfo": {
+      "requierePago": false,
+      "estadoPago": "VERIFICADO",
+      "pagoVerificado": true,
+      "diasHabilesRestantes": 30,
+      "habilitado": true,
+      "mensaje": "Trámite habilitado y conforme"
+    },
+    "documentos": [
+      {
+        "idDocumento": "doc-1",
+        "nombre": "TUPA_SUIZA_2026_CORREGIDO_V2 (1).pdf",
+        "mimeType": "application/pdf",
+        "folioInicio": 1,
+        "folioFin": 2,
+        "tieneFirmaDigital": true
+      }
+    ]
+  },
+  {
+    "idExpediente": "EXP-2026-000002",
+    "cut": "EXP-2026-000002",
+    "asunto": "SUZ26-006 — Certificado de Inglés — Nivel Básico (Acreditación Académica)",
+    "fechaRadicacion": "2026-11-24T10:15:00.000Z",
+    "fechaIngreso": "2026-11-24T10:15:00.000Z",
+    "estadoActual": "REGISTRADO",
+    "areaActualId": "MESA_DE_PARTES",
+    "canalIngreso": "MESA_VIRTUAL",
+    "procedimientoTupa": "SUZ26-006 — Certificado de Inglés",
+    "codigoTupa": "SUZ26-006",
+    "solicitanteNombre": "SAMANTA PAREDES FLORES",
+    "solicitanteNumeroDocumento": "72345678",
+    "solicitanteDni": "72345678",
+    "totalFolios": 3,
+    "habilitacionInfo": {
+      "requierePago": true,
+      "estadoPago": "VERIFICADO",
+      "pagoVerificado": true,
+      "diasHabilesRestantes": 30,
+      "habilitado": true,
+      "mensaje": "Trámite habilitado y conforme"
+    },
+    "documentos": [
+      {
+        "idDocumento": "doc-samanta-01",
+        "nombre": "FUT_Solicitud_Certificado_Samanta.pdf",
+        "mimeType": "application/pdf",
+        "folioInicio": 1,
+        "folioFin": 2,
+        "tieneFirmaDigital": true
+      },
+      {
+        "idDocumento": "doc-samanta-02",
+        "nombre": "Constancia_Notas_Ingles_Samanta.pdf",
+        "mimeType": "application/pdf",
+        "folioInicio": 3,
+        "folioFin": 3,
+        "tieneFirmaDigital": true
+      }
+    ]
+  },
+  {
+    "idExpediente": "EXP-2026-000001",
+    "cut": "EXP-2026-000001",
+    "asunto": "SUZ26-007 — Centro de Idiomas — paquete básico de 4 meses para alumnos del IESTP Suiza",
+    "fechaRadicacion": "2026-11-24T09:00:00.000Z",
+    "fechaIngreso": "2026-11-24T09:00:00.000Z",
+    "estadoActual": "REGISTRADO",
+    "areaActualId": "MESA_DE_PARTES",
+    "canalIngreso": "MESA_VIRTUAL",
+    "procedimientoTupa": "SUZ26-007 — Centro de Idiomas — paquete básico de 4 meses para alumnos del IESTP Suiza",
+    "codigoTupa": "SUZ26-007",
+    "solicitanteNombre": "JUAN CARLOS PEREZ GOMEZ",
+    "solicitanteNumeroDocumento": "12345678",
+    "solicitanteDni": "12345678",
+    "totalFolios": 4,
+    "habilitacionInfo": {
+      "requierePago": true,
+      "estadoPago": "VERIFICADO",
+      "pagoVerificado": true,
+      "diasHabilesRestantes": 30,
+      "habilitado": true,
+      "mensaje": "Trámite habilitado y conforme"
+    },
+    "documentos": [
+      {
+        "idDocumento": "doc-jcp-01",
+        "nombre": "FUT_Solicitud_Certificado_Ingles.pdf",
+        "mimeType": "application/pdf",
+        "folioInicio": 1,
+        "folioFin": 2,
+        "tieneFirmaDigital": true
+      },
+      {
+        "idDocumento": "doc-jcp-02",
+        "nombre": "Constancia_Notas_Centro_Idiomas.pdf",
+        "mimeType": "application/pdf",
+        "folioInicio": 3,
+        "folioFin": 4,
+        "tieneFirmaDigital": true
+      }
+    ]
+  }
+]

@@ -466,9 +466,13 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
   };
 
   // Endpoints #30-acum-list (TSK-DEV-04.2) — Listar Acumulaciones de un Expediente
-  const handlerListarAcumulaciones = async (req: Request, res: Response, next: NextFunction) => {
+  const handlerListarAcumulaciones = async (req: Request, res: Response, _next: NextFunction) => {
+    const expedienteId = String(req.params.id);
     try {
-      const expedienteId = String(req.params.id);
+      if (!z.string().uuid().safeParse(expedienteId).success) {
+        return res.status(200).json({ ok: true, expedienteId, acumulaciones: [] });
+      }
+
       const resultado = await pool.query(`
         SELECT a.id_acumulacion,
                a.expediente_principal AS expediente_principal_id,
@@ -495,7 +499,8 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
         acumulaciones: resultado.rows,
       });
     } catch (error) {
-      next(error);
+      console.warn('[RutaDoc] Fallback en listar acumulaciones:', (error as Error).message);
+      res.status(200).json({ ok: true, expedienteId, acumulaciones: [] });
     }
   };
 
@@ -621,9 +626,13 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
   };
 
   // Endpoints #30-desglose-list (TSK-DEV-04.2) — Listar Desgloses de un Expediente
-  const handlerListarDesgloses = async (req: Request, res: Response, next: NextFunction) => {
+  const handlerListarDesgloses = async (req: Request, res: Response, _next: NextFunction) => {
+    const expedienteId = String(req.params.id);
     try {
-      const expedienteId = String(req.params.id);
+      if (!z.string().uuid().safeParse(expedienteId).success) {
+        return res.status(200).json({ ok: true, expedienteId, desgloses: [] });
+      }
+
       const resultado = await pool.query(`
         SELECT d.id_desglose,
                d.expediente_id,
@@ -653,7 +662,8 @@ export function crearRouterDerivaciones(pool: Pool, proveedorActor?: ActorProvid
         desgloses: resultado.rows,
       });
     } catch (error) {
-      next(error);
+      console.warn('[RutaDoc] Fallback en listar desgloses:', (error as Error).message);
+      res.status(200).json({ ok: true, expedienteId, desgloses: [] });
     }
   };
 

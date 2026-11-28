@@ -5,6 +5,7 @@ import {
   formatearFechaLima,
   obtenerOActualizarHabilitacion,
   exigirExpedienteHabilitadoParaRecepcion,
+  registrarInicioPlazoPago,
 } from '../../../src/domains/tramicore/computoPlazo15Dias.service.js';
 import type { DiaCalendario } from '../../../src/domains/organicore/calendario.service.js';
 
@@ -487,5 +488,37 @@ describe('Bloque 1: Cómputo de 15 Días Hábiles y Calendario Institucional (17
     expect(res.fechaInicioComputo).toBe('2026-12-21'); // Lunes 21
     // Salta 25-Dic (Navidad), 01-Ene (Año Nuevo) y 3 fines de semana -> Martes 12 de Enero 2027
     expect(res.fechaHabilitacion).toBe('2027-01-12');
+  });
+
+  // -------------------------------------------------------------------------
+  // Caso 19: Registro de inicio de plazo de 15 días hábiles al radicar trámite
+  // -------------------------------------------------------------------------
+  it('19. registrarInicioPlazoPago: inserta o actualiza el registro en expediente_habilitacion con fecha_vencimiento_pago y fecha_habilitacion', async () => {
+    const executedQueries: string[] = [];
+    const mockClient = {
+      query: vi.fn(async (sql: string, params?: unknown[]) => {
+        executedQueries.push(sql);
+        if (sql.includes('sigd_org.calendario_laboral')) {
+          return { rows: CALENDARIO_BASE_TEST };
+        }
+        if (sql.includes('ALTER TABLE sigd_tra.expediente_habilitacion')) {
+          return { rows: [] };
+        }
+        if (sql.includes('INSERT INTO sigd_tra.expediente_habilitacion')) {
+          return { rows: [], rowCount: 1 };
+        }
+        return { rows: [] };
+      }),
+    } as unknown as PoolClient;
+
+    const fechaRadicacion = '2026-10-01T10:00:00-05:00';
+    await registrarInicioPlazoPago(mockClient, EXP_ID, ORDEN_ID, fechaRadicacion);
+
+    expect(mockClient.query).toHaveBeenCalled();
+    const insertQuery = executedQueries.find((q) => q.includes('INSERT INTO sigd_tra.expediente_habilitacion'));
+    expect(insertQuery).toBeDefined();
+    expect(insertQuery).toContain('fecha_vencimiento_pago');
+    expect(insertQuery).toContain('fecha_habilitacion');
+    expect(insertQuery).toContain('estado_plazo');
   });
 });

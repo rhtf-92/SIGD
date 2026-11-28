@@ -34,7 +34,7 @@ export default function ExpedienteTable<T extends ExpedienteSGD | ExpedienteResu
   if (expedientes.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center text-sm text-slate-500 shadow-sm">
-        <p className="text-base font-semibold text-slate-700">No hay expedientes en esta bandeja</p>
+        <p className="text-base font-semibold text-slate-700">No hay expedientes en esta pestaña</p>
         <p className="mt-1 text-xs text-slate-500">No se encontraron expedientes registrados con los filtros aplicados.</p>
       </div>
     );
@@ -121,7 +121,16 @@ export default function ExpedienteTable<T extends ExpedienteSGD | ExpedienteResu
                   {expediente.asunto}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-700 font-medium">
-                  {real ? "Ciudadano Administrado" : (expediente.solicitante?.nombreOrazonSocial || "Ciudadano Administrado")}
+                  <div>
+                    {real
+                      ? (expediente.solicitanteNombre || "Ciudadano Administrado")
+                      : (expediente.solicitante?.nombreOrazonSocial || "Ciudadano Administrado")}
+                  </div>
+                  {real && expediente.solicitanteNumeroDocumento && (
+                    <div className="text-[11px] text-slate-400 font-mono">
+                      Doc: {expediente.solicitanteNumeroDocumento}
+                    </div>
+                  )}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                   {real ? "Trámite General" : (expediente.clasificacionCCD?.serieDocumental || "Trámite General")}

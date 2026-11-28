@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { useContext, useEffect, useRef, useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { QueryClientContext } from "@tanstack/react-query";
 import CargoDigitalModal from "../../components/tramite/CargoDigitalModal";
 import { PROCEDIMIENTOS_TUPA_2026 } from "../../data/tupaSuiza2026";
 import { useHorarioCorte } from "../../hooks/useHorarioCorte";
@@ -33,6 +34,8 @@ interface VentanillaPresencialResultado {
 }
 
 export default function VentanillaPresencialPage() {
+  const navigate = useNavigate();
+  const queryClient = useContext(QueryClientContext);
   const { isAfterCutoff, requiresProjection, legalDate } = useHorarioCorte();
   const esCorteSuperado = isAfterCutoff || requiresProjection;
   const enJornada = !requiresProjection;
@@ -129,8 +132,8 @@ export default function VentanillaPresencialPage() {
           dniSolicitante: numeroDoc,
           nombres: nombres.trim(),
           apellidos: apellidos.trim(),
-          correo: correo.trim(),
-          telefono: telefono.trim(),
+          correo: correo.trim() || undefined,
+          telefono: telefono.trim() || undefined,
           asunto: asuntoFinal.trim(),
           foliosTotales: Number(cantidadFolios),
         },
@@ -187,6 +190,8 @@ export default function VentanillaPresencialPage() {
 
       setCargoGenerado(nuevoCargo);
       setModalAbierto(true);
+      void queryClient?.invalidateQueries({ queryKey: ["expedientes"] });
+      void queryClient?.invalidateQueries({ queryKey: ["mesa-partes"] });
     } catch (error) {
       setCargoGenerado(null);
       setModalAbierto(false);
@@ -585,6 +590,9 @@ export default function VentanillaPresencialPage() {
           isOpen={modalAbierto}
           onClose={() => setModalAbierto(false)}
           cargo={cargoGenerado}
+          modoVentanilla={true}
+          onIrBandeja={() => navigate("/expedientes")}
+          onNuevoRegistro={handleNuevoRegistro}
         />
       )}
     </main>

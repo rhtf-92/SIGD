@@ -340,6 +340,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
       nombre: 'solicitud_firmada_estudios_2026.pdf',
       peso: 154230,
       hashSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      storageUrl: 'expedientes/2026/029fe6e5-493a-4895-ba9c-11dec0fb1808.pdf',
     };
     dispatch({
       type: 'UPDATE_DOCUMENTOS',

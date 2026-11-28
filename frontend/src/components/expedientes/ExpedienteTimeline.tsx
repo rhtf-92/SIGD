@@ -41,7 +41,7 @@ export default function ExpedienteTimeline({
       <ol className="relative space-y-4 border-l-2 border-slate-200 pl-0">
         {eventos.map((evento, indice) => (
           <TimelineItemCard
-            key={"movimientoId" in evento ? evento.movimientoId : evento.eventoId}
+            key={(evento as any).idMovimiento || (evento as any).movimientoId || (evento as any).eventoId || indice}
             evento={evento}
             esMasReciente={indice === eventos.length - 1}
           />

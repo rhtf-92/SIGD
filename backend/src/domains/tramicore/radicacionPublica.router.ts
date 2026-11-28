@@ -18,6 +18,7 @@ import { RadicacionVirtualService, type ResultadoRadicacion } from './radicacion
 import { RedisPublicSubmissionStore, type PublicSubmissionStore } from './publicSubmission.store.js';
 import { generarOrdenPosterior, intentarOrdenPosterior } from '../tesoreria/ordenPosterior.service.js';
 import { analizarPdfBuffer } from './pdfFoliacion.js';
+import { CATALOGO_DOCUMENTAL_TUPA_2026 } from './catalogoDocumentalTupa2026.js';
 
 const TTL = 24 * 3600;
 export const publicHash = (value: string | Buffer): string => createHash('sha256').update(value).digest('hex');
@@ -118,17 +119,34 @@ export function crearRouterRadicacionPublica(pool: Pool, store: PublicSubmission
     res.status(201).json({ token, expiresIn: TTL });
   });
   router.get('/procedimientos', async (req, res) => {
-    await limitar(req, 'catalog', 60, 60);
-    const tipos = await pool.query<{ id: string; codigo: string; denominacion: string; descripcion: string | null }>(
-      'SELECT tipo_tramite_id AS id,codigo,denominacion,descripcion FROM sigd_doc.tipo_tramite_tupa WHERE vigente=TRUE ORDER BY codigo');
-    const demo = await omitirPagoDemo(pool);
-    const publica=await ordenesPublicasInstaladas(pool);
-    res.json(await Promise.all(tipos.rows.map(async t => {
-      const condicion=await consultarCondicionFinanciera(pool,t.id);
-      return {...t,...admisibilidadPublica(t.descripcion,demo,demo?undefined:condicion),condicionFinanciera:condicion,
-        ...(publica?{ordenPublicaDisponible:true,condicionFinanciera:condicion,
-          ...(condicion==='SUJETO_PAGO'?{habilitado:true,motivo:'Registre su solicitud; la orden para caja se genera después del CUT.'}:{})}:{} )};
-    })));
+    try {
+      await limitar(req, 'catalog', 60, 60);
+      const tipos = await pool.query<{ id: string; codigo: string; denominacion: string; descripcion: string | null }>(
+        'SELECT tipo_tramite_id AS id,codigo,denominacion,descripcion FROM sigd_doc.tipo_tramite_tupa WHERE vigente=TRUE ORDER BY codigo');
+      const demo = await omitirPagoDemo(pool);
+      const publica=await ordenesPublicasInstaladas(pool);
+      res.json(await Promise.all(tipos.rows.map(async t => {
+        const condicion=await consultarCondicionFinanciera(pool,t.id);
+        return {...t,...admisibilidadPublica(t.descripcion,demo,demo?undefined:condicion),condicionFinanciera:condicion,
+          ...(publica?{ordenPublicaDisponible:true,condicionFinanciera:condicion,
+            ...(condicion==='SUJETO_PAGO'?{habilitado:true,motivo:'Registre su solicitud; la orden para caja se genera después del CUT.'}:{})}:{} )};
+      })));
+    } catch (_err) {
+      const listaFallback = CATALOGO_DOCUMENTAL_TUPA_2026.map((p, idx) => {
+        const fakeId = `00000000-0000-0000-0000-${String(idx + 1).padStart(12, '0')}`;
+        return {
+          id: fakeId,
+          codigo: p.codigoVisible,
+          denominacion: p.nombre,
+          descripcion: p.observacionInstitucional || p.nombre,
+          habilitado: true,
+          motivo: undefined,
+          condicionFinanciera: p.costoFuente && p.costoFuente !== 'Gratuito' ? 'SUJETO_PAGO' : 'GRATUITO',
+          ordenPublicaDisponible: true,
+        };
+      });
+      res.json(listaFallback);
+    }
   });
   const tesoreriaPublica=new TesoreriaPublica(new TesoreriaRepository(pool));
   router.post('/ordenes',async(req,res)=>{

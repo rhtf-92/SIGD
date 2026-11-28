@@ -204,6 +204,29 @@ export async function expedienteRequierePagoTupa(
   };
 }
 
+let columnasVerificadas = false;
+
+/**
+ * Garantiza que la tabla sigd_tra.expediente_habilitacion contenga todas las columnas
+ * necesarias para trazabilidad institucional y cómputo de plazos.
+ */
+export async function asegurarEsquemaHabilitacion(conexion: Conexion): Promise<void> {
+  if (columnasVerificadas) return;
+  try {
+    await conexion.query(`
+      ALTER TABLE sigd_tra.expediente_habilitacion
+        ADD COLUMN IF NOT EXISTS fecha_radicacion TIMESTAMPTZ NULL,
+        ADD COLUMN IF NOT EXISTS fecha_vencimiento_pago DATE NULL,
+        ADD COLUMN IF NOT EXISTS estado_plazo VARCHAR(30) NULL DEFAULT 'EN_PLAZO',
+        ADD COLUMN IF NOT EXISTS motivo_cierre VARCHAR(50) NULL,
+        ADD COLUMN IF NOT EXISTS cerrado_por_falta_pago_en TIMESTAMPTZ NULL;
+    `);
+    columnasVerificadas = true;
+  } catch {
+    // Si no tiene privilegios DDL o la tabla aún no existe o en entorno de tests mockeado, continuar
+  }
+}
+
 /**
  * Registra o inicializa el cómputo del plazo de 15 días hábiles al radicar un trámite.
  */
@@ -214,6 +237,7 @@ export async function registrarInicioPlazoPago(
   fechaRadicacion: Date | string,
   now: Date = new Date(),
 ): Promise<void> {
+  await asegurarEsquemaHabilitacion(conexion);
   const calendario = await obtenerCalendarioLaboralActivo(conexion);
   const { fechaRadicacionIso, fechaInicioComputo, fechaVencimientoPago } = calcularPlazoPago15Dias(fechaRadicacion, calendario);
 
@@ -227,6 +251,7 @@ export async function registrarInicioPlazoPago(
       fecha_inicio_computo,
       dias_habiles_regla,
       fecha_vencimiento_pago,
+      fecha_habilitacion,
       habilitado,
       estado_plazo,
       creado_en,
@@ -240,6 +265,7 @@ export async function registrarInicioPlazoPago(
       $4::date,
       15,
       $5::date,
+      $5::date,
       FALSE,
       'EN_PLAZO',
       $6::timestamptz,
@@ -249,6 +275,7 @@ export async function registrarInicioPlazoPago(
         fecha_radicacion = COALESCE(EXCLUDED.fecha_radicacion, sigd_tra.expediente_habilitacion.fecha_radicacion),
         fecha_inicio_computo = EXCLUDED.fecha_inicio_computo,
         fecha_vencimiento_pago = EXCLUDED.fecha_vencimiento_pago,
+        fecha_habilitacion = COALESCE(sigd_tra.expediente_habilitacion.fecha_habilitacion, EXCLUDED.fecha_habilitacion),
         actualizado_en = EXCLUDED.actualizado_en;
   `, [expedienteId, ordenId, fechaRadicacion, fechaInicioComputo, fechaVencimientoPago, now]);
 }
@@ -356,6 +383,9 @@ export async function obtenerOActualizarHabilitacion(
   `, [expedienteId, now]);
 
   const nowIso = formatearFechaLima(now);
+
+  // Garantizar que las columnas de la tabla existan
+  await asegurarEsquemaHabilitacion(conexion);
 
   // Consultar registro previo de habilitación
   const prevHabilitacion = await conexion.query<{
@@ -586,6 +616,7 @@ export async function obtenerOActualizarHabilitacion(
       fecha_inicio_computo,
       dias_habiles_regla,
       fecha_vencimiento_pago,
+      fecha_habilitacion,
       habilitado,
       estado_plazo,
       actualizado_en
@@ -597,12 +628,14 @@ export async function obtenerOActualizarHabilitacion(
       $3::date,
       15,
       $4::date,
+      $4::date,
       FALSE,
       'EN_PLAZO',
       now()
     ) ON CONFLICT (expediente_id) DO UPDATE
     SET estado_plazo = 'EN_PLAZO',
         fecha_vencimiento_pago = EXCLUDED.fecha_vencimiento_pago,
+        fecha_habilitacion = COALESCE(sigd_tra.expediente_habilitacion.fecha_habilitacion, EXCLUDED.fecha_habilitacion),
         actualizado_en = now();
   `, [expedienteId, fechaRadicacionRaw, computo.fechaInicioComputo, fechaVencimiento]);
 
@@ -640,6 +673,8 @@ export async function archivarPorFaltaDePago(
     if (manejaTx) {
       await cliente.query('BEGIN');
     }
+
+    await asegurarEsquemaHabilitacion(cliente);
 
     // 1. Bloqueo canónico a nivel de fila sobre sigd_tra.expediente
     const expRow = await cliente.query<{
