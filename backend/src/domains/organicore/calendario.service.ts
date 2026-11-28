@@ -28,7 +28,7 @@
 
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
-import { ConflictError, ValidationError } from '../../shared/domain/errors/index.js';
+import { ConflictError, NotFoundError, ValidationError } from '../../shared/domain/errors/index.js';
 import { getRequestContext } from '../../shared/request-context/request-context.js';
 import { registrarMutacion } from '../../audit/bitacora-auditoria.repository.js';
 import { insertarEvento } from '../../audit/evento-outbox.repository.js';
@@ -47,7 +47,7 @@ export const TIPOS_FERIADO = [
 
 export type TipoFeriado = (typeof TIPOS_FERIADO)[number];
 
-export const UNIDADES_TERRITORIALES = ['NACIONAL', 'UCAYALI', 'IESTP_SUIZA'] as const;
+export const UNIDADES_TERRITORIALES = ['NACIONAL', 'UCAYALI', 'REGIONAL_UCAYALI', 'IESTP_SUIZA'] as const;
 
 export type UnidadTerritorial = (typeof UNIDADES_TERRITORIALES)[number];
 
@@ -461,7 +461,7 @@ export const esquemaUnidadTerritorial = z.enum(UNIDADES_TERRITORIALES, {
  * administrador tenga que repetirla y mantiene la unicidad
  * (fecha, unidad_territorial) coherente con la clasificación normativa.
  */
-export function unidadTerritorialPorDefecto(tipo: string): UnidadTerritorial {
+export function unidadTerritorialPorDefecto(tipo: string | null | undefined): UnidadTerritorial {
   if (tipo === 'REGIONAL_UCAYALI') {
     return 'UCAYALI';
   }
@@ -508,6 +508,29 @@ export const esquemaFeriadoExcepcional = z
   }));
 
 export type FeriadoExcepcionalInput = z.infer<typeof esquemaFeriadoExcepcional>;
+
+/**
+ * Body de `PUT /api/v1/admin/calendario-laboral/:id`.
+ * Permite modificar fecha, descripción, tipo, unidad territorial, laborable, base legal o estado activo.
+ */
+export const esquemaActualizarFeriado = z
+  .object({
+    fecha: esquemaFecha.optional(),
+    descripcion: z
+      .string()
+      .trim()
+      .min(3, 'La descripción debe tener al menos 3 caracteres.')
+      .max(200, 'La descripción no puede superar los 200 caracteres.')
+      .optional(),
+    tipo_feriado: esquemaTipoFeriado.nullable().optional(),
+    unidad_territorial: esquemaUnidadTerritorial.optional(),
+    es_laborable: z.boolean().optional(),
+    base_legal: z.string().trim().max(500, 'La base legal no puede superar los 500 caracteres.').nullable().optional(),
+    activo: z.boolean().optional(),
+  })
+  .strict();
+
+export type ActualizarFeriadoInput = z.infer<typeof esquemaActualizarFeriado>;
 
 /** Query de `GET /api/v1/admin/calendario-laboral` (#48). */
 export const esquemaConsultaCalendario = z
@@ -645,6 +668,104 @@ async function existeCalendario(
   return resultado.rows[0]?.existe === true;
 }
 
+/** ¿Existe entrada para (fecha, unidad_territorial) excluyendo el ID actual? */
+async function existeCalendarioExcepto(
+  cliente: PoolClient,
+  fecha: string,
+  unidad_territorial: UnidadTerritorial,
+  id_calendario: string,
+): Promise<boolean> {
+  const resultado = await cliente.query<{ existe: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1
+         FROM sigd_org.calendario_laboral
+        WHERE fecha = $1::date
+          AND unidad_territorial = $2
+          AND id_calendario != $3::uuid
+     ) AS existe`,
+    [fecha, unidad_territorial, id_calendario],
+  );
+  return resultado.rows[0]?.existe === true;
+}
+
+/** Obtiene una fila del calendario por su id_calendario (UUID). */
+async function obtenerCalendarioPorId(
+  cliente: PoolClient | Pool,
+  id_calendario: string,
+): Promise<FilaCalendario | null> {
+  const resultado = await cliente.query<FilaCalendario>(
+    `${SELECCION} WHERE c.id_calendario = $1::uuid`,
+    [id_calendario],
+  );
+  return resultado.rows[0] ?? null;
+}
+
+/** Actualiza parcialmente los campos editables de un día en el calendario laboral. */
+async function actualizarFilaCalendario(
+  cliente: PoolClient,
+  id_calendario: string,
+  campos: {
+    fecha?: string;
+    tipo_feriado?: TipoFeriado | null;
+    descripcion?: string;
+    unidad_territorial?: UnidadTerritorial;
+    es_laborable?: boolean;
+    base_legal?: string | null;
+    activo?: boolean;
+  },
+): Promise<FilaCalendario> {
+  const sets: string[] = ['actualizado_en = now()'];
+  const valores: unknown[] = [id_calendario];
+
+  if (campos.fecha !== undefined) {
+    valores.push(campos.fecha);
+    sets.push(`fecha = $${valores.length}::date`);
+  }
+  if (campos.tipo_feriado !== undefined) {
+    valores.push(campos.tipo_feriado);
+    sets.push(`tipo_feriado = $${valores.length}`);
+  }
+  if (campos.descripcion !== undefined) {
+    valores.push(campos.descripcion);
+    sets.push(`descripcion = $${valores.length}`);
+  }
+  if (campos.unidad_territorial !== undefined) {
+    valores.push(campos.unidad_territorial);
+    sets.push(`unidad_territorial = $${valores.length}`);
+  }
+  if (campos.es_laborable !== undefined) {
+    valores.push(campos.es_laborable);
+    sets.push(`es_laborable = $${valores.length}`);
+  }
+  if (campos.base_legal !== undefined) {
+    valores.push(campos.base_legal);
+    sets.push(`base_legal = $${valores.length}`);
+  }
+  if (campos.activo !== undefined) {
+    valores.push(campos.activo);
+    sets.push(`activo = $${valores.length}`);
+  }
+
+  const query = `
+    UPDATE sigd_org.calendario_laboral
+       SET ${sets.join(', ')}
+     WHERE id_calendario = $1::uuid
+     RETURNING id_calendario,
+               to_char(fecha, 'YYYY-MM-DD') AS fecha,
+               anio,
+               tipo_feriado,
+               descripcion,
+               unidad_territorial,
+               es_laborable,
+               base_legal,
+               activo,
+               to_char(creado_en AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS creado_en
+  `;
+
+  const res = await cliente.query<FilaCalendario>(query, valores);
+  return res.rows[0];
+}
+
 async function listarCalendario(
   pool: Pool,
   filtro: FiltroCalendario = {},
@@ -715,6 +836,8 @@ export const AGREGADO_CALENDARIO = 'calendario_laboral';
 
 /** Evento de dominio que dispara el recálculo de los semáforos SLA. */
 export const EVENTO_FERIADO_EXCEPCIONAL = 'FeriadoExcepcionalRegistrado';
+export const EVENTO_FERIADO_ACTUALIZADO = 'FeriadoActualizado';
+export const EVENTO_FERIADO_ELIMINADO = 'FeriadoEliminado';
 
 /** Clave de caché del calendario laboral completo. */
 export const CLAVE_CACHE_CALENDARIO = 'organicore:calendario-laboral:v1';
@@ -822,6 +945,15 @@ export class CalendarioService {
     return this.listar({ anio });
   }
 
+  /** Lista los años (ejercicios fiscales) que tienen registros en el calendario. */
+  public async obtenerAniosDisponibles(): Promise<number[]> {
+    const resultado = await this.pool.query<{ anio: number }>(
+      `SELECT DISTINCT anio FROM sigd_org.calendario_laboral WHERE anio IS NOT NULL ORDER BY anio`,
+    );
+    const anios = resultado.rows.map((r) => Number(r.anio));
+    return anios.length > 0 ? anios : [2025, 2026, 2027];
+  }
+
   /** Fechas no laborables registradas en base de datos para el rango. */
   public async diasNoLaborables(desde: string, hasta: string): Promise<string[]> {
     return consultarDiasNoLaborables(this.pool, desde, hasta);
@@ -912,6 +1044,176 @@ export class CalendarioService {
         cache_invalidation: 'EMITIDA',
         id_evento_outbox,
         id_auditoria,
+      };
+    } catch (error) {
+      await cliente.query('ROLLBACK');
+      throw error;
+    } finally {
+      cliente.release();
+    }
+  }
+
+  /**
+   * Actualiza un feriado o día no laborable existente (#49b).
+   *
+   * Realiza validación de unicidad temporal y territorial, registra auditoría WORM
+   * y evento outbox e invalida la caché en memoria para refrescar el cómputo de plazos.
+   */
+  public async actualizarFeriado(
+    idCalendario: string,
+    entrada: ActualizarFeriadoInput,
+  ): Promise<DiaCalendario> {
+    if (entrada.fecha && !esFechaValida(entrada.fecha)) {
+      throw new ValidationError({
+        invalidParams: [{ name: 'fecha', reason: 'La fecha no existe en el calendario.' }],
+      });
+    }
+
+    const cliente = await this.pool.connect();
+    try {
+      await cliente.query('BEGIN');
+
+      const anterior = await obtenerCalendarioPorId(cliente, idCalendario);
+      if (!anterior) {
+        throw new NotFoundError({
+          message: `No se encontró el registro de calendario con id ${idCalendario}.`,
+        });
+      }
+
+      const nuevaFecha = entrada.fecha ?? anterior.fecha;
+      const nuevaUnidad = entrada.unidad_territorial ?? anterior.unidad_territorial;
+
+      if (
+        (entrada.fecha !== undefined || entrada.unidad_territorial !== undefined) &&
+        (nuevaFecha !== anterior.fecha || nuevaUnidad !== anterior.unidad_territorial)
+      ) {
+        if (await existeCalendarioExcepto(cliente, nuevaFecha, nuevaUnidad, idCalendario)) {
+          throw new ConflictError({
+            code: 'FERIADO_DUPLICADO',
+            message: 'Ya existe un registro en el calendario para esa fecha y unidad territorial.',
+            detail: `La fecha ${nuevaFecha} ya está registrada en el calendario para la unidad ${nuevaUnidad}.`,
+          });
+        }
+      }
+
+      let nuevoTipo = entrada.tipo_feriado;
+      if (entrada.es_laborable === true && nuevoTipo === undefined) {
+        nuevoTipo = null;
+      }
+
+      const fila = await actualizarFilaCalendario(cliente, idCalendario, {
+        fecha: entrada.fecha,
+        descripcion: entrada.descripcion,
+        tipo_feriado: nuevoTipo,
+        unidad_territorial: entrada.unidad_territorial,
+        es_laborable: entrada.es_laborable,
+        base_legal: entrada.base_legal,
+        activo: entrada.activo,
+      });
+
+      const contexto = getRequestContext();
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_org',
+        tabla: 'calendario_laboral',
+        operacion: 'UPDATE',
+        datos_antes: anterior,
+        datos_despues: fila,
+      });
+
+      await insertarEvento(cliente, {
+        agregado: AGREGADO_CALENDARIO,
+        tipo_evento: EVENTO_FERIADO_ACTUALIZADO,
+        payload: {
+          id_calendario: fila.id_calendario,
+          fecha: fila.fecha,
+          tipo_feriado: fila.tipo_feriado,
+          descripcion: fila.descripcion,
+          unidad_territorial: fila.unidad_territorial,
+          es_laborable: fila.es_laborable,
+          activo: fila.activo,
+          anio: Number(fila.anio),
+          invalidar_cache: true,
+          correlation_id: contexto?.correlation_id ?? null,
+        },
+      });
+
+      await cliente.query('COMMIT');
+      this.invalidarCache();
+
+      return mapearFila(fila);
+    } catch (error) {
+      await cliente.query('ROLLBACK');
+      throw error;
+    } finally {
+      cliente.release();
+    }
+  }
+
+  /**
+   * Elimina un registro del calendario laboral (#49c).
+   * Soporta tanto eliminación física como baja lógica (`softDelete = true`).
+   */
+  public async eliminarFeriado(
+    idCalendario: string,
+    softDelete: boolean = false,
+  ): Promise<{ id_calendario: string; eliminado: boolean; mensaje: string }> {
+    const cliente = await this.pool.connect();
+    try {
+      await cliente.query('BEGIN');
+
+      const anterior = await obtenerCalendarioPorId(cliente, idCalendario);
+      if (!anterior) {
+        throw new NotFoundError({
+          message: `No se encontró el registro de calendario con id ${idCalendario}.`,
+        });
+      }
+
+      if (softDelete) {
+        await cliente.query(
+          `UPDATE sigd_org.calendario_laboral
+              SET activo = FALSE, actualizado_en = now()
+            WHERE id_calendario = $1::uuid`,
+          [idCalendario],
+        );
+      } else {
+        await cliente.query(
+          `DELETE FROM sigd_org.calendario_laboral WHERE id_calendario = $1::uuid`,
+          [idCalendario],
+        );
+      }
+
+      const contexto = getRequestContext();
+      await registrarMutacion(cliente, {
+        esquema: 'sigd_org',
+        tabla: 'calendario_laboral',
+        operacion: softDelete ? 'UPDATE' : 'DELETE',
+        datos_antes: anterior,
+        datos_despues: softDelete ? { ...anterior, activo: false } : null,
+      });
+
+      await insertarEvento(cliente, {
+        agregado: AGREGADO_CALENDARIO,
+        tipo_evento: EVENTO_FERIADO_ELIMINADO,
+        payload: {
+          id_calendario: idCalendario,
+          fecha: anterior.fecha,
+          descripcion: anterior.descripcion,
+          tipo_feriado: anterior.tipo_feriado,
+          soft_delete: softDelete,
+          invalidar_cache: true,
+          correlation_id: contexto?.correlation_id ?? null,
+        },
+      });
+
+      await cliente.query('COMMIT');
+      this.invalidarCache();
+
+      return {
+        id_calendario: idCalendario,
+        eliminado: true,
+        mensaje: softDelete
+          ? 'El registro de calendario ha sido desactivado exitosamente.'
+          : 'El registro de calendario ha sido eliminado exitosamente.',
       };
     } catch (error) {
       await cliente.query('ROLLBACK');

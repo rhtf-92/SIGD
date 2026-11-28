@@ -11,6 +11,8 @@
  * con cálculo de huella criptográfica SHA-256.
  *
  * Características:
+ * - Soporte para trámites simplificados que NO requieren folios ni PDFs obligatorios.
+ * - Detección automática según catálogo TUPA y control accesible para el administrado.
  * - Validación reactiva de obligatoriedad, longitud mínima de asunto y archivos PDF.
  * - Validación de tamaño máximo de archivo (límite 25 MB según directiva LPAG).
  * - Accesibilidad WCAG 2.1 AA con contraste reforzado y alertas de error en rojo.
@@ -44,6 +46,8 @@ interface TipoTramiteCatalogo {
   codigo: string;
   denominacion: string;
   unidad_organica?: string | null;
+  total_requisitos?: number;
+  requiere_documentos?: boolean;
 }
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
@@ -88,6 +92,8 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     };
   }, []);
 
+  const esSinDocumentos = Boolean(data.noRequiereDocumentos);
+
   // ===========================================================================
   // VALIDACIÓN REACTIVA EN TIEMPO REAL
   // ===========================================================================
@@ -108,15 +114,23 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     }
 
     // 3. Cantidad de Folios
-    if (!data.numeroFolios || data.numeroFolios < 1) {
-      errs.numeroFolios = 'La cantidad de folios debe ser al menos 1 folio útil.';
-    } else if (data.numeroFolios > 500) {
-      errs.numeroFolios = 'La cantidad máxima estimada por expediente es de 500 folios.';
-    }
+    if (!data.noRequiereDocumentos) {
+      if (!data.numeroFolios || data.numeroFolios < 1) {
+        errs.numeroFolios = 'La cantidad de folios debe ser al menos 1 folio útil.';
+      } else if (data.numeroFolios > 500) {
+        errs.numeroFolios = 'La cantidad máxima estimada por expediente es de 500 folios.';
+      }
 
-    // 4. Archivos adjuntos obligatorios
-    if (data.archivos.length === 0) {
-      errs.archivos = 'Debe adjuntar al menos un documento probatorio principal en formato PDF.';
+      // 4. Archivos adjuntos obligatorios (solo si requiere documentos)
+      if (data.archivos.length === 0) {
+        errs.archivos = 'Debe adjuntar al menos un documento probatorio principal en formato PDF.';
+      }
+    } else {
+      if (data.numeroFolios < 0) {
+        errs.numeroFolios = 'La cantidad de folios no puede ser negativa.';
+      } else if (data.numeroFolios > 500) {
+        errs.numeroFolios = 'La cantidad máxima estimada por expediente es de 500 folios.';
+      }
     }
 
     return errs;
@@ -132,6 +146,33 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     dispatch({
       type: 'UPDATE_DOCUMENTOS',
       payload: { [field]: value },
+    });
+  };
+
+  const handleSelectTramite = (nuevoId: string) => {
+    const tramiteEncontrado = tiposTramite.find((t) => t.id === nuevoId);
+    const esTramiteSinRequisitos = Boolean(
+      tramiteEncontrado &&
+      tramiteEncontrado.total_requisitos !== undefined &&
+      tramiteEncontrado.total_requisitos === 0
+    );
+
+    dispatch({
+      type: 'UPDATE_DOCUMENTOS',
+      payload: {
+        tipoTramiteId: nuevoId,
+        noRequiereDocumentos: esTramiteSinRequisitos,
+      },
+    });
+  };
+
+  const handleToggleNoRequiereDocumentos = (checked: boolean) => {
+    dispatch({
+      type: 'UPDATE_DOCUMENTOS',
+      payload: {
+        noRequiereDocumentos: checked,
+        numeroFolios: checked ? 0 : (data.numeroFolios > 0 ? data.numeroFolios : 1),
+      },
     });
   };
 
@@ -196,7 +237,18 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
     });
   };
 
-  
+  const handleSimularArchivoPrueba = () => {
+    const dummy: ArchivoTramite = {
+      nombre: 'solicitud_firmada_estudios_2026.pdf',
+      peso: 154230,
+      hashSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    };
+    dispatch({
+      type: 'UPDATE_DOCUMENTOS',
+      payload: { archivos: [...data.archivos, dummy] },
+    });
+    setFileError(null);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -227,7 +279,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           Documentos del Trámite
         </h2>
         <p className="mt-1 text-sm text-slate-500">
-          Seleccione el procedimiento TUPA formal, describa el petitorio y adjunte los documentos probatorios escaneados en PDF.
+          Seleccione el procedimiento TUPA formal, describa el petitorio y adjunte los documentos probatorios en PDF si el trámite lo exige.
         </p>
       </header>
 
@@ -252,7 +304,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                 : undefined
             }
             value={data.tipoTramiteId}
-            onChange={(e) => handleFieldChange('tipoTramiteId', e.target.value)}
+            onChange={(e) => handleSelectTramite(e.target.value)}
             onBlur={() => markTouched('tipoTramiteId')}
             disabled={isSubmitting}
             className={`w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 transition cursor-pointer ${
@@ -302,6 +354,36 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           )}
         </div>
 
+        {/* Notificación cuando el trámite no requiere documentos */}
+        {esSinDocumentos && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-3.5 text-xs text-emerald-900 flex items-start gap-2.5">
+            <span className="text-base leading-none">✨</span>
+            <div>
+              <p className="font-bold">Procedimiento sin requisitos documentales obligatorios</p>
+              <p className="text-[11px] text-emerald-800 mt-0.5">
+                Este trámite no exige folios ni documentos sustentatorios en PDF según la normativa TUPA. Puede continuar directamente con su solicitud o adjuntar documentos de manera facultativa si lo desea.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Casilla interactiva para indicar que no requiere documentos */}
+        <div>
+          <label className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs font-semibold text-slate-700 hover:bg-slate-100/80 cursor-pointer transition">
+            <input
+              type="checkbox"
+              id={`${formId}-noRequiereDocumentos`}
+              checked={esSinDocumentos}
+              onChange={(e) => handleToggleNoRequiereDocumentos(e.target.checked)}
+              disabled={isSubmitting}
+              className="h-4 w-4 rounded border-slate-300 text-[#006EC7] focus:ring-[#006EC7]"
+            />
+            <span>
+              Trámite exento de requisitos documentales o PDFs adjuntos (solicitud o declaración directa)
+            </span>
+          </label>
+        </div>
+
         {/* 2. Asunto / Petitorio Sucinto */}
         <div>
           <div className="flex justify-between items-center mb-1.5">
@@ -332,7 +414,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             aria-describedby={
               touched.asunto && errors.asunto ? `${formId}-asunto-error` : undefined
             }
-            placeholder="Describa claramente su solicitud dirigida a la Dirección del Instituto de Educación Superior Tecnológico Público Suiza..."
+            placeholder="Describa claramente su solicitud dirigida a la Dirección del Instituto de Educación Superior Tecnológico Público..."
             value={data.asunto}
             onChange={(e) => handleFieldChange('asunto', e.target.value)}
             onBlur={() => markTouched('asunto')}
@@ -366,10 +448,10 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             id={`${formId}-numeroFolios`}
             name="numeroFolios"
             type="number"
-            min={1}
+            min={esSinDocumentos ? 0 : 1}
             max={500}
-            required
-            aria-required="true"
+            required={!esSinDocumentos}
+            aria-required={!esSinDocumentos}
             aria-invalid={touched.numeroFolios && Boolean(errors.numeroFolios)}
             aria-describedby={
               touched.numeroFolios && errors.numeroFolios
@@ -378,7 +460,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             }
             value={data.numeroFolios}
             onChange={(e) =>
-              handleFieldChange('numeroFolios', parseInt(e.target.value, 10) || 1)
+              handleFieldChange('numeroFolios', parseInt(e.target.value, 10) || 0)
             }
             onBlur={() => markTouched('numeroFolios')}
             disabled={isSubmitting}
@@ -398,7 +480,9 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             </p>
           ) : (
             <p className="mt-1 text-[11px] text-slate-500">
-              Número de caras numeradas o páginas útiles que componen el expediente.
+              {esSinDocumentos
+                ? 'Trámite virtual sin folios documentales obligatorios (0 folios).'
+                : 'Número de caras numeradas o páginas útiles que componen el expediente.'}
             </p>
           )}
         </div>
@@ -408,16 +492,29 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                Documentación Sustentatoria Principal en PDF <span className="text-red-600">*</span>
+                {esSinDocumentos ? (
+                  <>Documentación Sustentatoria <span className="text-emerald-700 font-normal">(Opcional / Facultativa)</span></>
+                ) : (
+                  <>Documentación Sustentatoria Principal en PDF <span className="text-red-600">*</span></>
+                )}
               </h3>
               <p className="text-xs text-slate-500">
-                Suba su solicitud o formulario formal en formato PDF (máximo 25 MB por archivo).
+                {esSinDocumentos
+                  ? 'No se requiere documentación obligatoria. Puede adjuntar archivos PDF si desea sustentar facultativamente su trámite (máx. 25 MB).'
+                  : 'Suba su solicitud o formulario formal en formato PDF (máximo 25 MB por archivo).'}
               </p>
               <p className="text-xs text-amber-800">
                 El archivo se verifica con su huella SHA-256. El almacenamiento definitivo es la siguiente etapa.
               </p>
             </div>
-            
+            <button
+              type="button"
+              onClick={handleSimularArchivoPrueba}
+              disabled={isSubmitting}
+              className="text-xs font-bold text-[#006EC7] hover:underline self-start sm:self-auto cursor-pointer"
+            >
+              + Cargar PDF de prueba
+            </button>
           </div>
 
           {/* Zona de Drop / Carga de Archivo */}
@@ -463,8 +560,8 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
             </p>
           )}
 
-          {/* Alerta si no hay archivos y el paso fue tocado */}
-          {touched.archivos && errors.archivos && (
+          {/* Alerta si no hay archivos y el trámite exige documentos */}
+          {!esSinDocumentos && touched.archivos && errors.archivos && (
             <p role="alert" className="text-xs font-semibold text-red-600">
               ⚠️ {errors.archivos}
             </p>

@@ -10,11 +10,22 @@ export interface TupaDifference {
 }
 
 const campos = [
+  ["denominacion", "Denominación"],
+  ["rubro", "Rubro"],
+  ["descripcion", "Descripción"],
+  ["calificacion", "Calificación"],
+  ["silencio_administrativo", "Silencio administrativo"],
+  ["plazo_dias_habiles", "Días hábiles"],
+  ["plazo_texto", "Plazo"],
   ["derecho_monto", "Derecho de tramitación"],
   ["derecho_porcentaje_uit", "Porcentaje de UIT"],
-  ["plazo_texto", "Plazo"],
-  ["silencio_administrativo", "Silencio administrativo"],
+  ["derecho_texto", "Texto del derecho"],
+  ["cuenta_pago", "Cuenta o lugar de pago"],
+  ["unidad_recibe", "Unidad que recibe"],
   ["autoridad_resuelve", "Autoridad que resuelve"],
+  ["base_legal", "Base legal"],
+  ["recursos", "Recursos impugnatorios"],
+  ["observaciones", "Observaciones"],
 ] as const;
 
 function mostrar(valor: unknown): string {

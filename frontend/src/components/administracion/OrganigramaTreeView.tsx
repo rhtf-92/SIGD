@@ -18,7 +18,11 @@ function construirArbol(areas: AreaOrganica[]): NodoArbol[] {
   const raices: NodoArbol[] = [];
   ordenado.forEach((area) => {
     const partes = area.ruta.split(".");
-    const rutaPadre = partes.slice(0, -1).join(".");
+    let rutaPadre = partes.slice(0, -1).join(".");
+    // Soporte defensivo para tokens ltree prefijados con 'a.' (ej: a.ARE_DIR.a.ARE_SUBDIR)
+    if (rutaPadre && !mapa.has(rutaPadre) && partes.length >= 3 && partes[partes.length - 2] === "a") {
+      rutaPadre = partes.slice(0, -2).join(".");
+    }
     const padre = rutaPadre ? mapa.get(rutaPadre) : undefined;
     const nodo = mapa.get(area.ruta);
     if (!nodo) return;

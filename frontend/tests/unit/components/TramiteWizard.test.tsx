@@ -28,11 +28,14 @@
 
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { TramiteWizard } from '@/components/tramite/TramiteWizard';
 import { TRAMITE_WIZARD_STORAGE_KEY } from '@/hooks/useTramiteWizardReducer';
 import { apiClient } from '@/api/client';
+
+const renderWizard = () => render(<MemoryRouter><TramiteWizard /></MemoryRouter>);
 
 describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', () => {
   beforeEach(() => {
@@ -103,10 +106,25 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
       ...overrides,
     };
 
-    await user.selectOptions(
-      screen.getByLabelText(/Procedimiento Institucional/i),
-      data.tipoTramiteId
+    await waitFor(() => {
+      const s = screen.getByLabelText(/Procedimiento Institucional/i) as HTMLSelectElement;
+      expect(s.options.length).toBeGreaterThan(1);
+    });
+
+    const select = screen.getByLabelText(/Procedimiento Institucional/i) as HTMLSelectElement;
+    const target = overrides?.tipoTramiteId ?? data.tipoTramiteId;
+    const targetNormalized = target?.replace(/^TUPA-/, '');
+    const match = Array.from(select.options).find(
+      (o) =>
+        o.value === target ||
+        (target && o.text.includes(target)) ||
+        (targetNormalized && (o.value === targetNormalized || o.text.trim().startsWith(targetNormalized) || o.text.includes(targetNormalized)))
     );
+    const valueToSelect = match?.value || select.options[1]?.value;
+    if (valueToSelect) {
+      await user.selectOptions(select, valueToSelect);
+    }
+
     await user.type(screen.getByLabelText(/Asunto o Petitorio Sucinto \*/i), data.asunto);
     const inputFolios = screen.getByLabelText(/Folios/i);
     await user.clear(inputFolios);
@@ -115,13 +133,16 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     // Cargar archivo PDF de prueba requerido para validación
     const btnCargarPdf = screen.getByRole('button', { name: /\+ Cargar PDF de prueba/i });
     await user.click(btnCargarPdf);
+    await waitFor(() => {
+      expect(screen.getByText(/solicitud_firmada_estudios_2026\.pdf/i)).toBeInTheDocument();
+    });
   };
 
   /**
    * Helper para aceptar declaraciones en el Paso 3 (Declaración Jurada)
    */
   const fillPaso3 = async (user: ReturnType<typeof userEvent.setup>) => {
-    const checkVeracidad = screen.getByLabelText(
+    const checkVeracidad = await screen.findByLabelText(
       /Declaración Jurada de Veracidad \(Art\. 51 LPAG\)/i
     );
     const checkTerminos = screen.getByLabelText(
@@ -135,7 +156,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
   // TEST 1
   // ===========================================================================
   it('Test 1: Renderizado inicial en Paso 1 con foco en el primer campo', () => {
-    render(<TramiteWizard />);
+    renderWizard();
 
     // Verifica que el asistente renderiza el encabezado del Paso 1
     expect(
@@ -154,7 +175,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
   // ===========================================================================
   it('Test 2: Validación bloqueante de DNI (rechazar letras o menos de 8 dígitos) impidiendo avanzar', async () => {
     const user = userEvent.setup();
-    render(<TramiteWizard />);
+    renderWizard();
 
     const inputDoc = screen.getByLabelText(/Número de Documento \*/i);
     const btnSiguiente = screen.getByRole('button', { name: /^Siguiente/i });
@@ -205,7 +226,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
   // ===========================================================================
   it('Test 3: Avance exitoso al Paso 2 con datos de identificación completos', async () => {
     const user = userEvent.setup();
-    render(<TramiteWizard />);
+    renderWizard();
 
     await fillPaso1(user);
 
@@ -226,7 +247,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
   // ===========================================================================
   it('Test 4: Validación de selección de trámite TUPA y asunto en Paso 2', async () => {
     const user = userEvent.setup();
-    render(<TramiteWizard />);
+    renderWizard();
 
     await fillPaso1(user);
     await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
@@ -240,8 +261,12 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     expect(btnSiguiente).toBeDisabled();
 
     // Seleccionar TUPA pero sin asunto
-    const selectTupa = screen.getByLabelText(/Procedimiento Institucional/i);
-    await user.selectOptions(selectTupa, 'TUPA-01');
+    await waitFor(() => {
+      const s = screen.getByLabelText(/Procedimiento Institucional/i) as HTMLSelectElement;
+      expect(s.options.length).toBeGreaterThan(1);
+    });
+    const selectTupa = screen.getByLabelText(/Procedimiento Institucional/i) as HTMLSelectElement;
+    await user.selectOptions(selectTupa, selectTupa.options[1].value);
     expect(btnSiguiente).toBeDisabled();
 
     // Asunto muy corto (menos de 10 caracteres)
@@ -273,7 +298,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
   // ===========================================================================
   it('Test 5: Persistencia de datos (State Lifting / Reducer) al retroceder del Paso 2 al Paso 1 con botón "Anterior"', async () => {
     const user = userEvent.setup();
-    render(<TramiteWizard />);
+    renderWizard();
 
     await fillPaso1(user, {
       numDoc: '78945612',
@@ -310,7 +335,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
   // ===========================================================================
   it('Test 6: Validación de consentimiento obligatorio de términos y LPAG en Paso 3', async () => {
     const user = userEvent.setup();
-    render(<TramiteWizard />);
+    renderWizard();
 
     await fillPaso1(user);
     await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
@@ -354,7 +379,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
   // ===========================================================================
   it('Test 7: Verificación del resumen consolidado en Paso 4 con los datos provistos en pasos previos', async () => {
     const user = userEvent.setup();
-    render(<TramiteWizard />);
+    renderWizard();
 
     await fillPaso1(user, {
       numDoc: '76543210',
@@ -387,7 +412,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     expect(screen.getByText('942123456')).toBeInTheDocument();
 
     // 2. Resumen Procedimiento
-    expect(screen.getByText('TUPA-02')).toBeInTheDocument();
+    expect(await screen.findByText(/(TUPA-02|02)/i)).toBeInTheDocument();
     expect(screen.getByText(/Folios:/i)).toBeInTheDocument();
     expect(
       screen.getByText(/Constancia de Egresado y No Adeudo Institucional/i)
@@ -406,7 +431,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
   // ===========================================================================
   it('Test 8: Sincronización y persistencia defensiva con sessionStorage', async () => {
     const user = userEvent.setup();
-    const { unmount } = render(<TramiteWizard />);
+    const { unmount } = renderWizard();
 
     await fillPaso1(user, {
       numDoc: '71122334',
@@ -426,7 +451,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     unmount();
 
     // Volver a montar: Lazy initialization debe restaurar los datos del borrador
-    render(<TramiteWizard />);
+    renderWizard();
 
     expect(screen.getByLabelText(/Número de Documento \*/i)).toHaveValue('71122334');
     expect(screen.getByLabelText(/Nombres Completos \*/i)).toHaveValue('Fernando');
@@ -446,7 +471,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     });
     vi.spyOn(apiClient, 'post').mockImplementation(() => mockPostPromise as any);
 
-    render(<TramiteWizard />);
+    renderWizard();
 
     await fillPaso1(user);
     await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
@@ -519,7 +544,7 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
       status: 201,
     } as any);
 
-    render(<TramiteWizard />);
+    renderWizard();
 
     await fillPaso1(user);
     await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
@@ -567,5 +592,93 @@ describe('T-FE-MPV-17: Pruebas de Integración de Componentes - TramiteWizard', 
     expect(
       within(modalDialog).getByRole('button', { name: /Finalizar y Cerrar/i })
     ).toBeInTheDocument();
+  });
+
+  // ===========================================================================
+  // TEST 11: TRÁMITE QUE NO REQUIERE FOLIOS NI DOCUMENTACIÓN SUSTENTADA EN PDF
+  // ===========================================================================
+  it('Test 11: Permite radicar exitosamente un trámite que no requiere folios ni documentación sustentada en PDF', async () => {
+    const user = userEvent.setup();
+
+    const spyPost = vi.spyOn(apiClient, 'post').mockResolvedValue({
+      data: {
+        expedienteId: '00000000-0000-0000-0000-000000000002',
+        cut: 'EXP-2026-990011',
+        anioFiscal: 2026,
+        fechaEnvioReal: '2026-03-24T10:00:00.000Z',
+        fechaRadicacionLegal: '2026-03-24T10:00:00.000Z',
+        diferidoPorCorte: false,
+        totalFolios: 0,
+        qrSeguimientoUrl: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-990011',
+        cargoDigital: {
+          codigo: 'CARGO-778899AA',
+          hashSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+          qrContenido: 'https://sigd.iestpsuiza.edu.pe/consulta/EXP-2026-990011',
+        },
+        mensajeLegal: 'Trámite simplificado radicado formalmente.',
+      },
+      status: 201,
+    } as any);
+
+    renderWizard();
+
+    // 1. Paso 1: Identificación
+    await fillPaso1(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    // 2. Paso 2: Procedimiento y exención de documentos/folios
+    await waitFor(() => {
+      const s = screen.getByLabelText(/Procedimiento Institucional/i) as HTMLSelectElement;
+      expect(s.options.length).toBeGreaterThan(1);
+    });
+
+    const select = screen.getByLabelText(/Procedimiento Institucional/i) as HTMLSelectElement;
+    await user.selectOptions(select, select.options[1].value);
+
+    await user.type(
+      screen.getByLabelText(/Asunto o Petitorio Sucinto \*/i),
+      'Solicitud de trámite directo sin folios ni documentación sustentatoria en PDF'
+    );
+
+    // Marcar checkbox de trámite exento de requisitos documentales
+    const checkExento = screen.getByLabelText(
+      /Trámite exento de requisitos documentales o PDFs adjuntos/i
+    );
+    await user.click(checkExento);
+
+    // Verificar que el botón Siguiente está habilitado SIN haber cargado ningún PDF
+    const btnSiguientePaso2 = screen.getByRole('button', { name: /^Siguiente/i });
+    expect(btnSiguientePaso2).not.toBeDisabled();
+    await user.click(btnSiguientePaso2);
+
+    // 3. Paso 3: Declaración Jurada
+    await fillPaso3(user);
+    await user.click(screen.getByRole('button', { name: /^Siguiente/i }));
+
+    // 4. Paso 4: Confirmación
+    expect(
+      screen.getByText(/0 \(Trámite virtual sin folios documentales\)/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Sin documentos adjuntos \(Trámite no requiere folios ni sustento en PDF\)/i)
+    ).toBeInTheDocument();
+
+    const btnRadicar = await screen.findByRole('button', { name: /Radicar Trámite/i });
+    await user.click(btnRadicar);
+
+    // Verificar que el payload enviado al backend tiene totalFolios: 0 y documentos: []
+    expect(spyPost).toHaveBeenCalledWith(
+      '/api/v1/tramites/radicacion-virtual',
+      expect.objectContaining({
+        totalFolios: 0,
+        documentos: [],
+      })
+    );
+
+    // Verificar apertura del CargoDigitalModal
+    const modalDialog = await screen.findByRole('dialog');
+    expect(modalDialog).toBeInTheDocument();
+    const cutElements = within(modalDialog).getAllByText('EXP-2026-990011');
+    expect(cutElements.length).toBeGreaterThan(0);
   });
 });

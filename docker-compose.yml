@@ -80,6 +80,7 @@ services:
       REDIS_URL: redis://redis:6379
       OUTBOX_POLL_INTERVAL_MS: 5000
       SIGD_DISABLE_VITE: "true"
+      ARGON2_FORCE_FALLBACK: "true"
     ports:
       - "3000:3000"
     depends_on:

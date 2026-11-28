@@ -67,7 +67,7 @@ export default function CargoDigitalModal({
   const tipoDoc = isDigitalResponse ? "DOC" : cargo.solicitante.tipoDocumento;
   const numDoc = isDigitalResponse ? "" : cargo.solicitante.numeroDocumento;
   const asunto = cargo.asunto;
-  const folios = isDigitalResponse ? 1 : cargo.cantidadFolios;
+  const folios = isDigitalResponse ? (cargo.totalFolios ?? 0) : cargo.cantidadFolios;
   const docPrincipalTipo = isDigitalResponse ? "SOLICITUD DIGITAL" : cargo.documentoPrincipalTipo;
   const horaRecepcion = isDigitalResponse
     ? cargo.fechaRecepcionOficial
@@ -86,6 +86,8 @@ export default function CargoDigitalModal({
 
 function formatoLima(fechaISO: string | null | undefined): string {
   if (!fechaISO) return 'No registrado';
+  const d = new Date(fechaISO);
+  if (isNaN(d.getTime())) return fechaISO;
   return new Intl.DateTimeFormat('es-PE', {
     timeZone: 'America/Lima',
     year: 'numeric',
@@ -93,7 +95,7 @@ function formatoLima(fechaISO: string | null | undefined): string {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(fechaISO));
+  }).format(d);
 }
 
   function handleImprimirTicket() {

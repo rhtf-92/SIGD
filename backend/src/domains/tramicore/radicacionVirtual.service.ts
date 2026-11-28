@@ -100,6 +100,14 @@ export class RadicacionVirtualService {
 
       await this.insertarAsiento(cliente, expediente.expediente_id, datos, horario.envioReal, idPersonaAutenticada);
       await this.insertarConstanciaCasilla(cliente, idUsuario, cut, datos, horario.envioReal);
+      // Registrar hito inicial de trazabilidad en RutaDoc (FSM: REGISTRADO -> RECEPCION -> RECEPCIONADO)
+      await this.insertarMovimientoInicial(
+        cliente,
+        expediente.expediente_id,
+        idUsuario,
+        datos.asunto,
+        horario.envioReal,
+      );
       // Etapa 2b: integrar con sigd_doc.expediente y MinIO.
       // Los adjuntos se validan en el DTO pero no se persisten en esta etapa.
       const cargo = this.emitirCargoDigital(expediente.expediente_id, cut, datos, horario.envioReal);
@@ -315,6 +323,39 @@ export class RadicacionVirtualService {
     const hashSha256 = createHash('sha256').update(contenido).digest('hex');
     const qrContenido = `SIGD://cargo/${codigo}?h=${hashSha256.slice(0, 16)}`;
     return { codigo, hashSha256, qrContenido };
+  }
+
+  private async insertarMovimientoInicial(
+    cliente: PoolClient,
+    expedienteId: string,
+    idUsuario: string,
+    asunto: string,
+    fechaHora: Date,
+  ): Promise<void> {
+    try {
+      const resArea = await cliente.query<{ area_id: string }>(
+        `SELECT area_id FROM sigd_org.area WHERE codigo = 'ARE_MPV' LIMIT 1`
+      );
+      const areaId = resArea.rows[0]?.area_id ?? null;
+
+      await cliente.query(
+        `INSERT INTO sigd_rut.movimiento_tramite
+           (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id, fecha_hora, datos)
+         VALUES ($1::uuid, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', $2::uuid, $3, $4::jsonb)`,
+        [
+          expedienteId,
+          idUsuario,
+          fechaHora,
+          JSON.stringify({
+            areaId,
+            areaNombre: 'Mesa de Partes Virtual',
+            resumen: `Radicación virtual de expediente: ${asunto.slice(0, 100)}`,
+          }),
+        ],
+      );
+    } catch {
+      // Degradar silenciosamente si sigd_rut no estuviera inicializado
+    }
   }
 }
 

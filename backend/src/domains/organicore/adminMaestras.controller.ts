@@ -32,6 +32,7 @@ import { z } from 'zod';
 import {
   CalendarioService,
   construirVistaCalendario,
+  esquemaActualizarFeriado,
   esquemaConsultaCalendario,
   esquemaFeriadoExcepcional,
 } from './calendario.service.js';
@@ -86,13 +87,20 @@ export function listarCalendario(deps: DependenciasController) {
       incluirInactivos: consulta.incluir_inactivos ?? false,
     });
 
-    const anios = [...new Set(catalogo.map((dia) => dia.anio))].sort((a, b) => a - b);
-    const anio = consulta.anio ?? anios[0] ?? anioPorDefecto();
+    let aniosTotales: number[];
+    try {
+      aniosTotales = await deps.calendario.obtenerAniosDisponibles();
+    } catch {
+      aniosTotales = [...new Set(catalogo.map((dia) => dia.anio))].sort((a, b) => a - b);
+    }
+
+    const anio = consulta.anio ?? aniosTotales[0] ?? anioPorDefecto();
 
     res.json({
       ...construirVistaCalendario(anio, catalogo),
-      anios_disponibles: anios,
+      anios_disponibles: aniosTotales.length > 0 ? aniosTotales : [anio],
       total: catalogo.length,
+      todos_los_dias: catalogo,
       correlation_id: getRequestContext()?.correlation_id ?? '',
     });
   };
@@ -110,6 +118,46 @@ export function registrarFeriadoExcepcional(deps: DependenciasController) {
     const entrada = esquemaFeriadoExcepcional.parse(req.body);
     const registrado = await deps.calendario.registrarFeriadoExcepcional(entrada);
     res.status(201).json(registrado);
+  };
+}
+
+/**
+ * `#49b PUT /api/v1/admin/calendario-laboral/:id`
+ * Actualización integral de un feriado o excepción existente.
+ */
+export function actualizarFeriado(deps: DependenciasController) {
+  return async function actualizarFeriadoHandler(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    const id = req.params.id;
+    if (!id || typeof id !== 'string') {
+      res.status(400).json({ error: 'Identificador de feriado requerido' });
+      return;
+    }
+    const entrada = esquemaActualizarFeriado.parse(req.body);
+    const actualizado = await deps.calendario.actualizarFeriado(id, entrada);
+    res.status(200).json(actualizado);
+  };
+}
+
+/**
+ * `#49c DELETE /api/v1/admin/calendario-laboral/:id`
+ * Eliminación física o baja lógica (soft delete con query `?soft=true`) de un feriado.
+ */
+export function eliminarFeriado(deps: DependenciasController) {
+  return async function eliminarFeriadoHandler(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    const id = req.params.id;
+    if (!id || typeof id !== 'string') {
+      res.status(400).json({ error: 'Identificador de feriado requerido' });
+      return;
+    }
+    const soft = req.query.soft === 'true';
+    const resultado = await deps.calendario.eliminarFeriado(id, soft);
+    res.status(200).json(resultado);
   };
 }
 

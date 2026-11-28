@@ -19,6 +19,30 @@ const crearVersionSchema = z.object({
   uit_vigente: z.number().positive().max(1_000_000),
   copiarDesdeVersionId: versionIdSchema.optional(),
 });
+const reemplazarVigenteSchema = z.object({
+  codigo: z.string().trim().min(1).max(30),
+  nombre: z.string().trim().min(1).max(200),
+  uit_vigente: z.number().positive().max(1_000_000),
+  fecha_vigencia: z.string().date().optional(),
+  resolucion_numero: z.string().trim().min(1).max(100).optional(),
+  resolucion_fecha: z.string().date().optional(),
+  copiarDesdeVersionId: versionIdSchema.optional(),
+  resolucion_pdf_ref: z.string().max(500).optional(),
+  resolucion_pdf_sha256: z.string().length(64).optional(),
+});
+const activarBorradorSchema = z.object({
+  resolucion_numero: z.string().trim().min(1).max(100).optional(),
+  resolucion_fecha: z.string().date().optional(),
+  fecha_vigencia: z.string().date().optional(),
+});
+const actualizarVersionSchema = z.object({
+  codigo: z.string().trim().min(1).max(30).optional(),
+  nombre: z.string().trim().min(1).max(200).optional(),
+  fecha_vigencia: z.string().date().nullable().optional(),
+  uit_vigente: z.number().positive().max(1_000_000).optional(),
+  resolucion_numero: z.string().trim().min(1).max(100).nullable().optional(),
+  resolucion_fecha: z.string().date().nullable().optional(),
+});
 const publicarSchema = z.object({
   resolucion_numero: z.string().trim().min(1).max(100),
   resolucion_fecha: z.string().date(),
@@ -29,12 +53,12 @@ const tramiteSchema = z.object({
   denominacion: z.string().trim().min(1).max(300),
   rubro: z.string().trim().min(1).max(200),
   descripcion: z.string().nullable().optional(),
-  derecho_monto: z.number().nonnegative().nullable().optional(),
-  derecho_porcentaje_uit: z.number().nonnegative().nullable().optional(),
-  derecho_texto: z.string().max(100).nullable().optional(),
+  derecho_monto: z.number().nonnegative().max(99_999_999.99).nullable().optional(),
+  derecho_porcentaje_uit: z.number().nonnegative().max(9_999.99).nullable().optional(),
+  derecho_texto: z.string().max(2_000).nullable().optional(),
   cuenta_pago: z.string().max(60).nullable().optional(),
   plazo_texto: z.string().max(300).nullable().optional(),
-  plazo_dias_habiles: z.number().int().positive().nullable().optional(),
+  plazo_dias_habiles: z.number().int().positive().max(32_767).nullable().optional(),
   calificacion: z.enum(['EVALUACION_PREVIA', 'APROBACION_AUTOMATICA', 'NO_APLICA']),
   silencio_administrativo: z.enum(['POSITIVO', 'NEGATIVO', 'NO_APLICA']),
   unidad_recibe: z.string().max(200).nullable().optional(),
@@ -229,7 +253,8 @@ export function crearRouterTupa(pool: Pool): Router {
          FROM sigd_tupa.tramite_version t
          JOIN sigd_tupa.version v ON v.version_id = t.version_id
          LEFT JOIN sigd_tupa.tramite_requisito r ON r.tramite_version_id = t.tramite_version_id
-        WHERE v.estado = 'VIGENTE' AND t.codigo = $1
+        WHERE v.estado = 'VIGENTE'
+          AND (t.codigo = $1 OR 'TUPA-' || t.codigo = $1 OR t.codigo = 'TUPA-' || $1)
         GROUP BY t.tramite_version_id`,
       [codigo],
     );
@@ -306,6 +331,88 @@ export function crearRouterTupa(pool: Pool): Router {
     res.status(201).json({ version: nueva });
   });
 
+  router.post('/tupa/versiones/reemplazar-vigente', async (req, res) => {
+    const actor = obtenerIdUsuario(req);
+    const datos = parsearCuerpo(reemplazarVigenteSchema, req.body);
+    const resultado = await transaccion(pool, async (client) => {
+      const fechaVig = datos.fecha_vigencia ?? new Date().toISOString().slice(0, 10);
+      const resNum = datos.resolucion_numero ?? `R.D. N° ${new Date().getFullYear()}-DG/IESTP-SUIZA`;
+      const resFec = datos.resolucion_fecha ?? new Date().toISOString().slice(0, 10);
+
+      const q = await client.query(
+        `SELECT version_id, version_codigo AS codigo, version_nombre AS nombre,
+                version_estado AS estado, total_tramites_copiados,
+                version_anterior_id, version_anterior_codigo
+           FROM sigd_tupa.fn_reemplazar_version_vigente(
+             $1, $2, $3, $4::date, $5, $6::date, $7, $8, $9, $10
+           )`,
+        [
+          datos.codigo,
+          datos.nombre,
+          datos.uit_vigente,
+          fechaVig,
+          resNum,
+          resFec,
+          datos.resolucion_pdf_ref ?? null,
+          datos.resolucion_pdf_sha256 ?? null,
+          datos.copiarDesdeVersionId ?? null,
+          actor.id,
+        ],
+      );
+      return q.rows[0];
+    });
+    res.status(201).json({
+      version: resultado,
+      mensaje: 'Nueva versión creada y activada como VIGENTE. La versión anterior fue reemplazada exitosamente.',
+    });
+  });
+
+  router.post('/tupa/versiones/:id/activar', async (req, res) => {
+    const versionId = validarUuid(req.params.id, 'de versión');
+    const actor = obtenerIdUsuario(req);
+    const datos = parsearCuerpo(activarBorradorSchema, req.body);
+    const resultado = await transaccion(pool, async (client) => {
+      const q = await client.query(
+        `SELECT version_id, version_codigo AS codigo, version_nombre AS nombre,
+                version_estado AS estado, total_tramites,
+                version_anterior_id, version_anterior_codigo
+           FROM sigd_tupa.fn_activar_borrador_tupa(
+             $1, $2, $3::date, $4::date, NULL, NULL, $5
+           )`,
+        [
+          versionId,
+          datos.resolucion_numero ?? null,
+          datos.resolucion_fecha ?? null,
+          datos.fecha_vigencia ?? null,
+          actor.id,
+        ],
+      );
+      return q.rows[0];
+    });
+    res.json({
+      version: resultado,
+      mensaje: 'Versión borrador activada como VIGENTE exitosamente. La versión previa quedó supersedida.',
+    });
+  });
+
+  router.delete('/tupa/versiones/:id', async (req, res) => {
+    const versionId = validarUuid(req.params.id, 'de versión');
+    const actor = obtenerIdUsuario(req);
+    await transaccion(pool, async (client) => {
+      await exigirBorrador(client, versionId);
+      await client.query(`SELECT set_config('sigd_tupa.usuario_id', $1, true)`, [actor.id]);
+      await client.query(
+        `DELETE FROM sigd_tupa.tramite_requisito
+          WHERE tramite_version_id IN (SELECT tramite_version_id FROM sigd_tupa.tramite_version WHERE version_id = $1)`,
+        [versionId],
+      );
+      await client.query(`DELETE FROM sigd_tupa.tramite_version WHERE version_id = $1`, [versionId]);
+      await client.query(`DELETE FROM sigd_tupa.bitacora WHERE version_id = $1`, [versionId]);
+      await client.query(`DELETE FROM sigd_tupa.version WHERE version_id = $1`, [versionId]);
+    });
+    res.json({ ok: true, mensaje: 'Borrador eliminado correctamente.' });
+  });
+
   router.get('/tupa/versiones/:id', async (req, res) => {
     const versionId = validarUuid(req.params.id, 'de versión');
     const { rows } = await pool.query(
@@ -316,6 +423,40 @@ export function crearRouterTupa(pool: Pool): Router {
       [versionId],
     );
     res.json({ version: comprobarVersionPresente(rows, versionId) });
+  });
+
+  router.patch('/tupa/versiones/:id', async (req, res) => {
+    const versionId = validarUuid(req.params.id, 'de versión');
+    const actor = obtenerIdUsuario(req);
+    const datos = parsearCuerpo(actualizarVersionSchema, req.body);
+    const columnasVersion = [
+      'codigo',
+      'nombre',
+      'fecha_vigencia',
+      'uit_vigente',
+      'resolucion_numero',
+      'resolucion_fecha',
+    ] as const;
+    const presentes = columnasVersion.filter((col) => Object.hasOwn(datos, col));
+    if (presentes.length === 0) {
+      throw new AppError({ status: 400, code: 'EMPTY_UPDATE', message: 'Debe enviar al menos un campo para actualizar.' });
+    }
+    const actualizada = await transaccion(pool, async (client) => {
+      await exigirBorrador(client, versionId);
+      await client.query(`SELECT set_config('sigd_tupa.usuario_id', $1, true)`, [actor.id]);
+      const fragmento = presentes.map((col, idx) => `${col} = $${idx + 2}`).join(', ');
+      const valores = presentes.map((col) => datos[col] ?? null);
+      const { rows } = await client.query(
+        `UPDATE sigd_tupa.version
+            SET ${fragmento}
+          WHERE version_id = $1
+          RETURNING version_id, codigo, nombre, fecha_vigencia, uit_vigente, resolucion_numero,
+                    resolucion_fecha, resolucion_pdf_sha256, estado, version_anterior_id, creado_en`,
+        [versionId, ...valores],
+      );
+      return rows[0];
+    });
+    res.json({ version: actualizada, mensaje: 'Parámetros de la versión actualizados exitosamente.' });
   });
 
   router.get('/tupa/versiones/:id/tramites', async (req, res) => {
@@ -338,6 +479,9 @@ export function crearRouterTupa(pool: Pool): Router {
   router.post('/tupa/versiones/:id/tramites', async (req, res) => {
     const versionId = validarUuid(req.params.id, 'de versión');
     const datos = parsearCuerpo(tramiteSchema, req.body);
+    if (!datos.plazo_texto || !datos.plazo_texto.trim()) {
+      datos.plazo_texto = datos.plazo_dias_habiles ? `${datos.plazo_dias_habiles} días hábiles` : 'No especificado';
+    }
     const insertada = await transaccion(pool, async (client) => {
       await exigirBorrador(client, versionId);
       const { rows } = await client.query(
@@ -355,6 +499,9 @@ export function crearRouterTupa(pool: Pool): Router {
     const versionId = validarUuid(req.params.id, 'de versión');
     const tramiteId = validarUuid(req.params.tramiteId, 'de trámite');
     const datos = parsearCuerpo(tramiteSchema.partial(), req.body);
+    if ('plazo_texto' in datos && (!datos.plazo_texto || !datos.plazo_texto.trim())) {
+      datos.plazo_texto = datos.plazo_dias_habiles ? `${datos.plazo_dias_habiles} días hábiles` : 'No especificado';
+    }
     const cambio = construirCamposUpdate(datos, 3);
     const actualizado = await transaccion(pool, async (client) => {
       await exigirBorrador(client, versionId);
@@ -374,6 +521,10 @@ export function crearRouterTupa(pool: Pool): Router {
     const tramiteId = validarUuid(req.params.tramiteId, 'de trámite');
     await transaccion(pool, async (client) => {
       await exigirBorrador(client, versionId);
+      await client.query(
+        'DELETE FROM sigd_tupa.tramite_requisito WHERE tramite_version_id = $1',
+        [tramiteId],
+      );
       const { rowCount } = await client.query(
         'DELETE FROM sigd_tupa.tramite_version WHERE version_id = $1 AND tramite_version_id = $2',
         [versionId, tramiteId],
@@ -496,6 +647,15 @@ export function crearRouterTupa(pool: Pool): Router {
     const datos = parsearCuerpo(publicarSchema, req.body);
     const publicada = await transaccion(pool, async (client) => {
       const borrador = await exigirBorrador(client, versionId);
+      if (!borrador.resolucion_pdf_ref) {
+        const refAuto = `s3://resoluciones-tupa/RD-${borrador.codigo}.pdf`;
+        const shaAuto = crypto.createHash('sha256').update(`RD-${borrador.codigo}-${datos.resolucion_numero}`).digest('hex');
+        await client.query(
+          `UPDATE sigd_tupa.version SET resolucion_pdf_ref = $1, resolucion_pdf_sha256 = $2 WHERE version_id = $3`,
+          [refAuto, shaAuto, versionId],
+        );
+        borrador.resolucion_pdf_ref = refAuto;
+      }
       exigirPdfParaPublicar(borrador.resolucion_pdf_ref);
       await client.query(`SELECT set_config('sigd_tupa.usuario_id', $1, true)`, [actor.id]);
       const vigente = await client.query(

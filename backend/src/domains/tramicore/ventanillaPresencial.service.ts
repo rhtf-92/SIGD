@@ -176,6 +176,32 @@ export class VentanillaPresencialService {
         [cut, anioActual, datos.datosRemitente, datos.dniSolicitante, datos.asunto, datos.foliosTotales, ahora],
       );
 
+      // 4b. Registrar hito inicial de recepción en ventanilla física (RutaDoc FSM)
+      try {
+        const idOperador = datos.idOperadorVentanilla && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(datos.idOperadorVentanilla)
+          ? datos.idOperadorVentanilla
+          : '00000000-0000-0000-0000-000000000001';
+
+        await cliente.query(
+          `INSERT INTO sigd_rut.movimiento_tramite
+             (expediente_id, estado_anterior, evento, estado_nuevo, usuario_operador_id, fecha_hora, datos)
+           VALUES ($1::uuid, 'REGISTRADO', 'RECEPCION', 'RECEPCIONADO', $2::uuid, $3, $4::jsonb)`,
+          [
+            expedienteId,
+            idOperador,
+            ahora,
+            JSON.stringify({
+              areaId: datos.areaDestinoId ?? null,
+              areaNombre: 'Ventanilla Presencial',
+              resumen: `Recepción física en ventanilla: ${datos.asunto.slice(0, 100)}`,
+              folios: datos.foliosTotales,
+            }),
+          ],
+        );
+      } catch {
+        // Degradar silenciosamente si sigd_rut no estuviera inicializado
+      }
+
       if (debeManejarTx) await cliente.query('COMMIT');
 
       // 5. Generar cargo y ticket térmico

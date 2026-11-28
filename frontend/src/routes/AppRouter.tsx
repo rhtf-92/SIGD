@@ -136,8 +136,26 @@ export default function AppRouter() {
         element={<Navigate to="/administracion" replace />}
       />
 
-      <Route path="/expedientes" element={<BandejaExpedientesPage />} />
-      <Route path="/expedientes/:id" element={<ExpedienteDetallePage />} />
+      <Route
+        path="/expedientes"
+        element={
+          <ProtectedRoute
+            requiredRoles={["ADMINISTRADOR", "DIRECTOR", "SECRETARIO", "ESPECIALISTA", "MESA_PARTES"]}
+          >
+            <BandejaExpedientesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/expedientes/:id"
+        element={
+          <ProtectedRoute
+            requiredRoles={["ADMINISTRADOR", "DIRECTOR", "SECRETARIO", "ESPECIALISTA", "MESA_PARTES"]}
+          >
+            <ExpedienteDetallePage />
+          </ProtectedRoute>
+        }
+      />
 
       <Route path="/reportes" element={<DashboardEjecutivoPage />} />
       <Route path="/reportes/dashboard" element={<DashboardEjecutivoPage />} />

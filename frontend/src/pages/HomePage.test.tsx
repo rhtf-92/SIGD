@@ -12,6 +12,7 @@ vi.mock("../services/tupaApi", () => ({
 }));
 
 import { tupaApi } from "../services/tupaApi";
+import { useAuthStore } from "../stores/authStore";
 
 function LocationText() {
   const location = useLocation();
@@ -20,6 +21,12 @@ function LocationText() {
 
 describe("HomePage", () => {
   beforeEach(() => {
+    useAuthStore.setState({
+      accessToken: null,
+      refreshToken: null,
+      usuario: null,
+      isAuthenticated: false,
+    });
     vi.mocked(tupaApi.vigente).mockResolvedValue({
       version_id: "version-1",
       codigo: "TUPA-BASE",
@@ -58,5 +65,30 @@ describe("HomePage", () => {
     expect(screen.getByText("TUPA-BASE")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /Mesa de Partes Virtual/ })[0]).toHaveAttribute("href", "/tramite/mesa-partes-virtual");
     expect(screen.getAllByRole("link", { name: /Consultar expediente/ })[0]).toHaveAttribute("href", "/consulta");
+  });
+
+  it("muestra módulos operativos específicos al ingresar con rol MESA_PARTES", async () => {
+    useAuthStore.setState({
+      accessToken: "token-mesa-partes",
+      isAuthenticated: true,
+      usuario: {
+        id: "usr-mp-1",
+        nombreCompleto: "Operador Mesa de Partes",
+        correo: "mesapartes@iestpsuiza.edu.pe",
+        rol: "MESA_PARTES",
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("MESA DE PARTES · MÓDULOS OPERATIVOS")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bandeja de Expedientes" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ventanilla Presencial" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Atención de Trámites" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Ir a Bandeja de Expedientes/i })).toHaveAttribute("href", "/expedientes");
   });
 });

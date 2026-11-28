@@ -161,7 +161,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         return;
       }
 
-            if (documentos.archivos.length === 0) {
+            if (!documentos.noRequiereDocumentos && documentos.archivos.length === 0) {
         dispatch({ type: 'SET_SUBMITTING', payload: false });
         dispatch({ type: 'SET_ERROR', payload: 'Debe adjuntar al menos un archivo PDF antes de radicar.' });
         return;
@@ -188,12 +188,16 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         hashSha256: a.hashSha256.toLowerCase(),
       }));
 
+      const totalFoliosPayload = documentos.noRequiereDocumentos
+        ? (documentos.archivos.length > 0 ? Number(documentos.numeroFolios || 0) : 0)
+        : Number(documentos.numeroFolios);
+
       const payload = {
         asunto: asuntoFinal,
         idTipoTramiteTupa: idTipoTramite,
         nombreSolicitante: nombreCompleto,
         correo: correoReal,
-        totalFolios: Number(documentos.numeroFolios),
+        totalFolios: totalFoliosPayload,
         documentos: archivosPayload,
       };
 
@@ -212,6 +216,7 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
         hashTransaccion:
           serverData.cargoDigital?.hashSha256 ?? '',
         qrValidationUrl: serverData.qrSeguimientoUrl,
+        totalFolios: serverData.totalFolios ?? totalFoliosPayload,
       };
 
       dispatch({ type: 'SET_CARGO', payload: cargoEmitido });
@@ -435,14 +440,20 @@ export const StepConfirmacion: React.FC<StepConfirmacionProps> = ({
           </p>
           <p className="text-xs text-slate-600">
             <span className="font-semibold">Folios:</span>{' '}
-            <span className="font-mono">{documentos.numeroFolios}</span>
+            <span className="font-mono">
+              {documentos.noRequiereDocumentos && (!documentos.numeroFolios || documentos.numeroFolios === 0)
+                ? '0 (Trámite virtual sin folios documentales)'
+                : documentos.numeroFolios}
+            </span>
           </p>
           <p className="text-xs text-slate-600 italic bg-white p-2.5 rounded border border-slate-200 line-clamp-2">
             &ldquo;{documentos.asunto || 'Sin asunto especificado'}&rdquo;
           </p>
           <p className="text-xs text-slate-600">
             <span className="font-semibold">Archivos adjuntos:</span>{' '}
-            {documentos.archivos.length} archivo(s) PDF verificado(s)
+            {documentos.archivos.length === 0 && documentos.noRequiereDocumentos
+              ? 'Sin documentos adjuntos (Trámite no requiere folios ni sustento en PDF)'
+              : `${documentos.archivos.length} archivo(s) PDF verificado(s)`}
           </p>
         </div>
 

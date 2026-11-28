@@ -110,14 +110,21 @@ export const radicacionVirtualSchema = z
       .toLowerCase()
       .email('El correo electronico no tiene un formato valido.')
       .max(150, 'El correo electronico no puede superar los 150 caracteres.'),
-    totalFolios: z.number().int().min(1).max(5000),
+    totalFolios: z.number().int().min(0).max(5000).default(0),
     documentos: z
       .array(adjuntoRadicacionSchema)
-      .min(1, 'La radicacion exige al menos un archivo cargado.')
-      .max(30, 'Se admiten hasta 30 archivos por radicacion.'),
+      .max(30, 'Se admiten hasta 30 archivos por radicacion.')
+      .default([]),
   })
   .strict()
   .superRefine((valor, ctx) => {
+    if (valor.totalFolios > 0 && valor.documentos.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['documentos'],
+        message: 'La radicacion exige al menos un archivo cargado.',
+      });
+    }
     const nombres = new Set(valor.documentos.map((doc) => doc.nombreArchivo.toLowerCase()));
     if (nombres.size !== valor.documentos.length) {
       ctx.addIssue({

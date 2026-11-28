@@ -23,10 +23,16 @@ export function crearRouterTiposTupaReal(pool: Pool): Router {
               tv.silencio_administrativo,
               tv.calificacion,
               tv.base_legal,
-              TRUE AS vigente
+              TRUE AS vigente,
+              COUNT(r.requisito_id)::int AS total_requisitos,
+              (COUNT(r.requisito_id) > 0) AS requiere_documentos
          FROM sigd_tupa.tramite_version tv
          JOIN sigd_tupa.version v ON v.version_id = tv.version_id
+         LEFT JOIN sigd_tupa.tramite_requisito r ON r.tramite_version_id = tv.tramite_version_id
         WHERE v.estado = 'VIGENTE'
+        GROUP BY tv.tramite_version_id, tv.codigo, tv.denominacion, tv.descripcion,
+                 tv.unidad_recibe, tv.plazo_dias_habiles, tv.silencio_administrativo,
+                 tv.calificacion, tv.base_legal
         ORDER BY tv.codigo ASC`,
     );
     res.status(200).json(resultado.rows);

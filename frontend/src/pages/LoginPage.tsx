@@ -14,7 +14,7 @@ export const ROLES_CANONICOS = [
   { id: "DIRECTOR", label: "DIRECTOR - Director", destino: "/administracion" },
   { id: "SECRETARIO", label: "SECRETARIO - Secretario", destino: "/administracion/atencion" },
   { id: "ESPECIALISTA", label: "ESPECIALISTA - Especialista", destino: "/administracion/atencion" },
-  { id: "MESA_PARTES", label: "MESA_PARTES - Mesa de Partes", destino: "/administracion/atencion" },
+  { id: "MESA_PARTES", label: "MESA_PARTES - Mesa de Partes", destino: "/expedientes" },
   { id: "CIUDADANO", label: "CIUDADANO - Ciudadano", destino: "/casilla" },
 ];
 
@@ -49,13 +49,17 @@ export default function LoginPage() {
     setCargando(true);
     try {
       await login({ identificador: identificador.trim(), password });
-      const rolSesion = String(useAuthStore.getState().usuario?.rol ?? "");       const rolesAtencion = ["MESA_PARTES", "SECRETARIO", "ESPECIALISTA"];
+      const rolSesion = String(useAuthStore.getState().usuario?.rol ?? "");
       const destinoPorRol =
         rolSesion === "ADMINISTRADOR" || rolSesion === "DIRECTOR"
           ? "/administracion"
-          : rolesAtencion.includes(rolSesion)
-            ? "/administracion/atencion"
-            : null;
+          : rolSesion === "MESA_PARTES"
+            ? "/expedientes"
+            : rolSesion === "SECRETARIO" || rolSesion === "ESPECIALISTA"
+              ? "/administracion/atencion"
+              : rolSesion === "CIUDADANO"
+                ? "/casilla"
+                : null;
       navigate(!location.state?.from && destinoPorRol ? destinoPorRol : rutaDestino(), { replace: true });
     } catch (cause) {
       const status =

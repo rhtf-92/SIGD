@@ -54,7 +54,7 @@ import {
   TTL_TABLAS_MAESTRAS_MS,
   TTL_TABLAS_MAESTRAS_SEGUNDOS,
 } from '../../../../src/domains/organicore/tablasMaestras.service.js';
-import { ConflictError, ValidationError } from '../../../../src/shared/domain/errors/index.js';
+import { ConflictError, NotFoundError, ValidationError } from '../../../../src/shared/domain/errors/index.js';
 import { esquemaConsultaCalendario, esquemaFeriadoExcepcional } from '../../../../src/domains/organicore/calendario.service.js';
 
 /**
@@ -739,8 +739,25 @@ function crearPoolFalso(opciones: { fechasExistentes?: string[] } = {}): {
     if (sql.includes('INSERT INTO sigd_audit.evento_outbox')) {
       return { rows: [{ id_evento: 'evt-1' } as unknown as T], rowCount: 1 };
     }
+    if (sql.includes('UPDATE sigd_org.calendario_laboral')) {
+      const fila = { ...filaPara('2026-11-20', 'NACIONAL'), descripcion: 'Actualizado' };
+      return { rows: [fila as unknown as T], rowCount: 1 };
+    }
+    if (sql.includes('DELETE FROM sigd_org.calendario_laboral')) {
+      return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes('SELECT DISTINCT anio')) {
+      return { rows: [{ anio: 2025 } as unknown as T, { anio: 2026 } as unknown as T], rowCount: 2 };
+    }
     if (sql.includes('FROM sigd_org.calendario_laboral AS c')) {
       lecturas += 1;
+      if (sql.includes('WHERE c.id_calendario')) {
+        const idBuscado = String(valores[0]);
+        if (idBuscado === 'no-existe') {
+          return { rows: [], rowCount: 0 };
+        }
+        return { rows: [filaPara('2026-11-20', 'NACIONAL') as unknown as T], rowCount: 1 };
+      }
       const filas = [...fechasExistentes]
         .sort()
         .map((fecha) => filaPara(fecha, 'NACIONAL')) as unknown as T[];
@@ -838,5 +855,57 @@ describe('calendario laboral · alta de feriado con transaction/outbox', () => {
     const despues = await servicio.calcularSla('2026-11-16', '2026-11-20');
     expect(despues.dias_habiles_consumidos).toBe(3);
     expect(despues.dias_habiles_restantes).toBe(27);
+  });
+
+  it('actualizarFeriado modifica los datos y confirma la transacción', async () => {
+    const { pool, cliente } = crearPoolFalso();
+    servicio = new CalendarioService(pool, { cache });
+
+    const actualizado = await servicio.actualizarFeriado('11111111-1111-4111-8111-111111111111', {
+      descripcion: 'Actualizado con éxito',
+      tipo_feriado: 'INSTITUCIONAL',
+    });
+
+    expect(actualizado.descripcion).toBe('Actualizado');
+    const unicos = new Set(cliente.consultas);
+    expect(unicos.has('BEGIN')).toBe(true);
+    expect(unicos.has('COMMIT')).toBe(true);
+  });
+
+  it('actualizarFeriado lanza NotFoundError si el id no existe', async () => {
+    const { pool } = crearPoolFalso();
+    servicio = new CalendarioService(pool, { cache });
+
+    await expect(
+      servicio.actualizarFeriado('no-existe', {
+        descripcion: 'Nuevo nombre',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('eliminarFeriado realiza la eliminación y emite evento de outbox', async () => {
+    const { pool, cliente } = crearPoolFalso();
+    servicio = new CalendarioService(pool, { cache });
+
+    const resultado = await servicio.eliminarFeriado('11111111-1111-4111-8111-111111111111', false);
+    expect(resultado.eliminado).toBe(true);
+    const unicos = new Set(cliente.consultas);
+    expect(unicos.has('BEGIN')).toBe(true);
+    expect(unicos.has('COMMIT')).toBe(true);
+  });
+
+  it('eliminarFeriado lanza NotFoundError si no existe', async () => {
+    const { pool } = crearPoolFalso();
+    servicio = new CalendarioService(pool, { cache });
+
+    await expect(servicio.eliminarFeriado('no-existe')).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('obtenerAniosDisponibles devuelve la lista de años presentes en el calendario', async () => {
+    const { pool } = crearPoolFalso();
+    servicio = new CalendarioService(pool, { cache });
+
+    const anios = await servicio.obtenerAniosDisponibles();
+    expect(anios).toEqual([2025, 2026]);
   });
 });

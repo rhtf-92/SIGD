@@ -7,7 +7,7 @@ import { RadicacionVirtualService, type ProveedorFeriados } from './radicacionVi
 import { VentanillaPresencialService } from './ventanillaPresencial.service.js';
 import { TicketTermicoUtil } from './ticketTermico.util.js';
 import { consultaPublicaParamsSchema, radicacionVirtualSchema } from './tramites.schemas.js';
-import { NotFoundError, UnauthorizedError } from '../../shared/domain/errors/index.js';
+import { ForbiddenError, NotFoundError, UnauthorizedError } from '../../shared/domain/errors/index.js';
 import { extraerTokenBearer, verificarTokenAcceso } from '../../core/auth/jwt.service.js';
 
 const ventanillaPresencialSchema = z.object({
@@ -171,7 +171,7 @@ async function obtenerPersonaAutenticada(pool: Pool, req: Request): Promise<{ id
     throw new UnauthorizedError({ detail: 'Cuenta de usuario no encontrada.' });
   }
   if (!cuenta.activo) {
-    throw new UnauthorizedError({ detail: 'La cuenta de usuario esta inactiva.', status: 403 });
+    throw new ForbiddenError({ detail: 'La cuenta de usuario esta inactiva.' });
   }
   return { idUsuario: claims.sub, idPersona: cuenta.id_persona };
 }

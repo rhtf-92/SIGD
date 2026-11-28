@@ -143,12 +143,18 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
     descripcion: 'Tipos documentales configurables exigidos por los trámites del TUPA.',
     soloActivos: true,
     sql: `
-      SELECT t.codigo_tipo AS codigo,
+      SELECT t.codigo      AS codigo,
              t.nombre      AS nombre,
-             t.descripcion AS descripcion,
-             jsonb_build_object('id_tipo_tramite_tupa', t.id_tipo_tramite_tupa) AS extra
+             t.nombre      AS descripcion,
+             jsonb_build_object(
+                 'id_tipo_documento', t.tipo_documental_id,
+                 'exige_firma', t.exige_firma,
+                 'tamano_maximo_mb', t.tamano_maximo_mb,
+                 'extension', t.extension,
+                 'mime_type', t.mime_type
+             ) AS extra
         FROM sigd_doc.tipo_documento AS t
-       WHERE ($1 = FALSE OR t.activo = TRUE)
+       WHERE ($1 = FALSE OR t.vigente = TRUE)
        ORDER BY t.nombre`,
   },
   {
@@ -158,18 +164,17 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
     descripcion: 'Tipos de trámite del TUPA con su calificación y plazo legal en días hábiles.',
     soloActivos: true,
     sql: `
-      SELECT t.codigo_tupa     AS codigo,
+      SELECT t.codigo          AS codigo,
              t.denominacion    AS nombre,
              t.base_legal      AS descripcion,
              jsonb_build_object(
-                 'es_tupa', t.es_tupa,
-                 'calificacion_administrativa', t.calificacion_administrativa,
-                 'plazo_max_dias_habiles', t.plazo_max_dias_habiles,
-                 'costo', t.costo,
-                 'unidad_organica_responsable', t.unidad_organica_responsable
+                 'es_tupa', TRUE,
+                 'calificacion_administrativa', t.silencio_administrativo,
+                 'plazo_max_dias_habiles', t.plazo_dias,
+                 'unidad_organica_responsable', t.unidad_organica
              ) AS extra
         FROM sigd_doc.tipo_tramite_tupa AS t
-       WHERE ($1 = FALSE OR t.activo = TRUE)
+       WHERE ($1 = FALSE OR t.vigente = TRUE)
        ORDER BY t.denominacion`,
   },
   {
@@ -180,12 +185,12 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
     soloActivos: true,
     sql: `
       SELECT e.codigo            AS codigo,
-             e.nombre            AS nombre,
-             e.descripcion       AS descripcion,
+             e.codigo            AS nombre,
+             CASE WHEN e.es_terminal THEN 'Estado terminal de trámite (conclusión procesal)'
+                  ELSE 'Estado de trámite en flujo activo' END AS descripcion,
              jsonb_build_object('es_terminal', e.es_terminal) AS extra
         FROM sigd_rut.estado_tramite AS e
-       WHERE ($1 = FALSE OR e.activo = TRUE)
-       ORDER BY e.nombre`,
+       ORDER BY e.codigo`,
   },
   {
     clave: 'acciones_tramite',
@@ -195,27 +200,25 @@ export const CATALOGOS: readonly DefinicionCatalogo[] = [
     soloActivos: true,
     sql: `
       SELECT a.codigo      AS codigo,
-             a.nombre      AS nombre,
-             a.descripcion AS descripcion,
+             a.codigo      AS nombre,
+             'Acción procesal de trazabilidad en RutaDoc' AS descripcion,
              '{}'::jsonb   AS extra
         FROM sigd_rut.accion_tramite AS a
-       WHERE ($1 = FALSE OR a.activo = TRUE)
-       ORDER BY a.nombre`,
+       ORDER BY a.codigo`,
   },
   {
     clave: 'tipos_relacion_movimiento',
     esquema: 'sigd_rut',
-    tabla: 'tipo_relacion_movimiento',
-    descripcion: 'Relaciones semánticas entre movimientos de trámite.',
+    tabla: 'transicion_estado_tramite',
+    descripcion: 'Transiciones de estado autorizadas entre movimientos de trámite.',
     soloActivos: true,
     sql: `
-      SELECT r.codigo      AS codigo,
-             r.nombre      AS nombre,
-             r.descripcion AS descripcion,
-             '{}'::jsonb   AS extra
-        FROM sigd_rut.tipo_relacion_movimiento AS r
-       WHERE ($1 = FALSE OR r.activo = TRUE)
-       ORDER BY r.nombre`,
+      SELECT (t.estado_anterior || ' -> ' || t.estado_nuevo) AS codigo,
+             t.evento      AS nombre,
+             ('Transición de ' || t.estado_anterior || ' hacia ' || t.estado_nuevo) AS descripcion,
+             jsonb_build_object('estado_anterior', t.estado_anterior, 'estado_nuevo', t.estado_nuevo, 'evento', t.evento) AS extra
+        FROM sigd_rut.transicion_estado_tramite AS t
+       ORDER BY t.estado_anterior, t.estado_nuevo`,
   },
   {
     clave: 'unidades_organicas',

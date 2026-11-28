@@ -107,6 +107,63 @@ export const tupaApi = {
     });
     return data.version;
   },
+  async reemplazarVigente(
+    token: string,
+    datos: {
+      codigo: string;
+      nombre: string;
+      uit_vigente: number;
+      fecha_vigencia?: string;
+      resolucion_numero?: string;
+      resolucion_fecha?: string;
+      copiarDesdeVersionId?: string;
+    },
+  ) {
+    const { data } = await http.post<{ version: TupaVersion; mensaje: string }>(
+      `${endpoint}/versiones/reemplazar-vigente`,
+      datos,
+      { headers: authorization(token) },
+    );
+    return data;
+  },
+  async activarVersion(
+    token: string,
+    versionId: string,
+    datos?: { resolucion_numero?: string; resolucion_fecha?: string; fecha_vigencia?: string },
+  ) {
+    const { data } = await http.post<{ version: TupaVersion; mensaje: string }>(
+      `${endpoint}/versiones/${versionId}/activar`,
+      datos ?? {},
+      { headers: authorization(token) },
+    );
+    return data;
+  },
+  async eliminarBorrador(token: string, versionId: string) {
+    const { data } = await http.delete<{ ok: boolean; mensaje: string }>(
+      `${endpoint}/versiones/${versionId}`,
+      { headers: authorization(token) },
+    );
+    return data;
+  },
+  async actualizarVersion(
+    token: string,
+    versionId: string,
+    datos: {
+      codigo?: string;
+      nombre?: string;
+      fecha_vigencia?: string | null;
+      uit_vigente?: number;
+      resolucion_numero?: string | null;
+      resolucion_fecha?: string | null;
+    },
+  ) {
+    const { data } = await http.patch<{ version: TupaVersion; mensaje: string }>(
+      `${endpoint}/versiones/${versionId}`,
+      datos,
+      { headers: authorization(token) },
+    );
+    return data;
+  },
   async tramitesVersion(token: string, versionId: string) {
     const { data } = await http.get<{ tramites: TupaTramite[] }>(
       `${endpoint}/versiones/${versionId}/tramites`,
@@ -114,11 +171,59 @@ export const tupaApi = {
     );
     return data.tramites;
   },
+  async crearTramite(
+    token: string,
+    versionId: string,
+    datos: {
+      codigo: string;
+      denominacion: string;
+      rubro: string;
+      descripcion?: string | null;
+      derecho_monto?: number | null;
+      derecho_porcentaje_uit?: number | null;
+      derecho_texto?: string | null;
+      cuenta_pago?: string | null;
+      plazo_texto?: string | null;
+      plazo_dias_habiles?: number | null;
+      calificacion: "EVALUACION_PREVIA" | "APROBACION_AUTOMATICA" | "NO_APLICA";
+      silencio_administrativo: "POSITIVO" | "NEGATIVO" | "NO_APLICA";
+      unidad_recibe?: string | null;
+      autoridad_resuelve?: string | null;
+      recursos?: string | null;
+      base_legal?: string | null;
+      observaciones?: string | null;
+    },
+  ) {
+    const { data } = await http.post<{ tramite: TupaTramite }>(
+      `${endpoint}/versiones/${versionId}/tramites`,
+      datos,
+      { headers: authorization(token) },
+    );
+    return data.tramite;
+  },
   async actualizarTramite(
     token: string,
     versionId: string,
     tramiteId: string,
-    datos: Pick<Partial<TupaTramite>, "derecho_monto" | "plazo_texto">,
+    datos: Partial<{
+      codigo: string;
+      denominacion: string;
+      rubro: string;
+      descripcion: string | null;
+      derecho_monto: number | null;
+      derecho_porcentaje_uit: number | null;
+      derecho_texto: string | null;
+      cuenta_pago: string | null;
+      plazo_texto: string | null;
+      plazo_dias_habiles: number | null;
+      calificacion: "EVALUACION_PREVIA" | "APROBACION_AUTOMATICA" | "NO_APLICA";
+      silencio_administrativo: "POSITIVO" | "NEGATIVO" | "NO_APLICA";
+      unidad_recibe: string | null;
+      autoridad_resuelve: string | null;
+      recursos: string | null;
+      base_legal: string | null;
+      observaciones: string | null;
+    }>,
   ) {
     const { data } = await http.patch<{ tramite: TupaTramite }>(
       `${endpoint}/versiones/${versionId}/tramites/${tramiteId}`,
@@ -127,8 +232,13 @@ export const tupaApi = {
     );
     return data.tramite;
   },
+  async eliminarTramite(token: string, versionId: string, tramiteId: string) {
+    await http.delete(`${endpoint}/versiones/${versionId}/tramites/${tramiteId}`, {
+      headers: authorization(token),
+    });
+  },
   async agregarRequisito(token: string, versionId: string, tramiteId: string, orden: number, texto: string) {
-    const { data } = await http.post(
+    const { data } = await http.post<{ requisito: TupaRequisito }>(
       `${endpoint}/versiones/${versionId}/tramites/${tramiteId}/requisitos`,
       { orden, texto },
       { headers: authorization(token) },
@@ -142,12 +252,18 @@ export const tupaApi = {
     requisitoId: string,
     datos: { orden?: number; texto?: string },
   ) {
-    const { data } = await http.patch(
+    const { data } = await http.patch<{ requisito: TupaRequisito }>(
       `${endpoint}/versiones/${versionId}/tramites/${tramiteId}/requisitos/${requisitoId}`,
       datos,
       { headers: authorization(token) },
     );
     return data;
+  },
+  async eliminarRequisito(token: string, versionId: string, tramiteId: string, requisitoId: string) {
+    await http.delete(
+      `${endpoint}/versiones/${versionId}/tramites/${tramiteId}/requisitos/${requisitoId}`,
+      { headers: authorization(token) },
+    );
   },
   async subirResolucion(token: string, versionId: string, archivo: File) {
     const { data } = await http.put(

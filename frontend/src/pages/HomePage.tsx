@@ -1,9 +1,10 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Skeleton from "../components/Skeleton";
 import { tupaApi, type TupaVersion } from "../services/tupaApi";
+import { useAuthStore } from "../stores/authStore";
 
-const accesos: Array<{ ruta: string; titulo: string; descripcion: string; icono: string; protegida?: boolean }> = [
+const accesosCiudadano: Array<{ ruta: string; titulo: string; descripcion: string; icono: string; protegida?: boolean }> = [
   {
     ruta: "/tramite/mesa-partes-virtual",
     titulo: "Mesa de Partes Virtual",
@@ -52,10 +53,104 @@ function AccesoIcono({ tipo }: { tipo: string }) {
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const { isAuthenticated, usuario } = useAuthStore();
   const [busqueda, setBusqueda] = useState("");
   const [version, setVersion] = useState<TupaVersion | null>(null);
   const [totalTramites, setTotalTramites] = useState<number | null>(null);
   const [cargandoDatos, setCargandoDatos] = useState(true);
+
+  const accesosVisibles = useMemo(() => {
+    if (!isAuthenticated) return accesosCiudadano;
+
+    if (usuario?.rol === "MESA_PARTES") {
+      return [
+        {
+          ruta: "/expedientes",
+          titulo: "Bandeja de Expedientes",
+          descripcion: "Califica, revisa y deriva expedientes a las distintas áreas orgánicas.",
+          icono: "documento",
+        },
+        {
+          ruta: "/ventanilla",
+          titulo: "Ventanilla Presencial",
+          descripcion: "Radicación física presencial, generación de CUT y emisión de cargo térmico.",
+          icono: "casilla",
+        },
+        {
+          ruta: "/administracion/atencion",
+          titulo: "Atención de Trámites",
+          descripcion: "Búsqueda por CUT y transición de estados del ciclo de vida procesal.",
+          icono: "busqueda",
+        },
+        {
+          ruta: "/tramite/mesa-partes-virtual",
+          titulo: "Mesa de Partes Virtual",
+          descripcion: "Supervisa e ingresa trámites remitidos por administrados en canal digital.",
+          icono: "registro",
+        },
+      ];
+    }
+
+    if (usuario?.rol === "ADMINISTRADOR" || usuario?.rol === "DIRECTOR") {
+      return [
+        {
+          ruta: "/administracion",
+          titulo: "Panel de Administración",
+          descripcion: "Gestión de tablas maestras, usuarios, roles, auditoría y calendario laboral.",
+          icono: "casilla",
+        },
+        {
+          ruta: "/expedientes",
+          titulo: "Bandeja de Expedientes",
+          descripcion: "Monitoreo global de expedientes institucionales y control de plazos SLA.",
+          icono: "documento",
+        },
+        {
+          ruta: "/ventanilla",
+          titulo: "Ventanilla Presencial",
+          descripcion: "Recepción de documentos en ventanilla física y radicación inmediata.",
+          icono: "registro",
+        },
+        {
+          ruta: "/reportes",
+          titulo: "Dashboard y Reportes",
+          descripcion: "Métricas de gestión documental, tiempos de atención y cuellos de botella.",
+          icono: "busqueda",
+        },
+      ];
+    }
+
+    if (usuario?.rol === "SECRETARIO" || usuario?.rol === "ESPECIALISTA") {
+      return [
+        {
+          ruta: "/expedientes",
+          titulo: "Bandeja de Expedientes",
+          descripcion: "Gestión y despacho de expedientes asignados a su unidad orgánica.",
+          icono: "documento",
+        },
+        {
+          ruta: "/administracion/atencion",
+          titulo: "Atención de Trámites",
+          descripcion: "Búsqueda por CUT y avance de trámites según el recorrido procesal.",
+          icono: "busqueda",
+        },
+        {
+          ruta: "/casilla",
+          titulo: "Casilla Electrónica",
+          descripcion: "Bandeja de actos administrativos y notificaciones oficiales.",
+          icono: "casilla",
+        },
+        {
+          ruta: "/tupa",
+          titulo: "TUPA Vigente",
+          descripcion: "Consulta catálogo de procedimientos y requisitos normativos.",
+          icono: "tupa",
+        },
+      ];
+    }
+
+    return accesosCiudadano;
+  }, [isAuthenticated, usuario?.rol]);
 
   useEffect(() => {
     let activo = true;
@@ -121,11 +216,30 @@ export default function HomePage() {
 
       <section className="sigd-home-access">
         <div className="sigd-home-section-heading">
-          <div><p>ACCESO DIRECTO</p><h2>¿Qué necesitas hacer?</h2></div>
-          <Link to="/tupa">Consultar todos los trámites</Link>
+          {isAuthenticated && usuario?.rol === "MESA_PARTES" ? (
+            <div>
+              <p className="text-emerald-700 font-bold">MESA DE PARTES · MÓDULOS OPERATIVOS</p>
+              <h2>¿Qué deseas gestionar hoy?</h2>
+            </div>
+          ) : isAuthenticated && (usuario?.rol === "ADMINISTRADOR" || usuario?.rol === "DIRECTOR") ? (
+            <div>
+              <p className="text-blue-700 font-bold">GESTIÓN INSTITUCIONAL</p>
+              <h2>Módulos de Gestión</h2>
+            </div>
+          ) : (
+            <div>
+              <p>ACCESO DIRECTO</p>
+              <h2>¿Qué necesitas hacer?</h2>
+            </div>
+          )}
+          {isAuthenticated && usuario?.rol === "MESA_PARTES" ? (
+            <Link to="/expedientes">Ir a Bandeja de Expedientes →</Link>
+          ) : (
+            <Link to="/tupa">Consultar todos los trámites</Link>
+          )}
         </div>
         <div className="sigd-home-access-grid">
-          {accesos.map((acceso) => (
+          {accesosVisibles.map((acceso) => (
             <Link className="sigd-home-card" key={acceso.ruta} to={acceso.ruta}>
               <div className="sigd-home-card-head">
                 <AccesoIcono tipo={acceso.icono} />

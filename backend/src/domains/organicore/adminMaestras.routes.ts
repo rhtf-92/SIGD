@@ -24,6 +24,8 @@ import { exigirRoles } from '../../core/auth/exigirRol.js';
 import { CalendarioService } from './calendario.service.js';
 import { TablasMaestrasService } from './tablasMaestras.service.js';
 import {
+  actualizarFeriado,
+  eliminarFeriado,
   listarCalendario,
   listarTablasMaestras,
   registrarFeriadoExcepcional,
@@ -40,9 +42,24 @@ export function crearRouterAdminMaestras(pool: Pool): Router {
   router.get('/tablas-maestras', exigirRoles('ADMINISTRADOR', 'DIRECTOR'), listarTablasMaestras(deps));
   router.get('/calendario-laboral', exigirRoles('ADMINISTRADOR', 'DIRECTOR'), listarCalendario(deps));
   router.post(
+    '/calendario-laboral',
+    exigirRoles('ADMINISTRADOR'),
+    registrarFeriadoExcepcional(deps),
+  );
+  router.post(
     '/calendario-laboral/feriado-excepcional',
     exigirRoles('ADMINISTRADOR'),
     registrarFeriadoExcepcional(deps),
+  );
+  router.put(
+    '/calendario-laboral/:id',
+    exigirRoles('ADMINISTRADOR'),
+    actualizarFeriado(deps),
+  );
+  router.delete(
+    '/calendario-laboral/:id',
+    exigirRoles('ADMINISTRADOR'),
+    eliminarFeriado(deps),
   );
 
   return router;
