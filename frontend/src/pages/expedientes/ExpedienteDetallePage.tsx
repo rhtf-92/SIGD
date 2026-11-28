@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import ExpedienteTimeline from "../../components/expedientes/ExpedienteTimeline";
@@ -70,12 +70,67 @@ export default function ExpedienteDetallePage() {
     };
   }, [expediente]);
 
-  const unidadesDestino = useMemo(() => [
-    { id: "area-dg", nombre: "Dirección General", habilitada: true },
-    { id: "area-sa", nombre: "Secretaría Académica", habilitada: true },
-    { id: "area-inf", nombre: "Coordinación de Informática", habilitada: true },
-    { id: "area-mp", nombre: "Mesa de Partes", habilitada: true },
+  const UNIDADES_DESTINO_OFICIALES = useMemo(() => [
+    // Órganos de Dirección
+    { id: "24987bfe-5378-40ba-9c80-a7015e3a6c02", nombre: "Dirección General (ARE_DIR)", habilitada: true },
+    { id: "f1e2d3c4-b5a6-4789-9012-345678900001", nombre: "Sub Dirección (ARE_SUBDIR)", habilitada: true },
+    // Órgano de Recepción
+    { id: "2720dcef-cc8b-440a-a43e-ff83a93266f1", nombre: "Mesa de Partes y Ventanilla (ARE_MPV)", habilitada: true },
+    // Órganos de Apoyo y Asesoría
+    { id: "f1e2d3c4-b5a6-4789-9012-345678900002", nombre: "Abastecimiento Administrativo (ARE_ABA)", habilitada: true },
+    { id: "97f7e7b8-b519-4c0b-b880-a6246cf95e12", nombre: "Secretaría Académica (ARE_SEC)", habilitada: true },
+    { id: "f1e2d3c4-b5a6-4789-9012-345678900005", nombre: "Calidad (ARE_CAL)", habilitada: true },
+    { id: "79360374-edaa-4c3b-8f6e-e591711b0083", nombre: "Administración y Finanzas (ARE_ADM)", habilitada: true },
+    { id: "50329bbd-6cbd-4506-affb-d6ed0d2b2dd1", nombre: "Archivo Central y Acervo Documentario (ARE_ARC)", habilitada: true },
+    { id: "4fc2a68f-9eb2-496d-9c59-66a57b7d1118", nombre: "Coordinación de Sistemas e Informática (ARE_DSI)", habilitada: true },
+    // Coordinaciones Generales
+    { id: "f1e2d3c4-b5a6-4789-9012-345678900003", nombre: "Coordinación Académica (ARE_ACAD)", habilitada: true },
+    { id: "f1e2d3c4-b5a6-4789-9012-345678900004", nombre: "Bienestar (ARE_BIE)", habilitada: true },
+    { id: "f1e2d3c4-b5a6-4789-9012-345678900006", nombre: "Investigación (ARE_INV)", habilitada: true },
+    // Coordinaciones de Programas de Estudio (Carreras)
+    { id: "f1e2d3c4-b5a6-4789-9012-345678900011", nombre: "Coordinación de Administración de Empresas (ARE_CADM)", habilitada: true },
+    { id: "f1e2d3c4-b5a6-4789-9012-345678900012", nombre: "Coordinación de Administración en Operaciones Turísticas (ARE_CTUR)", habilitada: true },
+    { id: "f1e2d3c4-b5a6-4789-9012-345678900013", nombre: "Coordinación de Enfermería Técnica (ARE_CENF)", habilitada: true },
+    { id: "f1e2d3c4-b5a6-4789-9012-345678900014", nombre: "Coordinación de Construcción Civil (ARE_CCON)", habilitada: true },
+    { id: "f1e2d3c4-b5a6-4789-9012-345678900015", nombre: "Coordinación de Asistencia Administrativa (ARE_CASS)", habilitada: true },
+    { id: "f1e2d3c4-b5a6-4789-9012-345678900016", nombre: "Coordinación de Manejo Forestal (ARE_CFOR)", habilitada: true },
+    { id: "f1e2d3c4-b5a6-4789-9012-345678900017", nombre: "Coordinación de Producción Agropecuaria (ARE_CAGR)", habilitada: true },
+    { id: "f1e2d3c4-b5a6-4789-9012-345678900018", nombre: "Coordinación de Electricidad Industrial (ARE_CELE)", habilitada: true },
+    { id: "f1e2d3c4-b5a6-4789-9012-345678900019", nombre: "Coordinación de Contabilidad (ARE_CCONTA)", habilitada: true },
+    { id: "f1e2d3c4-b5a6-4789-9012-345678900020", nombre: "Coordinación de Mecatrónica Automotriz (ARE_CAUT)", habilitada: true },
   ], []);
+
+  const [unidadesDestino, setUnidadesDestino] = useState(UNIDADES_DESTINO_OFICIALES);
+
+  useEffect(() => {
+    let activo = true;
+    import("../../api/client").then(({ apiClient }) => {
+      apiClient.get<Array<{ id: string; nombre: string; sigla?: string; estado?: boolean; children?: unknown[] }>>("/api/v1/admin/organigrama")
+        .then((res) => {
+          if (!activo || !Array.isArray(res.data) || res.data.length === 0) return;
+          const aplanar = (nodos: Array<{ id: string; nombre: string; sigla?: string; estado?: boolean; children?: unknown[] }>): Array<{ id: string; nombre: string; habilitada: boolean }> => {
+            const resultado: Array<{ id: string; nombre: string; habilitada: boolean }> = [];
+            for (const n of nodos) {
+              if (n.id && n.nombre) {
+                resultado.push({
+                  id: String(n.id),
+                  nombre: n.sigla ? `${n.nombre} (${n.sigla})` : n.nombre,
+                  habilitada: n.estado !== false,
+                });
+              }
+              if (Array.isArray(n.children) && n.children.length > 0) {
+                resultado.push(...aplanar(n.children as any));
+              }
+            }
+            return resultado;
+          };
+          const aplanadas = aplanar(res.data);
+          if (aplanadas.length > 0) setUnidadesDestino(aplanadas);
+        })
+        .catch(() => {});
+    });
+    return () => { activo = false; };
+  }, [UNIDADES_DESTINO_OFICIALES]);
 
   const documentosFoliados: DocumentoExpediente[] = useMemo(() => {
     if (!expediente || expediente.versionesDocumentos.length === 0) {

@@ -21,7 +21,7 @@ describe('RbacGuard Component - Aislamiento y Restricción por Roles (12 Tests)'
     expect(screen.queryByText('Firmar Resolución')).toBeNull();
   });
 
-  it('3. Valida restricción estricta para rol ESTUDIANTE sobre GESTION_ROLES', () => {
+  it('3. Valida restricción estricta para rol CIUDADANO sobre GESTION_ROLES', () => {
     render(
       <RbacGuard permission="GESTION_ROLES" userPermissions={['EXPEDIENTE_CREAR']}>
         <div>Panel Admin</div>
@@ -30,7 +30,7 @@ describe('RbacGuard Component - Aislamiento y Restricción por Roles (12 Tests)'
     expect(screen.queryByText('Panel Admin')).toBeNull();
   });
 
-  it('4. Valida acceso correcto para rol SUPER_ADMIN', () => {
+  it('4. Valida acceso correcto para rol ADMINISTRADOR', () => {
     render(
       <RbacGuard permission="CONFIG_CALENDARIO" userPermissions={['CONFIG_CALENDARIO', 'GESTION_ROLES']}>
         <div>Configuración Calendario</div>
@@ -41,14 +41,14 @@ describe('RbacGuard Component - Aislamiento y Restricción por Roles (12 Tests)'
 
   it('5. Valida comportamiento con fallback personalizado ante falta de permisos', () => {
     render(
-      <RbacGuard permission="EXPEDIENTE_FIRMAR" userPermissions={['ESTUDIANTE']} fallback={<span>Acceso Denegado</span>}>
+      <RbacGuard permission="EXPEDIENTE_FIRMAR" userPermissions={['CIUDADANO']} fallback={<span>Acceso Denegado</span>}>
         <button>Firmar</button>
       </RbacGuard>
     );
     expect(screen.getByText('Acceso Denegado')).toBeDefined();
   });
 
-  it('6. Valida aislamiento visual para rol DOCENTE sin permisos de derivación', () => {
+  it('6. Valida aislamiento visual para rol ESPECIALISTA sin permisos de derivación', () => {
     render(
       <RbacGuard permission="EXPEDIENTE_DERIVAR" userPermissions={['EXPEDIENTE_CREAR']}>
         <button>Derivar</button>
@@ -104,7 +104,7 @@ describe('RbacGuard Component - Aislamiento y Restricción por Roles (12 Tests)'
 
   it('12. Asegura que ningún componente hijo filtre información sin autorización', () => {
     render(
-      <RbacGuard permission="CONFIG_CALENDARIO" userPermissions={['ESTUDIANTE']}>
+      <RbacGuard permission="CONFIG_CALENDARIO" userPermissions={['CIUDADANO']}>
         <div>Datos Sensibles Calendario</div>
       </RbacGuard>
     );

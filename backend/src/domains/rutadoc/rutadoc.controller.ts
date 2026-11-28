@@ -28,6 +28,10 @@ export function crearControladorRutaDoc(servicio: ServicioRutaDoc, reversion: Se
   return {
     listar: async (req, res) => {
       const actor = await actorAutenticado(req);
+      if (!req.query.pestana) {
+        res.json(await servicio.listarBandejaFrontend(actor));
+        return;
+      }
       const filtros = filtrosSchema.parse(req.query);
       res.json(await servicio.listar(filtros, actor));
     },

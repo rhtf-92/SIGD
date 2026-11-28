@@ -14,6 +14,8 @@ export interface ActuacionTrazabilidad {
   destinatario: string | null;
   proveido: unknown | null;
   datosAsociados: Record<string, unknown>;
+  areaNombre?: string | null;
+  usuarioNombre?: string | null;
   duracionMs: number | null;
   duracionMinutos: number | null;
   tipoActuacion: 'NORMAL' | 'COMPENSATORIA';

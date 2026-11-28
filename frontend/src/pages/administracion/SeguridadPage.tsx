@@ -54,6 +54,10 @@ export default function SeguridadPage() {
           </div>
         )}
 
+                <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" role="status">
+          Módulo en proceso: intentos de acceso, cuentas bloqueadas y políticas son
+          valores de demostración. Todavía no se guardan ni se aplican en el sistema.
+        </div>
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold">Políticas de acceso</h2>

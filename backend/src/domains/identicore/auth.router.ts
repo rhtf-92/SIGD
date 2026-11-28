@@ -49,7 +49,7 @@ export function crearRouterAuth(pool: Pool): Router {
       SELECT c.id_usuario, c.id_persona, c.usuario, c.correo,
              c.password_hash, c.activo,
              COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
-             COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo,
+             COALESCE(r.codigo, 'CIUDADANO') AS rol_codigo,
              p.area_id
         FROM sigd_auth.cuenta_usuario c
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
@@ -86,11 +86,36 @@ export function crearRouterAuth(pool: Pool): Router {
       });
     }
 
-    const rol = usuario.rol_codigo ?? 'ESTUDIANTE';
+    const rol = usuario.rol_codigo ?? 'CIUDADANO';
+
+    // Obtener todos los roles activos asignados al usuario (Soporte SuperAdmin / Multi-rol)
+    let roles: string[] = [rol];
+    try {
+      const rolesQuery = await pool.query<{ codigo: string }>(
+        `SELECT DISTINCT r.codigo
+           FROM sigd_org.usuario_rol ur
+           JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+          WHERE ur.id_usuario = $1
+            AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+            AND r.vigente = TRUE`,
+        [usuario.id_usuario],
+      );
+      if (rolesQuery.rows.length > 0) {
+        roles = rolesQuery.rows.map((r) => r.codigo);
+        if (rol && !roles.includes(rol)) roles.unshift(rol);
+      }
+    } catch {
+      // Fallback a rol único
+    }
+
+    const rolPrincipal = roles.includes('ADMINISTRADOR')
+      ? 'ADMINISTRADOR'
+      : (roles[0] ?? rol);
+
     const accessToken = firmarTokenAcceso({
       sub: usuario.id_usuario,
-      roles: [rol],
-      expiraSegundos: 900, // 15 minutos
+      roles: roles,
+      expiraSegundos: 3600, // 1 hora
     });
 
     const refreshToken = crypto.randomBytes(32).toString('hex');
@@ -116,7 +141,8 @@ export function crearRouterAuth(pool: Pool): Router {
         id: usuario.id_usuario,
         nombreCompleto: usuario.nombre_completo,
         correo: usuario.correo ?? `${usuario.usuario}@iestp-suiza.edu.pe`,
-        rol: rol,
+        rol: rolPrincipal,
+        roles: roles,
         areaId: usuario.area_id ?? undefined,
       },
     });
@@ -147,7 +173,7 @@ export function crearRouterAuth(pool: Pool): Router {
 
     const query = `
       SELECT s.id_usuario, s.expira_en, s.revocado_en,
-             COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo
+             COALESCE(r.codigo, 'CIUDADANO') AS rol_codigo
         FROM sigd_auth.sesion_usuario s
         LEFT JOIN sigd_org.usuario_rol ur ON ur.id_usuario = s.id_usuario AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
         LEFT JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
@@ -205,8 +231,8 @@ export function crearRouterAuth(pool: Pool): Router {
     const query = `
       SELECT c.id_usuario, c.id_persona, c.usuario, c.correo,
              COALESCE(pn.nombre_completo, pj.razon_social, c.usuario) AS nombre_completo,
-             COALESCE(r.codigo, 'ESTUDIANTE') AS rol_codigo,
-             p.area_id, p.cargo_id, p.telefono
+             COALESCE(r.codigo, 'CIUDADANO') AS rol_codigo,
+             p.area_id, p.cargo_id, p.telefono, p.firma_electronica_habilitada
         FROM sigd_auth.cuenta_usuario c
         LEFT JOIN sigd_auth.persona_natural pn ON pn.id_persona = c.id_persona
         LEFT JOIN sigd_auth.persona_juridica pj ON pj.id_persona = c.id_persona
@@ -224,16 +250,53 @@ export function crearRouterAuth(pool: Pool): Router {
       throw new UnauthorizedError({ detail: 'Usuario no encontrado o sesión caducada.' });
     }
 
+    let roles: string[] = [usuario.rol_codigo ?? 'CIUDADANO'];
+    let permisos: string[] = [];
+    try {
+      const rolesQuery = await pool.query<{ codigo: string }>(
+        `SELECT DISTINCT r.codigo
+           FROM sigd_org.usuario_rol ur
+           JOIN sigd_org.rol_sistema r ON r.rol_id = ur.rol_id
+          WHERE ur.id_usuario = $1
+            AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())
+            AND r.vigente = TRUE`,
+        [claims.sub],
+      );
+      if (rolesQuery.rows.length > 0) {
+        roles = rolesQuery.rows.map((r) => r.codigo);
+      }
+
+      const permisosQuery = await pool.query<{ codigo: string }>(
+        `SELECT DISTINCT p.codigo
+           FROM sigd_org.usuario_rol ur
+           JOIN sigd_org.rol_permiso rp ON rp.rol_id = ur.rol_id
+           JOIN sigd_org.permiso_sistema p ON p.permiso_id = rp.permiso_id
+          WHERE ur.id_usuario = $1
+            AND (ur.vigente_hasta IS NULL OR ur.vigente_hasta > now())`,
+        [claims.sub],
+      );
+      permisos = permisosQuery.rows.map((p) => p.codigo);
+    } catch {
+      // Ignorar si falla lectura extendida
+    }
+
+    const rolEfectivo = roles.includes('ADMINISTRADOR')
+      ? 'ADMINISTRADOR'
+      : (usuario.rol_codigo ?? roles[0] ?? 'CIUDADANO');
+
     res.status(200).json({
       id: usuario.id_usuario,
       usuario: usuario.usuario,
       username: usuario.usuario,
       nombreCompleto: usuario.nombre_completo,
       correo: usuario.correo,
-      rol: usuario.rol_codigo,
-      areaId: usuario.area_id,
-      cargoId: usuario.cargo_id,
-      telefono: usuario.telefono,
+      rol: rolEfectivo,
+      roles: roles,
+      permisos: permisos,
+      firmaElectronicaHabilitada: usuario.firma_electronica_habilitada ?? true,
+      areaId: usuario.area_id ?? null,
+      cargoId: usuario.cargo_id ?? null,
+      telefono: usuario.telefono ?? null,
     });
   };
 

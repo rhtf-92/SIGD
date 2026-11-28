@@ -136,11 +136,31 @@ export default function BandejaExpedientesPage() {
             ← Volver al inicio
           </button>
 
-          <p className="text-sm font-bold text-blue-700">SIGD · IESTP "Suiza"</p>
-          <h1 className="text-2xl font-bold">Bandeja de Trabajo Diario</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Gestión operativa de expedientes, semáforo SLA de 30 días LPAG y taxonomía archivística CCD.
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold text-blue-700">SIGD · IESTP "Suiza"</p>
+              <h1 className="text-2xl font-bold">Bandeja de Trabajo Diario</h1>
+              <p className="mt-1 text-sm text-slate-500">
+                Gestión operativa de expedientes, semáforo SLA de 30 días LPAG y taxonomía archivística CCD.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigate("/ventanilla")}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-800 transition"
+              >
+                + Radicar en Ventanilla
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/administracion/atencion")}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+              >
+                🔍 Atención por CUT
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 

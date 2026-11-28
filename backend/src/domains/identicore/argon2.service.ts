@@ -30,6 +30,14 @@ async function getArgon2Module(): Promise<Argon2NativeModule | null> {
   if (argon2ModuleCache !== undefined) {
     return argon2ModuleCache;
   }
+  if (
+    process.env.ARGON2_FORCE_FALLBACK === 'true' ||
+    process.env.DISABLE_NATIVE_ARGON2 === 'true' ||
+    process.env.SIGD_USE_FALLBACK_CRYPTO === 'true'
+  ) {
+    argon2ModuleCache = null;
+    return null;
+  }
   try {
     const mod = await import('argon2');
     argon2ModuleCache = (mod.default ?? mod) as Argon2NativeModule;

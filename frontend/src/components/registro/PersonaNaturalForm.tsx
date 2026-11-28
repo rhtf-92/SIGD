@@ -26,27 +26,29 @@ export default function PersonaNaturalForm({
     formState: { errors, isSubmitting },
   } = useForm<Natural>({
     resolver: zodResolver(naturalSchema),
-    defaultValues: {
-      tipoPersona: "NATURAL",
-      nombres: "",
-      apellidos: "",
-      fechaNacimiento: "",
-      correo: "",
-      celular: "",
-      tipoDocumento: "DNI",
-      numeroDocumento: "",
-      domicilio: {
-        departamentoCodigo: "25",
-        provinciaCodigo: "2501",
-        distritoCodigo: "",
-        direccionExacta: "",
-        referencia: "",
+      defaultValues: {
+        tipoPersona: "NATURAL",
+        nombres: "",
+        apellidos: "",
+        fechaNacimiento: "",
+        correo: "",
+        celular: "",
+        tipoDocumento: "DNI",
+        numeroDocumento: "",
+        domicilio: {
+          departamentoCodigo: "25",
+          provinciaCodigo: "2501",
+          distritoCodigo: "",
+          direccionExacta: "",
+          referencia: "",
+        },
+        declaracionJuradaAceptada: false,
+        consentimientoLey29733: false,
+        version: "1.0",
+        fechaAceptacion: "",
+        password: "",
+        confirmarPassword: "",
       },
-      declaracionJuradaAceptada: false,
-      consentimientoLey29733: false,
-      version: "1.0",
-      fechaAceptacion: "",
-    },
   });
 
   const domicilioValue = watch("domicilio");
@@ -78,7 +80,7 @@ export default function PersonaNaturalForm({
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="space-y-6"
+      className="sigd-form space-y-6"
       noValidate
     >
       {/* Tipo de Documento y Número de Documento */}
@@ -96,7 +98,6 @@ export default function PersonaNaturalForm({
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-[#006EC7] focus:border-[#006EC7] outline-none"
           >
             <option value="DNI">DNI</option>
-            <option value="CE">CE</option>
           </select>
           {errors.tipoDocumento && (
             <p className="mt-1 text-xs text-red-600 font-medium">
@@ -119,7 +120,7 @@ export default function PersonaNaturalForm({
             className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
               errors.numeroDocumento ? "border-red-500" : "border-gray-300"
             }`}
-            placeholder="DNI: 8 dígitos o CE: 9-12 caracteres"
+            placeholder="DNI: 8 dígitos"
           />
           {errors.numeroDocumento && (
             <p className="mt-1 text-xs text-red-600 font-medium">
@@ -247,12 +248,72 @@ export default function PersonaNaturalForm({
         )}
       </div>
 
+      {/* Contraseña */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label
+            htmlFor="password"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Contraseña *
+          </label>
+          <input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            {...register("password")}
+            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
+              errors.password ? "border-red-500" : "border-gray-300"
+            }`}
+          />
+          {errors.password && (
+            <p className="mt-1 text-xs text-red-600 font-medium">
+              {errors.password.message}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label
+            htmlFor="confirmarPassword"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Confirmar contraseña *
+          </label>
+          <input
+            id="confirmarPassword"
+            type="password"
+            autoComplete="new-password"
+            {...register("confirmarPassword")}
+            className={`w-full px-3 py-2 text-sm border rounded-md focus:ring-2 focus:ring-[#006EC7] outline-none ${
+              errors.confirmarPassword ? "border-red-500" : "border-gray-300"
+            }`}
+          />
+          {errors.confirmarPassword && (
+            <p className="mt-1 text-xs text-red-600 font-medium">
+              {errors.confirmarPassword.message}
+            </p>
+          )}
+        </div>
+      </div>
+
       {/* Sección de Domicilio */}
       <UbigeoSelector
         initialProvinciaId={domicilioValue.provinciaCodigo}
         initialDistritoId={domicilioValue.distritoCodigo}
         onChange={handleUbigeoChange}
       />
+      <input
+        {...register("domicilio.distritoCodigo")}
+        style={{ display: "none" }}
+        aria-hidden="true"
+        tabIndex={-1}
+      />
+      {errors.domicilio?.distritoCodigo && (
+        <p className="mt-1 text-xs text-red-600 font-medium">
+          {errors.domicilio.distritoCodigo.message}
+        </p>
+      )}
 
       {/* Dirección Exacta */}
       <div>

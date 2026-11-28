@@ -117,6 +117,7 @@ export interface DocumentosData {
   asunto: string;
   numeroFolios: number;
   archivos: ArchivoTramite[];
+  noRequiereDocumentos?: boolean;
 }
 
 /**
@@ -141,6 +142,7 @@ export interface CargoDigitalResponse {
   remitente: string;
   hashTransaccion: string;
   qrValidationUrl: string;
+  totalFolios?: number;
 }
 
 /**
@@ -190,6 +192,7 @@ export const INITIAL_DOCUMENTOS: DocumentosData = {
   asunto: '',
   numeroFolios: 1,
   archivos: [],
+  noRequiereDocumentos: false,
 };
 
 /**

@@ -67,7 +67,7 @@ export default function CargoDigitalModal({
   const tipoDoc = isDigitalResponse ? "DOC" : cargo.solicitante.tipoDocumento;
   const numDoc = isDigitalResponse ? "" : cargo.solicitante.numeroDocumento;
   const asunto = cargo.asunto;
-  const folios = isDigitalResponse ? 1 : cargo.cantidadFolios;
+  const folios = isDigitalResponse ? (cargo.totalFolios ?? 0) : cargo.cantidadFolios;
   const docPrincipalTipo = isDigitalResponse ? "SOLICITUD DIGITAL" : cargo.documentoPrincipalTipo;
   const horaRecepcion = isDigitalResponse
     ? cargo.fechaRecepcionOficial
@@ -83,6 +83,20 @@ export default function CargoDigitalModal({
     : cargo.hashSha256Recepcion;
   const radicadoDiaSiguiente = !isDigitalResponse && cargo.radicadoDiaSiguiente;
   const horaCorteAplicada = !isDigitalResponse ? cargo.horaCorteAplicada : "16:30";
+
+function formatoLima(fechaISO: string | null | undefined): string {
+  if (!fechaISO) return 'No registrado';
+  const d = new Date(fechaISO);
+  if (isNaN(d.getTime())) return fechaISO;
+  return new Intl.DateTimeFormat('es-PE', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d);
+}
 
   function handleImprimirTicket() {
     window.print();
@@ -126,7 +140,7 @@ export default function CargoDigitalModal({
             <h3 id="titulo-cargo-modal" className="text-sm font-bold text-slate-900">
               Cargo de Recepción Digital (CUT)
             </h3>
-            <p className="text-xs text-slate-500">Mesa de Partes / Ventanilla Presencial</p>
+            <p className="text-xs text-slate-500">Mesa de Partes Virtual</p>
           </div>
           <button
             type="button"
@@ -145,7 +159,6 @@ export default function CargoDigitalModal({
             <p className="font-bold text-sm tracking-wide">IESTP &ldquo;SUIZA&rdquo;</p>
             <p className="text-[10px] text-slate-600">PUCALLPA — UCAYALI</p>
             <p className="text-[9px] text-slate-500 mt-0.5">Mesa de Partes y Trámite Documentario</p>
-            <p className="text-[9px] text-slate-500">RUC: 20131312955</p>
           </div>
 
           {/* Código CUT Destacado */}
@@ -165,7 +178,7 @@ export default function CargoDigitalModal({
             />
           </div>
           <p className="text-center text-[9px] text-slate-500">
-            Escanee para consultar estado en línea 24/7
+            Código de cargo digital. Consulte su trámite en la página de consulta con el CUT.
           </p>
 
           {/* Datos del Trámite */}
@@ -191,7 +204,7 @@ export default function CargoDigitalModal({
             </p>
             <p>
               <span className="font-bold">Fecha / Hora:</span>{" "}
-              {horaRecepcion}
+              {formatoLima(horaRecepcion)}
             </p>
             <p>
               <span className="font-bold">Operador:</span>{" "}

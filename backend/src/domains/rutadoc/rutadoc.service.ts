@@ -3,10 +3,26 @@ import { ESTADOS_POR_PESTANA, type ActorRutaDoc, type ContadoresRutaDoc, type Fi
 import { codificarCursor, decodificarCursor } from './rutadoc.cursor.js';
 import type { RepositorioRutaDoc } from './rutadoc.repository.js';
 
-const ROLES_BANDEJA = new Set(['DOCENTE', 'DIRECTOR', 'MESA_PARTES', 'SUPER_ADMIN']);
+const ROLES_BANDEJA = new Set([
+  'ADMINISTRADOR',
+  'DIRECTOR',
+  'SECRETARIO',
+  'ESPECIALISTA',
+  'MESA_PARTES',
+  'DOCENTE',
+  'SUPER_ADMIN',
+]);
 
 export class ServicioRutaDoc {
   constructor(private readonly repositorio: RepositorioRutaDoc) {}
+
+  async listarBandejaFrontend(actor: ActorRutaDoc): Promise<unknown[]> {
+    if (!actor.roles.some((rol) => ROLES_BANDEJA.has(rol))) throw new ForbiddenError();
+    if (this.repositorio.listarBandejaFrontend) {
+      return this.repositorio.listarBandejaFrontend();
+    }
+    return [];
+  }
 
   async listar(filtros: FiltrosRutaDoc, actor: ActorRutaDoc): Promise<ResultadoBandeja> {
     if (!actor.roles.some((rol) => ROLES_BANDEJA.has(rol))) throw new ForbiddenError();

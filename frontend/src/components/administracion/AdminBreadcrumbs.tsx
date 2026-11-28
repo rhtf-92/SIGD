@@ -9,6 +9,7 @@ export const ETIQUETAS_ADMIN: Record<string, string> = {
   "tablas-maestras": "Tablas Maestras",
   "calendario-laboral": "Calendario Laboral",
   seguridad: "Seguridad",
+    atencion: "Atención de expedientes",
 };
 
 interface Miga {
@@ -22,7 +23,7 @@ export default function AdminBreadcrumbs() {
 
   const segmentos = location.pathname.split("/").filter(Boolean);
 
-  const migas: Miga[] =
+    const todasLasMigas: Miga[] =
     segmentos.length === 0
       ? [{ etiqueta: "Panel de Administración", ruta: "/administracion", actual: true }]
       : segmentos.map((segmento, indice) => {
@@ -36,6 +37,12 @@ export default function AdminBreadcrumbs() {
             actual: indice === segmentos.length - 1,
           };
         });
+          const rolSesion = window.localStorage.getItem("sigd_rol") ?? "";
+  const ocultarPanel =
+    rolSesion !== "" && rolSesion !== "ADMINISTRADOR" && rolSesion !== "DIRECTOR";
+  const migas = ocultarPanel
+    ? todasLasMigas.filter((miga) => miga.ruta !== "/administracion")
+    : todasLasMigas;
 
   if (migas.length === 0) return null;
 
